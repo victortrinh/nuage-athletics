@@ -1,0 +1,25 @@
+---
+import { LOCALES, type Locale } from '../i18n/config'
+import { route, type RouteId } from '../i18n/utils'
+import { t } from '../i18n/ui'
+
+interface Props {
+  locale: Locale
+  routeId: RouteId
+}
+const { locale, routeId } = Astro.props
+const other = LOCALES.find((l) => l !== locale)!
+---
+
+<!--
+  Bill 96: the French version must be at least as easy to reach as any other.
+  Keep this control visible in the header — not buried in a footer.
+-->
+<a
+  href={route(routeId, other)}
+  hreflang={other}
+  rel="alternate"
+  class="text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100"
+>
+  {t(locale).switchTo}
+</a>
