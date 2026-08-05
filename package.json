@@ -1,0 +1,36 @@
+{
+  "name": "nuage-athletics",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "wrangler dev",
+    "check": "tsc --noEmit",
+    "deploy": "astro build && wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "db:create": "wrangler d1 create nuage-athletics",
+    "db:migrate:local": "wrangler d1 migrations apply nuage-athletics --local",
+    "db:migrate:remote": "wrangler d1 migrations apply nuage-athletics --remote",
+    "db:subscribers": "wrangler d1 execute nuage-athletics --remote --command \"SELECT email, locale, status, datetime(consented_at/1000,'unixepoch') AS consented FROM subscribers ORDER BY created_at DESC LIMIT 50\""
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.1.7",
+    "@astrojs/react": "^6.0.2",
+    "@astrojs/sitemap": "^3.7.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.1.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260804.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.42.0"
+  }
+}

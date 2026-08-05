@@ -1,0 +1,35 @@
+# Cloudflare Workers (static assets + SSR endpoints).
+# Astro 7's Cloudflare adapter targets Workers, not Pages — do not add
+# `pages_build_output_dir`, it makes wrangler treat this as a Pages project
+# and the reserved ASSETS binding then fails the build.
+
+name = "nuage-athletics"
+compatibility_date = "2025-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nuage-athletics"
+database_id = "REPLACE_ME"   # wrangler d1 create nuage-athletics
+migrations_dir = "migrations"
+
+[vars]
+PUBLIC_SITE_URL = "https://nuageathletics.com"
+PUBLIC_TURNSTILE_SITE_KEY = "1x00000000000000000000AA"  # Cloudflare test key: always passes
+
+# Secrets — set with `wrangler secret put <NAME>`, never commit:
+#   RESEND_API_KEY
+#   TURNSTILE_SECRET_KEY
+#   STRIPE_SECRET_KEY        (phase 2)
+#   STRIPE_WEBHOOK_SECRET    (phase 2)
+
+# The Cloudflare adapter enables Astro sessions backed by KV and expects a
+# "SESSION" binding. Create one before the first deploy:
+#   wrangler kv namespace create SESSION
+# then uncomment and fill in the id.
+# [[kv_namespaces]]
+# binding = "SESSION"
+# id = "REPLACE_ME"
