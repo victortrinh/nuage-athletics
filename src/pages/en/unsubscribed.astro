@@ -1,0 +1,14 @@
+---
+import Base from '../../layouts/Base.astro'
+import { t } from '../../i18n/ui'
+
+const locale = 'en-CA' as const
+const d = t(locale)
+---
+
+<Base {locale} routeId="unsubscribed" title={d.unsubTitle} description={d.unsubBody} noindex>
+  <section class="max-w-xl py-24">
+    <h1 class="text-3xl font-semibold tracking-tight">{d.unsubTitle}</h1>
+    <p class="mt-4 opacity-70">{d.unsubBody}</p>
+  </section>
+</Base>

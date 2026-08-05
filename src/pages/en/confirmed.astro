@@ -1,0 +1,14 @@
+---
+import Base from '../../layouts/Base.astro'
+import { t } from '../../i18n/ui'
+
+const locale = 'en-CA' as const
+const d = t(locale)
+---
+
+<Base {locale} routeId="confirmed" title={d.confirmTitle} description={d.confirmBody} noindex>
+  <section class="max-w-xl py-24">
+    <h1 class="text-3xl font-semibold tracking-tight">{d.confirmTitle}</h1>
+    <p class="mt-4 opacity-70">{d.confirmBody}</p>
+  </section>
+</Base>
