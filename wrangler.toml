@@ -27,9 +27,7 @@ PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAEHjCji09tkyDdAX"
 #   STRIPE_WEBHOOK_SECRET    (phase 2)
 
 # The Cloudflare adapter enables Astro sessions backed by KV and expects a
-# "SESSION" binding. Create one before the first deploy:
-#   wrangler kv namespace create SESSION
-# then uncomment and fill in the id.
-# [[kv_namespaces]]
-# binding = "SESSION"
-# id = "REPLACE_ME"
+# "SESSION" binding.
+[[kv_namespaces]]
+binding = "SESSION"
+id = "f23256bb893b4d8f81062c7fe55fac1f"
