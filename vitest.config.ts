@@ -16,5 +16,8 @@ export default defineConfig({
   ],
   test: {
     setupFiles: ['./test/apply-migrations.ts'],
+    // Default excludes don't cover nested worktrees under .worktrees/, whose
+    // own test/ directories would otherwise be discovered and run twice.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**'],
   },
 })
