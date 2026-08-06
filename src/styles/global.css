@@ -3,8 +3,23 @@
 @theme {
   --color-ink: #0a0a0a;
   --color-paper: #fafafa;
+  /* The one accent: everything else on the site stays ink/paper. */
+  --color-accent: #4f7cff;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  /* Wordmark + headings only — reads closest to Futura Bold Oblique without
+     shipping a webfont. Falls back through other geometric sans before the
+     system default. */
+  --font-display: Futura, "Century Gothic", "Avenir Next", var(--font-sans);
 }
 
 html { -webkit-text-size-adjust: 100%; }
 body { background: var(--color-ink); color: var(--color-paper); }
+
+/* The one wordmark treatment, used for the brand mark and page headings —
+   nothing else on the site carries a display typeface. */
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}

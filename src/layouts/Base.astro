@@ -27,7 +27,7 @@ const year = new Date().getFullYear()
   </head>
   <body class="min-h-dvh flex flex-col font-sans antialiased">
     <header class="flex items-center justify-between px-6 py-6 sm:px-10">
-      <a href={route('home', locale)} class="text-xs tracking-[0.25em] uppercase">
+      <a href={route('home', locale)} class="wordmark text-sm uppercase hover:text-accent">
         {d.brand}
       </a>
       <LocaleSwitcher {locale} {routeId} />
@@ -39,9 +39,9 @@ const year = new Date().getFullYear()
 
     <footer class="px-6 py-10 sm:px-10 text-xs opacity-60">
       <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
-        <a href={route('privacy', locale)} class="hover:opacity-100">{d.privacy}</a>
-        <a href={route('terms', locale)} class="hover:opacity-100">{d.terms}</a>
-        <a href="mailto:hello@nuageathletics.com" class="hover:opacity-100">{d.contact}</a>
+        <a href={route('privacy', locale)} class="hover:text-accent">{d.privacy}</a>
+        <a href={route('terms', locale)} class="hover:text-accent">{d.terms}</a>
+        <a href="mailto:hello@nuageathletics.com" class="hover:text-accent">{d.contact}</a>
       </nav>
       <p>© {year} {d.brand}. {d.rights}</p>
     </footer>
