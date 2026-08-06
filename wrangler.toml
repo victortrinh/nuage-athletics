@@ -18,7 +18,7 @@ migrations_dir = "migrations"
 
 [vars]
 PUBLIC_SITE_URL = "https://nuageathletics.com"
-PUBLIC_TURNSTILE_SITE_KEY = "1x00000000000000000000AA"  # Cloudflare test key: always passes
+PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAEHjCji09tkyDdAX"
 
 # Secrets — set with `wrangler secret put <NAME>`, never commit:
 #   RESEND_API_KEY
@@ -27,9 +27,7 @@ PUBLIC_TURNSTILE_SITE_KEY = "1x00000000000000000000AA"  # Cloudflare test key: a
 #   STRIPE_WEBHOOK_SECRET    (phase 2)
 
 # The Cloudflare adapter enables Astro sessions backed by KV and expects a
-# "SESSION" binding. Create one before the first deploy:
-#   wrangler kv namespace create SESSION
-# then uncomment and fill in the id.
-# [[kv_namespaces]]
-# binding = "SESSION"
-# id = "REPLACE_ME"
+# "SESSION" binding.
+[[kv_namespaces]]
+binding = "SESSION"
+id = "f23256bb893b4d8f81062c7fe55fac1f"

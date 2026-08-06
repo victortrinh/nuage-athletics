@@ -106,7 +106,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
         placeholder={d.emailPlaceholder}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mt-2 w-full bg-transparent border-b border-white/30 py-2 text-base outline-none focus:border-white transition-colors"
+        className="mt-2 w-full bg-transparent border-b border-white/30 py-2 text-base outline-none focus:border-accent transition-colors"
       />
 
       {/*

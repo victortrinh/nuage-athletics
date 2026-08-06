@@ -1,5 +1,10 @@
 ---
+// BROUILLON — en attente de révision juridique avant le lancement commercial.
+// Portée volontairement limitée à un site vitrine / liste d'attente : les
+// divulgations propres aux contrats à distance (Loi sur la protection du
+// consommateur) seront ajoutées lorsque la vente en ligne sera activée.
 import Base from '../layouts/Base.astro'
+import { SENDER_IDENTITY } from '../lib/consent'
 
 const locale = 'fr-CA' as const
 ---
@@ -8,13 +13,86 @@ const locale = 'fr-CA' as const
   {locale}
   routeId="terms"
   title="Conditions d'utilisation — Nuage Athletics"
-  description="Conditions d'utilisation"
+  description="Conditions d'utilisation de Nuage Athletics"
   noindex
 >
-  <section class="max-w-2xl py-24 prose-invert">
-    <h1 class="text-3xl font-semibold tracking-tight">Conditions d'utilisation</h1>
-    <p class="mt-6 opacity-70">
-      PLACEHOLDER — à rédiger avant toute vente. Contrats à distance au Québec : la Loi sur la protection du consommateur impose des divulgations précises avant la conclusion du contrat.
-    </p>
+  <section class="max-w-2xl py-24 prose-invert space-y-8 text-sm leading-relaxed opacity-90">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight opacity-100">Conditions d'utilisation</h1>
+      <p class="mt-3 text-xs uppercase tracking-wide text-amber-400">
+        Brouillon — en attente de révision juridique. Ne reflète pas nécessairement le texte final.
+      </p>
+      <p class="mt-4 opacity-70">Dernière mise à jour : 5 août 2026</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Portée</h2>
+      <p class="mt-2">
+        Ce site sert actuellement à annoncer le lancement de la première collection de{' '}
+        {SENDER_IDENTITY.name} et à recueillir des inscriptions à notre liste de diffusion.
+        Aucune vente n'est effectuée sur ce site pour le moment. Lorsque la vente en ligne sera
+        activée, ces conditions seront mises à jour pour inclure les divulgations propres aux
+        contrats à distance exigées par la Loi sur la protection du consommateur du Québec.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Acceptation</h2>
+      <p class="mt-2">
+        En consultant ou en utilisant ce site, vous acceptez les présentes conditions. Si vous
+        n'êtes pas d'accord, veuillez ne pas utiliser le site.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Propriété intellectuelle</h2>
+      <p class="mt-2">
+        Le contenu de ce site (textes, marque, mise en page) appartient à {SENDER_IDENTITY.name}
+        ou est utilisé avec permission. Vous ne pouvez pas le reproduire ou le redistribuer sans
+        notre autorisation écrite préalable.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Aucune garantie</h2>
+      <p class="mt-2">
+        Ce site est fourni « tel quel », sans garantie d'aucune sorte, dans la mesure permise par
+        la loi. Nous ne garantissons pas que le site sera exempt d'erreurs ou disponible en tout
+        temps.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Limitation de responsabilité</h2>
+      <p class="mt-2">
+        Dans la mesure permise par la loi, {SENDER_IDENTITY.name} ne pourra être tenue responsable
+        de dommages indirects, accessoires ou consécutifs découlant de l'utilisation de ce site.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Droit applicable</h2>
+      <p class="mt-2">
+        Les présentes conditions sont régies par les lois de la province de Québec et les lois
+        fédérales du Canada qui s'y appliquent.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Modifications</h2>
+      <p class="mt-2">
+        Nous pouvons mettre à jour ces conditions à l'occasion, notamment lors de l'activation de
+        la vente en ligne. La date de la dernière mise à jour figure en haut de cette page.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Contact</h2>
+      <p class="mt-2">
+        {SENDER_IDENTITY.name}<br />
+        {SENDER_IDENTITY.address}<br />
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>
+      </p>
+    </div>
   </section>
 </Base>

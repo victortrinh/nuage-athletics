@@ -1,5 +1,8 @@
 ---
+// DRAFT — pending legal review before commercial launch.
+// Do not remove this notice until a lawyer has approved the text.
 import Base from '../../layouts/Base.astro'
+import { SENDER_IDENTITY } from '../../lib/consent'
 
 const locale = 'en-CA' as const
 ---
@@ -8,13 +11,113 @@ const locale = 'en-CA' as const
   {locale}
   routeId="privacy"
   title="Privacy Policy — Nuage Athletics"
-  description="Privacy Policy"
+  description="Nuage Athletics privacy policy"
   noindex
 >
-  <section class="max-w-2xl py-24 prose-invert">
-    <h1 class="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-    <p class="mt-6 opacity-70">
-      PLACEHOLDER — draft and have reviewed before commercial launch. Must cover: data collected, purpose, retention, CASL (consent and withdrawal), Quebec Law 25, and privacy officer contact details.
-    </p>
+  <section class="max-w-2xl py-24 prose-invert space-y-8 text-sm leading-relaxed opacity-90">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight opacity-100">Privacy Policy</h1>
+      <p class="mt-3 text-xs uppercase tracking-wide text-amber-400">
+        Draft — pending legal review. May not reflect the final text.
+      </p>
+      <p class="mt-4 opacity-70">Last updated: August 5, 2026</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Who we are</h2>
+      <p class="mt-2">
+        {SENDER_IDENTITY.name} runs this site to announce the launch of its first collection of
+        technical apparel made in Canada. For any question about this policy, write to us at{' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Information we collect</h2>
+      <p class="mt-2">When you sign up for our emails, we collect:</p>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>your email address;</li>
+        <li>your IP address;</li>
+        <li>technical browser information (user agent);</li>
+        <li>the language you signed up in (French or English);</li>
+        <li>the page that referred you to the site, if any;</li>
+        <li>the timestamp and exact wording of the consent you gave.</li>
+      </ul>
+      <p class="mt-2">
+        We do not collect any financial or payment information: the site does not currently
+        process any sales.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Why we collect it</h2>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>To send you the emails you consented to (release announcements, brand news);</li>
+        <li>To prevent abuse and automated signups (rate limiting, Cloudflare Turnstile bot verification);</li>
+        <li>
+          To keep proof of the express consent required by Canada's Anti-Spam Legislation
+          (CASL) — the burden of proving consent falls on us, not you.
+        </li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Your consent</h2>
+      <p class="mt-2">
+        We never infer your consent: the checkbox at signup is never pre-checked. You can
+        withdraw your consent at any time by clicking the unsubscribe link in any email we send,
+        at no cost and without needing to give a reason.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Who we share it with</h2>
+      <p class="mt-2">We use the following processors to run the site:</p>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>Cloudflare (hosting, infrastructure, database, Turnstile bot verification);</li>
+        <li>Resend (sending transactional and marketing emails).</li>
+      </ul>
+      <p class="mt-2">We do not sell or rent your personal information to third parties for marketing purposes.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Retention</h2>
+      <p class="mt-2">
+        We keep your subscriber record, including your IP address and the text of your consent,
+        for as long as necessary to demonstrate the consent CASL requires, or until you exercise
+        the rights described below. Withdrawing consent (unsubscribing) stops emails going out;
+        some minimal information may be kept longer to demonstrate that the withdrawal was
+        honoured.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Your rights (Quebec's Law 25)</h2>
+      <p class="mt-2">Subject to legal exceptions, you have the right to:</p>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>access the personal information we hold about you;</li>
+        <li>have it corrected if it is inaccurate, incomplete, or ambiguous;</li>
+        <li>withdraw your consent to its use;</li>
+        <li>file a complaint with Quebec's Commission d'accès à l'information.</li>
+      </ul>
+      <p class="mt-2">To exercise these rights, write to the privacy officer below.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Privacy officer</h2>
+      <p class="mt-2">
+        {SENDER_IDENTITY.name}<br />
+        {SENDER_IDENTITY.address}<br />
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Changes</h2>
+      <p class="mt-2">
+        We may update this policy from time to time. The last-updated date at the top of this
+        page reflects the most recent change.
+      </p>
+    </div>
   </section>
 </Base>
