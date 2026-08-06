@@ -1,5 +1,8 @@
 ---
+// BROUILLON — en attente de révision juridique avant le lancement commercial.
+// Ne pas retirer cet avis avant qu'un·e avocat·e ait approuvé le texte.
 import Base from '../layouts/Base.astro'
+import { SENDER_IDENTITY } from '../lib/consent'
 
 const locale = 'fr-CA' as const
 ---
@@ -8,13 +11,120 @@ const locale = 'fr-CA' as const
   {locale}
   routeId="privacy"
   title="Politique de confidentialité — Nuage Athletics"
-  description="Politique de confidentialité"
+  description="Politique de confidentialité de Nuage Athletics"
   noindex
 >
-  <section class="max-w-2xl py-24 prose-invert">
-    <h1 class="text-3xl font-semibold tracking-tight">Politique de confidentialité</h1>
-    <p class="mt-6 opacity-70">
-      PLACEHOLDER — à rédiger et à faire réviser avant le lancement commercial. Doit couvrir : renseignements collectés, finalité, conservation, LCAP (consentement, retrait), Loi 25 (Québec) et coordonnées du responsable de la protection des renseignements personnels.
-    </p>
+  <section class="max-w-2xl py-24 prose-invert space-y-8 text-sm leading-relaxed opacity-90">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight opacity-100">Politique de confidentialité</h1>
+      <p class="mt-3 text-xs uppercase tracking-wide text-amber-400">
+        Brouillon — en attente de révision juridique. Ne reflète pas nécessairement le texte final.
+      </p>
+      <p class="mt-4 opacity-70">Dernière mise à jour : 5 août 2026</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Qui nous sommes</h2>
+      <p class="mt-2">
+        {SENDER_IDENTITY.name} exploite ce site pour faire connaître le lancement de sa première
+        collection de vêtements techniques fabriqués au Canada. Pour toute question relative à la
+        présente politique, écrivez-nous à{' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Renseignements que nous recueillons</h2>
+      <p class="mt-2">Lorsque vous vous inscrivez à nos courriels, nous recueillons :</p>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>votre adresse courriel;</li>
+        <li>votre adresse IP;</li>
+        <li>les informations techniques de votre navigateur (user agent);</li>
+        <li>la langue d'inscription (français ou anglais);</li>
+        <li>la page qui vous a référé vers le site, le cas échéant;</li>
+        <li>l'horodatage et le texte exact du consentement que vous avez donné.</li>
+      </ul>
+      <p class="mt-2">
+        Nous ne recueillons aucun renseignement financier ou de paiement : le site n'effectue
+        actuellement aucune vente.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Pourquoi nous les recueillons</h2>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>Vous envoyer les courriels auxquels vous avez consenti (annonces de sorties, nouvelles de la marque);</li>
+        <li>Prévenir les abus et les inscriptions automatisées (limitation de débit, vérification anti-robot Cloudflare Turnstile);</li>
+        <li>
+          Conserver la preuve du consentement exprès que la Loi canadienne anti-pourriel (LCAP)
+          exige — le fardeau de la preuve du consentement repose sur nous, pas sur vous.
+        </li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Votre consentement</h2>
+      <p class="mt-2">
+        Nous ne présumons jamais votre consentement : la case à cocher au moment de l'inscription
+        n'est jamais précochée. Vous pouvez retirer votre consentement en tout temps en cliquant
+        sur le lien de désabonnement présent dans chaque courriel, sans frais et sans justification.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Avec qui nous les partageons</h2>
+      <p class="mt-2">Nous faisons appel aux sous-traitants suivants pour exploiter le site :</p>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>Cloudflare (hébergement, infrastructure, base de données, vérification anti-robot Turnstile);</li>
+        <li>Resend (envoi des courriels transactionnels et de marketing).</li>
+      </ul>
+      <p class="mt-2">
+        Nous ne vendons ni ne louons vos renseignements personnels à des tiers à des fins de
+        marketing.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Conservation</h2>
+      <p class="mt-2">
+        Nous conservons votre dossier d'abonné, y compris l'adresse IP et le texte du consentement,
+        aussi longtemps que nécessaire pour faire la preuve du consentement exigée par la LCAP,
+        ou jusqu'à ce que vous exerciez vos droits ci-dessous. Le retrait de votre consentement
+        (désabonnement) met fin à l'envoi de courriels; certains renseignements minimaux peuvent
+        être conservés plus longtemps afin de démontrer que le retrait a bien été respecté.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Vos droits (Loi 25 — Québec)</h2>
+      <p class="mt-2">Sous réserve des exceptions prévues par la loi, vous avez le droit :</p>
+      <ul class="mt-2 list-disc pl-5 space-y-1">
+        <li>d'accéder aux renseignements personnels que nous détenons à votre sujet;</li>
+        <li>de les faire rectifier s'ils sont inexacts, incomplets ou équivoques;</li>
+        <li>de retirer votre consentement à leur utilisation;</li>
+        <li>de déposer une plainte auprès de la Commission d'accès à l'information du Québec.</li>
+      </ul>
+      <p class="mt-2">
+        Pour exercer ces droits, écrivez au responsable de la protection des renseignements
+        personnels ci-dessous.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Responsable de la protection des renseignements personnels</h2>
+      <p class="mt-2">
+        {SENDER_IDENTITY.name}<br />
+        {SENDER_IDENTITY.address}<br />
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Modifications</h2>
+      <p class="mt-2">
+        Nous pouvons mettre à jour cette politique à l'occasion. La date de la dernière mise à
+        jour figure en haut de cette page.
+      </p>
+    </div>
   </section>
 </Base>
