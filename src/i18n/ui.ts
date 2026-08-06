@@ -37,6 +37,15 @@ export type Dict = {
   mailCta: string
   mailIgnore: string
   mailUnsub: string
+  // product / checkout
+  productSizeLabel: string
+  productOutOfStock: string
+  productBuy: string
+  productSelectSizeError: string
+  orderConfirmedTitle: string
+  orderConfirmedBody: string
+  orderCancelledTitle: string
+  orderCancelledBody: string
 }
 
 export const UI: Record<Locale, Dict> = {
@@ -75,6 +84,15 @@ export const UI: Record<Locale, Dict> = {
     mailIgnore:
       "Si vous n'avez pas demandé cette inscription, ignorez simplement ce courriel.",
     mailUnsub: 'Se désabonner',
+    productSizeLabel: 'Taille',
+    productOutOfStock: 'Épuisé',
+    productBuy: 'Acheter',
+    productSelectSizeError: 'Choisissez une taille.',
+    orderConfirmedTitle: 'Commande confirmée',
+    orderConfirmedBody:
+      'Merci pour votre commande. Un courriel de confirmation vous a été envoyé.',
+    orderCancelledTitle: 'Commande annulée',
+    orderCancelledBody: "Votre commande n'a pas été complétée. Aucun montant n'a été prélevé.",
   },
   'en-CA': {
     brand: 'Nuage Athletics',
@@ -110,6 +128,14 @@ export const UI: Record<Locale, Dict> = {
     mailCta: 'Confirm my signup',
     mailIgnore: "If you didn't request this, you can safely ignore this email.",
     mailUnsub: 'Unsubscribe',
+    productSizeLabel: 'Size',
+    productOutOfStock: 'Out of stock',
+    productBuy: 'Buy now',
+    productSelectSizeError: 'Choose a size.',
+    orderConfirmedTitle: 'Order confirmed',
+    orderConfirmedBody: 'Thanks for your order. A confirmation email is on its way.',
+    orderCancelledTitle: 'Order cancelled',
+    orderCancelledBody: 'Your order was not completed. You have not been charged.',
   },
 }
 

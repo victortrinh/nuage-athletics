@@ -1,0 +1,71 @@
+---
+import { env } from 'cloudflare:workers'
+import Base from '../../layouts/Base.astro'
+import BuyButton from '../../components/BuyButton.tsx'
+import CpaDisclosure from '../../components/CpaDisclosure.astro'
+import { t } from '../../i18n/ui.ts'
+import { getCommerce, commerceEnabled } from '../../lib/commerce/index.ts'
+import { productAlternates, productPath } from '../../i18n/utils.ts'
+
+export const prerender = false
+
+if (!commerceEnabled(env)) {
+  return new Response('Not found', { status: 404 })
+}
+
+const locale = 'fr-CA' as const
+const d = t(locale)
+const { slug } = Astro.params
+
+const commerce = getCommerce(env)
+const product = slug ? await commerce.getProduct(slug, locale) : null
+
+if (!product) {
+  return new Response('Not found', { status: 404 })
+}
+
+const alts = productAlternates(product.slugs)
+const priceDisplay = new Intl.NumberFormat('fr-CA', {
+  style: 'currency',
+  currency: product.price.currency,
+}).format(product.price.amount / 100)
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: product.name,
+  description: product.description,
+  image: product.images,
+  offers: {
+    '@type': 'Offer',
+    priceCurrency: product.price.currency,
+    price: (product.price.amount / 100).toFixed(2),
+    availability: product.variants.some((v) => v.inStock)
+      ? 'https://schema.org/InStock'
+      : 'https://schema.org/OutOfStock',
+    url: new URL(productPath(locale, product.slug), Astro.site).href,
+  },
+}
+---
+
+<Base
+  {locale}
+  alternates={alts}
+  localeHref={productPath('en-CA', product.slugs['en-CA'])}
+  title={`${product.name} — Nuage Athletics`}
+  description={product.description}
+>
+  <script type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
+
+  <section class="max-w-2xl py-16 sm:py-28">
+    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight">{product.name}</h1>
+    <p class="mt-4 text-lg opacity-70">{priceDisplay}</p>
+    <p class="mt-6 opacity-80">{product.description}</p>
+
+    <div class="mt-10">
+      <BuyButton client:load {locale} {d} variants={product.variants} />
+    </div>
+
+    <CpaDisclosure {locale} productName={product.name} />
+  </section>
+</Base>

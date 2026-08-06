@@ -8,13 +8,16 @@ import { t } from '../i18n/ui'
 
 interface Props {
   locale: Locale
-  routeId: RouteId
+  routeId?: RouteId
+  alternates?: { locale: Locale; path: string }[]
+  /** Explicit href for the locale-switch link, when routeId isn't usable. */
+  localeHref?: string
   title: string
   description: string
   noindex?: boolean
 }
 
-const { locale, routeId, title, description, noindex } = Astro.props
+const { locale, routeId, alternates, localeHref, title, description, noindex } = Astro.props
 const d = t(locale)
 const year = new Date().getFullYear()
 ---
@@ -22,7 +25,7 @@ const year = new Date().getFullYear()
 <!doctype html>
 <html lang={HTML_LANG[locale]}>
   <head>
-    <Seo {locale} {routeId} {title} {description} {noindex} />
+    <Seo {locale} {routeId} {alternates} {title} {description} {noindex} />
     <slot name="head" />
   </head>
   <body class="min-h-dvh flex flex-col font-sans antialiased">
@@ -30,7 +33,7 @@ const year = new Date().getFullYear()
       <a href={route('home', locale)} class="wordmark text-sm uppercase hover:text-accent">
         {d.brand}
       </a>
-      <LocaleSwitcher {locale} {routeId} />
+      <LocaleSwitcher {locale} {routeId} href={localeHref} />
     </header>
 
     <main class="flex-1 px-6 sm:px-10">

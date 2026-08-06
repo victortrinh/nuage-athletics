@@ -23,6 +23,9 @@ declare namespace Cloudflare {
     // [vars] in wrangler.toml
     PUBLIC_SITE_URL?: string
     PUBLIC_TURNSTILE_SITE_KEY?: string
+    // "true" to expose /produit/*, /en/product/* and /api/checkout. Everything
+    // else returns 404 while this is unset — see src/lib/commerce/index.ts.
+    COMMERCE_ENABLED?: string
   }
 }
 
