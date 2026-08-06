@@ -5,10 +5,16 @@ import { t } from '../i18n/ui'
 
 interface Props {
   locale: Locale
-  routeId: RouteId
+  // Either a fixed page id from ROUTES, or (for pages like products whose
+  // path isn't fixed per locale) the other locale's path directly.
+  routeId?: RouteId
+  href?: string
 }
-const { locale, routeId } = Astro.props
+const { locale, routeId, href } = Astro.props
 const other = LOCALES.find((l) => l !== locale)!
+if (!routeId && !href) {
+  throw new Error('LocaleSwitcher requires either routeId or href')
+}
 ---
 
 <!--
@@ -16,7 +22,7 @@ const other = LOCALES.find((l) => l !== locale)!
   Keep this control visible in the header — not buried in a footer.
 -->
 <a
-  href={route(routeId, other)}
+  href={href ?? route(routeId!, other)}
   hreflang={other}
   rel="alternate"
   class="text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100"

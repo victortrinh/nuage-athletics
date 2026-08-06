@@ -19,12 +19,15 @@ migrations_dir = "migrations"
 [vars]
 PUBLIC_SITE_URL = "https://nuageathletics.com"
 PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAEHjCji09tkyDdAX"
+# "true" to expose the commerce routes. Keep this "false" until Stripe is
+# actually configured — see src/lib/commerce/index.ts.
+COMMERCE_ENABLED = "false"
 
 # Secrets — set with `wrangler secret put <NAME>`, never commit:
 #   RESEND_API_KEY
 #   TURNSTILE_SECRET_KEY
-#   STRIPE_SECRET_KEY        (phase 2)
-#   STRIPE_WEBHOOK_SECRET    (phase 2)
+#   STRIPE_SECRET_KEY
+#   STRIPE_WEBHOOK_SECRET
 
 # The Cloudflare adapter enables Astro sessions backed by KV and expects a
 # "SESSION" binding.

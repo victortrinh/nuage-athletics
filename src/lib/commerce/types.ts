@@ -24,6 +24,8 @@ export interface ProductVariant {
 export interface Product {
   id: string
   slug: string
+  /** This product's slug in every locale, for hreflang alternates. */
+  slugs: Record<Locale, string>
   name: string
   description: string
   price: Money
@@ -53,9 +55,30 @@ export interface Order {
   createdAt: number
 }
 
+/**
+ * A normalized webhook event, decoupled from any one provider's payload
+ * shape or signature scheme. `raw` is kept for auditing but nothing under
+ * src/pages should need to read provider-specific fields off it directly.
+ */
+export interface WebhookEvent {
+  orderId: string
+  status: OrderStatus
+  email: string | null
+  locale: Locale
+  total: Money
+  raw: unknown
+}
+
 export interface CommerceAdapter {
   readonly name: string
   getProduct(slug: string, locale: Locale): Promise<Product | null>
   createCheckout(input: CheckoutInput): Promise<{ url: string }>
   getOrder(id: string): Promise<Order | null>
+  /**
+   * Verifies the webhook signature and, if valid and relevant, normalizes it
+   * into a WebhookEvent. Returns null for an invalid signature or an event
+   * type this app doesn't act on (e.g. Stripe sends many event types; only
+   * checkout completion matters here).
+   */
+  verifyWebhook(payload: string, signatureHeader: string | null): Promise<WebhookEvent | null>
 }

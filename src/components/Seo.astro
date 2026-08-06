@@ -4,15 +4,29 @@ import { alternates, type RouteId } from '../i18n/utils'
 
 interface Props {
   locale: Locale
-  routeId: RouteId
+  // Either a fixed page id from ROUTES, or (for pages whose path isn't fixed
+  // per locale, e.g. product pages with a per-locale slug) an explicit
+  // alternates list.
+  routeId?: RouteId
+  alternates?: { locale: Locale; path: string }[]
   title: string
   description: string
   noindex?: boolean
 }
 
-const { locale, routeId, title, description, noindex = false } = Astro.props
+const {
+  locale,
+  routeId,
+  alternates: altsOverride,
+  title,
+  description,
+  noindex = false,
+} = Astro.props
 const site = Astro.site?.origin ?? 'https://nuageathletics.com'
-const alts = alternates(routeId)
+if (!routeId && !altsOverride) {
+  throw new Error('Seo requires either routeId or alternates')
+}
+const alts = altsOverride ?? alternates(routeId!)
 const canonical = new URL(alts.find((a) => a.locale === locale)!.path, site).href
 
 const org = {

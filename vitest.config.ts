@@ -10,7 +10,13 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: './wrangler.toml' },
       miniflare: {
-        bindings: { TEST_MIGRATIONS: migrations },
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          // Fixed test-only values so webhook tests can generate valid
+          // Stripe signatures without hitting the real API.
+          STRIPE_SECRET_KEY: 'sk_test_not_a_real_key',
+          STRIPE_WEBHOOK_SECRET: 'whsec_test_not_a_real_secret',
+        },
       },
     }),
   ],

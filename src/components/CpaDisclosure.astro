@@ -1,0 +1,117 @@
+---
+// BROUILLON / DRAFT — en attente de révision juridique avant toute vente.
+// Quebec's Consumer Protection Act (Loi sur la protection du consommateur)
+// requires specific disclosures before a distance contract is formed. This is
+// the one pre-payment page in the current design (checkout redirects
+// straight to Stripe's hosted page), so it lives here.
+import { SENDER_IDENTITY } from '../lib/consent.ts'
+import type { Locale } from '../i18n/config.ts'
+
+interface Props {
+  locale: Locale
+  productName: string
+}
+const { locale, productName } = Astro.props
+---
+
+{
+  locale === 'fr-CA' ? (
+    <div class="mt-16 border-t border-white/10 pt-8 text-sm leading-relaxed opacity-90">
+      <p class="text-xs uppercase tracking-wide text-amber-400">
+        Brouillon — en attente de révision juridique. Ne reflète pas nécessairement le texte
+        final.
+      </p>
+      <h2 class="mt-3 text-base font-semibold opacity-100">Informations précontractuelles</h2>
+      <dl class="mt-4 space-y-3">
+        <div>
+          <dt class="font-medium opacity-100">Commerçant</dt>
+          <dd>
+            {SENDER_IDENTITY.name}, {SENDER_IDENTITY.address},{' '}
+            <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">
+              {SENDER_IDENTITY.email}
+            </a>
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Description</dt>
+          <dd>{productName} — voir la description ci-dessus.</dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Prix</dt>
+          <dd>
+            Indiqué ci-dessus, taxes en sus le cas échéant. Frais de livraison calculés au
+            moment du paiement (taux fixe national, gratuit à partir d'un certain montant).
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Modalités de paiement</dt>
+          <dd>Carte de crédit ou de débit, par l'entremise de Stripe, au moment de la commande.</dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Livraison</dt>
+          <dd>Au Canada seulement. Délai estimé indiqué au moment du paiement.</dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Droit de résolution</dt>
+          <dd>
+            Vous pouvez annuler votre commande tant qu'elle n'a pas été expédiée en nous
+            écrivant. Si le bien n'est pas livré dans les 30 jours suivant la date convenue,
+            vous pouvez résoudre le contrat.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Langue</dt>
+          <dd>Ce contrat peut être conclu en français.</dd>
+        </div>
+      </dl>
+    </div>
+  ) : (
+    <div class="mt-16 border-t border-white/10 pt-8 text-sm leading-relaxed opacity-90">
+      <p class="text-xs uppercase tracking-wide text-amber-400">
+        Draft — pending legal review. May not reflect the final text.
+      </p>
+      <h2 class="mt-3 text-base font-semibold opacity-100">Pre-contract information</h2>
+      <dl class="mt-4 space-y-3">
+        <div>
+          <dt class="font-medium opacity-100">Merchant</dt>
+          <dd>
+            {SENDER_IDENTITY.name}, {SENDER_IDENTITY.address},{' '}
+            <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">
+              {SENDER_IDENTITY.email}
+            </a>
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Description</dt>
+          <dd>{productName} — see description above.</dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Price</dt>
+          <dd>
+            Shown above, taxes extra where applicable. Shipping cost calculated at checkout
+            (flat national rate, free above a threshold).
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Payment terms</dt>
+          <dd>Credit or debit card, via Stripe, at time of order.</dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Delivery</dt>
+          <dd>Canada only. Estimated timeframe shown at checkout.</dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Right of withdrawal</dt>
+          <dd>
+            You may cancel your order before it ships by writing to us. If the goods are not
+            delivered within 30 days of the agreed date, you may terminate the contract.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium opacity-100">Language</dt>
+          <dd>This contract may be concluded in English.</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}

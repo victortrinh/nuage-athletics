@@ -15,8 +15,11 @@ interface SendArgs {
 /**
  * Shared branded shell for every outbound email. CASL requires sender
  * identification, a physical mailing address, and an unsubscribe mechanism in
- * every commercial email — this is the one place that renders all three, so
- * every call site (confirmation emails, broadcasts) gets them automatically.
+ * every *commercial* email — this is the one place that renders all three, so
+ * every commercial call site (confirmation emails, broadcasts) gets them
+ * automatically. Order confirmations are transactional, not commercial, so
+ * CASL doesn't require an unsubscribe link on them — unsubUrl is optional and
+ * that line is simply omitted when there's nothing to unsubscribe from.
  */
 export function renderEmailShell({
   locale,
@@ -27,7 +30,7 @@ export function renderEmailShell({
   locale: Locale
   heading: string
   bodyHtml: string
-  unsubUrl: string
+  unsubUrl?: string
 }): string {
   const d = UI[locale]
   return `<!doctype html>
@@ -38,12 +41,17 @@ export function renderEmailShell({
       <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">${heading}</h1>
       ${bodyHtml}
       <hr style="border:none;border-top:1px solid #e5e5e5;margin:32px 0 16px;" />
-      <!-- CASL: sender identification + physical address + unsubscribe are mandatory -->
+      <!-- CASL: sender identification + physical address are mandatory on
+           every commercial message; unsubscribe only applies when unsubUrl
+           is given (see doc comment above). -->
       <p style="font-size:12px;color:#888;line-height:1.6;margin:0;">
         ${SENDER_IDENTITY.name}<br />
         ${SENDER_IDENTITY.address}<br />
-        <a href="mailto:${SENDER_IDENTITY.email}" style="color:#888;">${SENDER_IDENTITY.email}</a><br />
-        <a href="${unsubUrl}" style="color:#888;">${d.mailUnsub}</a>
+        <a href="mailto:${SENDER_IDENTITY.email}" style="color:#888;">${SENDER_IDENTITY.email}</a>${
+          unsubUrl
+            ? `<br /><a href="${unsubUrl}" style="color:#888;">${d.mailUnsub}</a>`
+            : ''
+        }
       </p>
     </div>
   </body>
@@ -96,6 +104,65 @@ export async function sendConfirmationEmail({
       subject: d.mailSubject,
       html,
       headers: { 'List-Unsubscribe': `<${unsubUrl}>` },
+    }),
+  })
+
+  if (!res.ok) {
+    return { ok: false, error: `resend ${res.status}: ${await res.text()}` }
+  }
+  return { ok: true }
+}
+
+interface OrderEmailArgs {
+  apiKey: string | undefined
+  to: string
+  locale: Locale
+  amountTotal: number
+  currency: string
+}
+
+/**
+ * Order confirmation — transactional, sent from the Stripe webhook once a
+ * payment actually succeeds. Bill 96 requires this in the buyer's language
+ * just as much as any marketing page; it isn't exempt just for being a
+ * receipt.
+ */
+export async function sendOrderConfirmationEmail({
+  apiKey,
+  to,
+  locale,
+  amountTotal,
+  currency,
+}: OrderEmailArgs): Promise<{ ok: boolean; error?: string }> {
+  const d = UI[locale]
+  const total = new Intl.NumberFormat(locale, { style: 'currency', currency }).format(
+    amountTotal / 100
+  )
+
+  const html = renderEmailShell({
+    locale,
+    heading: d.orderConfirmedTitle,
+    bodyHtml: `
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">${d.orderConfirmedBody}</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;font-weight:600;">${total}</p>`,
+  })
+
+  if (!apiKey) {
+    console.log(`[email:dev] order confirmation for ${to} -> ${total}`)
+    return { ok: true }
+  }
+
+  const res = await fetch(RESEND_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `${SENDER_IDENTITY.name} <${SENDER_IDENTITY.email}>`,
+      to: [to],
+      subject: d.orderConfirmedTitle,
+      html,
     }),
   })
 
