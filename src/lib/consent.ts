@@ -1,5 +1,5 @@
-import { UI } from '../i18n/ui'
-import type { Locale } from '../i18n/config'
+import { UI } from '../i18n/ui.ts'
+import type { Locale } from '../i18n/config.ts'
 
 /**
  * Bump this whenever the consent wording changes. Existing rows keep the version

@@ -14,7 +14,8 @@
     "db:create": "wrangler d1 create nuage-athletics",
     "db:migrate:local": "wrangler d1 migrations apply nuage-athletics --local",
     "db:migrate:remote": "wrangler d1 migrations apply nuage-athletics --remote",
-    "db:subscribers": "wrangler d1 execute nuage-athletics --remote --command \"SELECT email, locale, status, datetime(consented_at/1000,'unixepoch') AS consented FROM subscribers ORDER BY created_at DESC LIMIT 50\""
+    "db:subscribers": "wrangler d1 execute nuage-athletics --remote --command \"SELECT email, locale, status, datetime(consented_at/1000,'unixepoch') AS consented FROM subscribers ORDER BY created_at DESC LIMIT 50\"",
+    "broadcast": "node scripts/broadcast.ts"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.1.7",
@@ -22,6 +23,7 @@
     "@astrojs/sitemap": "^3.7.3",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.1.6",
+    "marked": "^18.0.9",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",

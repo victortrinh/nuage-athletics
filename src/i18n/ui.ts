@@ -1,4 +1,4 @@
-import type { Locale } from './config'
+import type { Locale } from './config.ts'
 
 /**
  * Every user-facing string lives here. Bill 96 requires the French version to be
