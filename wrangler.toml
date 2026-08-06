@@ -13,7 +13,7 @@ enabled = true
 [[d1_databases]]
 binding = "DB"
 database_name = "nuage-athletics"
-database_id = "REPLACE_ME"   # wrangler d1 create nuage-athletics
+database_id = "45e7063a-4ac5-49d8-a594-950eb49fd40e"
 migrations_dir = "migrations"
 
 [vars]
