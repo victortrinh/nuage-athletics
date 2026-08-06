@@ -23,6 +23,7 @@ const year = new Date().getFullYear()
 <html lang={HTML_LANG[locale]}>
   <head>
     <Seo {locale} {routeId} {title} {description} {noindex} />
+    <slot name="head" />
   </head>
   <body class="min-h-dvh flex flex-col font-sans antialiased">
     <header class="flex items-center justify-between px-6 py-6 sm:px-10">

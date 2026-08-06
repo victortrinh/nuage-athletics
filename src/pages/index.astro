@@ -2,10 +2,12 @@
 import Base from '../layouts/Base.astro'
 import SignupForm from '../components/SignupForm.tsx'
 import { t } from '../i18n/ui'
+import { route } from '../i18n/utils'
 
 const locale = 'fr-CA' as const
 const d = t(locale)
 const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY
+const enHref = route('home', 'en-CA')
 ---
 
 <Base
@@ -14,6 +16,25 @@ const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY
   title={`${d.brand} — ${d.tagline}`}
   description={`${d.tagline} ${d.dropLine}`}
 >
+  <script slot="head" is:inline define:vars={{ enHref }}>
+    // French stays the canonical root for everyone — crawlers, no-JS
+    // visitors, and anyone whose language we can't read all get the French
+    // page above with no redirect. This nudges an English-primary browser
+    // once, and only once (localStorage flag), toward /en/. Client-side and
+    // dismissible by design: the raw HTML served here never changes, which
+    // keeps French "on terms at least as favourable" as English regardless
+    // of what a visitor's browser does with it (Charter of the French
+    // Language, see CLAUDE.md).
+    ;(function () {
+      try {
+        var KEY = 'na-locale-nudge'
+        if (localStorage.getItem(KEY)) return
+        localStorage.setItem(KEY, '1')
+        var lang = ((navigator.languages && navigator.languages[0]) || navigator.language || '').toLowerCase()
+        if (lang.indexOf('en') === 0) location.replace(enHref)
+      } catch (e) {}
+    })()
+  </script>
   <section class="max-w-2xl py-16 sm:py-28">
     <h1 class="text-4xl sm:text-6xl font-semibold tracking-tight">{d.tagline}</h1>
     <p class="mt-6 text-lg opacity-70">{d.dropLine}</p>
