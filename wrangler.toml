@@ -18,7 +18,7 @@ migrations_dir = "migrations"
 
 [vars]
 PUBLIC_SITE_URL = "https://nuageathletics.com"
-PUBLIC_TURNSTILE_SITE_KEY = "1x00000000000000000000AA"  # Cloudflare test key: always passes
+PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAEHjCji09tkyDdAX"
 
 # Secrets — set with `wrangler secret put <NAME>`, never commit:
 #   RESEND_API_KEY
