@@ -42,7 +42,8 @@ npm run dev
 ```
 
 Without `RESEND_API_KEY` the confirmation email is logged to the console with the
-confirm URL instead of being sent — signup still works locally.
+confirm URL, and the signup endpoint returns `email_failed` — the row is still
+written, so paste the logged URL to finish the double opt-in locally.
 
 Turnstile: `wrangler.toml` ships Cloudflare's always-passes test site key.
 Replace both the site key and `TURNSTILE_SECRET_KEY` before production.

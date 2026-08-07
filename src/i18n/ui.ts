@@ -52,7 +52,7 @@ export const UI: Record<Locale, Dict> = {
   'fr-CA': {
     brand: 'Nuage Athletics',
     tagline: 'Vêtements techniques. Fabriqués au Canada.',
-    dropLine: 'Première sortie — automne 2026.',
+    dropLine: 'Première sortie. Automne 2026.',
     emailLabel: 'Courriel',
     emailPlaceholder: 'vous@exemple.com',
     consentLabel:
@@ -76,13 +76,12 @@ export const UI: Record<Locale, Dict> = {
     contact: 'Contact',
     rights: 'Tous droits réservés.',
     switchTo: 'English',
-    mailSubject: 'Confirmez votre inscription — Nuage Athletics',
+    mailSubject: 'Confirmez votre inscription',
     mailHeading: 'Confirmez votre inscription',
     mailBody:
-      'Cliquez sur le lien ci-dessous pour confirmer que vous souhaitez recevoir nos courriels.',
+      "Confirmez que vous voulez recevoir nos courriels. C'est la seule étape qu'il reste.",
     mailCta: 'Confirmer mon inscription',
-    mailIgnore:
-      "Si vous n'avez pas demandé cette inscription, ignorez simplement ce courriel.",
+    mailIgnore: "Si cette inscription ne vient pas de vous, ignorez ce courriel.",
     mailUnsub: 'Se désabonner',
     productSizeLabel: 'Taille',
     productOutOfStock: 'Épuisé',
@@ -97,7 +96,7 @@ export const UI: Record<Locale, Dict> = {
   'en-CA': {
     brand: 'Nuage Athletics',
     tagline: 'Technical apparel. Made in Canada.',
-    dropLine: 'First drop — fall 2026.',
+    dropLine: 'First drop. Fall 2026.',
     emailLabel: 'Email',
     emailPlaceholder: 'you@example.com',
     consentLabel:
@@ -121,12 +120,11 @@ export const UI: Record<Locale, Dict> = {
     contact: 'Contact',
     rights: 'All rights reserved.',
     switchTo: 'Français',
-    mailSubject: 'Confirm your signup — Nuage Athletics',
+    mailSubject: 'Confirm your signup',
     mailHeading: 'Confirm your signup',
-    mailBody:
-      'Click the link below to confirm you want to receive our emails.',
+    mailBody: "Confirm that you want our emails. It's the only step left.",
     mailCta: 'Confirm my signup',
-    mailIgnore: "If you didn't request this, you can safely ignore this email.",
+    mailIgnore: "If this signup wasn't you, ignore this email.",
     mailUnsub: 'Unsubscribe',
     productSizeLabel: 'Size',
     productOutOfStock: 'Out of stock',

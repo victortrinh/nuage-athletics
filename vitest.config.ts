@@ -16,12 +16,15 @@ export default defineConfig({
           // Stripe signatures without hitting the real API.
           STRIPE_SECRET_KEY: 'sk_test_not_a_real_key',
           STRIPE_WEBHOOK_SECRET: 'whsec_test_not_a_real_secret',
+          // Fixed test-only value so the Resend path runs instead of the
+          // no-key dev branch. test/stub-resend.ts intercepts the request.
+          RESEND_API_KEY: 're_test_not_a_real_key',
         },
       },
     }),
   ],
   test: {
-    setupFiles: ['./test/apply-migrations.ts'],
+    setupFiles: ['./test/apply-migrations.ts', './test/stub-resend.ts'],
     // Default excludes don't cover nested worktrees under .worktrees/, whose
     // own test/ directories would otherwise be discovered and run twice.
     exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**'],

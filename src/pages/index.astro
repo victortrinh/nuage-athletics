@@ -42,5 +42,13 @@ const enHref = route('home', 'en-CA')
       <SignupForm client:load {locale} {d} turnstileSiteKey={siteKey} />
     </div>
   </section>
-  {siteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  {/*
+    render=explicit is load-bearing. In auto-render mode this script scans for
+    .cf-turnstile and injects a widget into it, which races React hydration:
+    the server sends that container empty, so the injected child makes the
+    client DOM diverge, hydration fails, and React re-renders the island —
+    deleting the widget and leaving the form with no token to submit.
+    SignupForm renders it from an effect instead, after hydration.
+  */}
+  {siteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>}
 </Base>

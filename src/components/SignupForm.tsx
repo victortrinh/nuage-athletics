@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Locale } from '../i18n/config'
 import type { Dict } from '../i18n/ui'
 
@@ -18,14 +18,57 @@ declare global {
   interface Window {
     turnstile?: {
       render: (el: HTMLElement, opts: Record<string, unknown>) => string
+      remove: (id: string) => void
+      reset: (id?: string) => void
     }
   }
 }
+
+const TURNSTILE_SRC = 'script[src*="turnstile/v0/api.js"]'
 
 export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [email, setEmail] = useState('')
   const [consent, setConsent] = useState(false)
+  const widgetRef = useRef<HTMLDivElement>(null)
+  const widgetId = useRef<string | null>(null)
+
+  /**
+   * Render Turnstile ourselves rather than letting api.js auto-scan the page.
+   * Auto-render injects into this container while React is still hydrating,
+   * which breaks hydration and costs us the widget (and therefore the token).
+   * An effect runs after hydration, so the DOM the server sent is never
+   * touched before React is done with it.
+   */
+  useEffect(() => {
+    if (!turnstileSiteKey) return
+
+    function mount() {
+      const el = widgetRef.current
+      if (!el || !window.turnstile || widgetId.current !== null) return
+      widgetId.current = window.turnstile.render(el, {
+        sitekey: turnstileSiteKey,
+        theme: 'dark',
+      })
+    }
+
+    // api.js is async: it may already be there, or still in flight.
+    const script = document.querySelector<HTMLScriptElement>(TURNSTILE_SRC)
+    if (window.turnstile) mount()
+    else script?.addEventListener('load', mount, { once: true })
+
+    return () => {
+      script?.removeEventListener('load', mount)
+      if (widgetId.current !== null) {
+        window.turnstile?.remove(widgetId.current)
+        widgetId.current = null
+      }
+    }
+  }, [turnstileSiteKey])
+
+  function resetTurnstile() {
+    if (widgetId.current !== null) window.turnstile?.reset(widgetId.current)
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -66,8 +109,12 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
         rate_limited: d.errorRate,
         already_subscribed: d.alreadySubscribed,
       }
+      // Turnstile tokens are single use. Without a reset, retrying after an
+      // error submits the spent token and fails the challenge every time.
+      resetTurnstile()
       setState({ kind: 'error', message: map[data.code ?? ''] ?? d.errorGeneric })
     } catch {
+      resetTurnstile()
       setState({ kind: 'error', message: d.errorGeneric })
     }
   }
@@ -124,13 +171,8 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
         <span className="opacity-80">{d.consentLabel}</span>
       </label>
 
-      {turnstileSiteKey && (
-        <div
-          className="cf-turnstile mt-6"
-          data-sitekey={turnstileSiteKey}
-          data-theme="dark"
-        />
-      )}
+      {/* Left empty on the server; the effect above fills it after hydration. */}
+      {turnstileSiteKey && <div ref={widgetRef} className="mt-6" />}
 
       <button
         type="submit"

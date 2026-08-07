@@ -33,6 +33,16 @@ function json(body: unknown, status = 200) {
   })
 }
 
+/**
+ * A send that never left is not a success. The subscriber row stays — consent
+ * was given and CASL requires us to keep that evidence — but the form must not
+ * tell someone to check an inbox we failed to reach.
+ */
+function emailFailed(error: string | undefined) {
+  console.error('confirmation email failed', error)
+  return json({ ok: false, code: 'email_failed' }, 502)
+}
+
 export const POST: APIRoute = async ({ request, url, clientAddress }) => {
   const ip = request.headers.get('CF-Connecting-IP') ?? clientAddress ?? null
   const userAgent = request.headers.get('User-Agent')
@@ -75,13 +85,14 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
     }
     // pending or previously unsubscribed: re-send confirmation, fresh consent timestamp
     const token = await refreshPendingToken(env.DB, input.email)
-    await sendConfirmationEmail({
+    const resent = await sendConfirmationEmail({
       apiKey: env.RESEND_API_KEY,
       to: input.email,
       locale: input.locale,
       siteUrl,
       token: token || existing.token,
     })
+    if (!resent.ok) return emailFailed(resent.error)
     return json({ ok: true })
   }
 
@@ -103,10 +114,7 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
     token,
   })
 
-  if (!sent.ok) {
-    console.error('confirmation email failed', sent.error)
-    // The row is stored with valid consent; the user can retry to re-trigger.
-  }
+  if (!sent.ok) return emailFailed(sent.error)
 
   return json({ ok: true })
 }

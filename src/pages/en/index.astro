@@ -21,5 +21,6 @@ const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY
       <SignupForm client:load {locale} {d} turnstileSiteKey={siteKey} />
     </div>
   </section>
-  {siteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  {/* render=explicit is load-bearing — see the note in src/pages/index.astro. */}
+  {siteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>}
 </Base>
