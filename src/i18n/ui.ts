@@ -52,7 +52,7 @@ export const UI: Record<Locale, Dict> = {
   'fr-CA': {
     brand: 'Nuage Athletics',
     tagline: 'Vêtements techniques. Fabriqués au Canada.',
-    dropLine: 'Première sortie — automne 2026.',
+    dropLine: 'Première sortie. Automne 2026.',
     emailLabel: 'Courriel',
     emailPlaceholder: 'vous@exemple.com',
     consentLabel:
@@ -96,7 +96,7 @@ export const UI: Record<Locale, Dict> = {
   'en-CA': {
     brand: 'Nuage Athletics',
     tagline: 'Technical apparel. Made in Canada.',
-    dropLine: 'First drop — fall 2026.',
+    dropLine: 'First drop. Fall 2026.',
     emailLabel: 'Email',
     emailPlaceholder: 'you@example.com',
     consentLabel:
