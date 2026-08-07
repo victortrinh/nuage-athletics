@@ -86,10 +86,14 @@ export async function sendConfirmationEmail({
     unsubUrl,
   })
 
-  // No key configured (local dev): log instead of failing the signup.
+  // No key configured: log the confirm URL so local dev is still usable, but
+  // never claim the mail was sent. `import.meta.env` is undefined when
+  // scripts/broadcast.ts imports this module under plain node, hence `?.`.
   if (!apiKey) {
-    console.log(`[email:dev] confirmation for ${to} -> ${confirmUrl}`)
-    return { ok: true }
+    if (import.meta.env?.DEV) {
+      console.log(`[email:dev] confirmation for ${to} -> ${confirmUrl}`)
+    }
+    return { ok: false, error: 'RESEND_API_KEY is not configured' }
   }
 
   const res = await fetch(RESEND_ENDPOINT, {
