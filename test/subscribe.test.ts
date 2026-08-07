@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { env } from 'cloudflare:test'
 import { POST } from '../src/pages/api/subscribe'
 
@@ -93,6 +93,40 @@ describe('POST /api/subscribe', () => {
     const res = await POST(makeContext(body, { ip: '203.0.113.14' }))
     expect(res.status).toBe(409)
     expect(await readJson(res)).toEqual({ ok: false, code: 'already_subscribed' })
+  })
+
+  it('reports failure when Resend rejects the send, and keeps the consent row', async () => {
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response('{"name":"validation_error","message":"domain is not verified"}', {
+          status: 403,
+        })
+    )
+
+    const body = validBody()
+    const res = await POST(makeContext(body, { ip: '203.0.113.20' }))
+    expect(res.status).toBe(502)
+    expect(await readJson(res)).toEqual({ ok: false, code: 'email_failed' })
+
+    // The row stays: consent was given, only delivery failed.
+    const row = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
+      .bind(body.email)
+      .first<{ status: string; consent_version: string }>()
+    expect(row?.status).toBe('pending')
+    expect(row?.consent_version).toBeTruthy()
+  })
+
+  it('reports failure when the re-send to a pending subscriber is rejected', async () => {
+    const body = validBody()
+    const first = await POST(makeContext(body, { ip: '203.0.113.21' }))
+    expect(first.status).toBe(200)
+
+    vi.stubGlobal('fetch', async () => new Response('nope', { status: 403 }))
+
+    const res = await POST(makeContext(body, { ip: '203.0.113.21' }))
+    expect(res.status).toBe(502)
+    expect(await readJson(res)).toEqual({ ok: false, code: 'email_failed' })
   })
 
   it('rate limits after 5 attempts from the same IP', async () => {
