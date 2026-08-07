@@ -10,7 +10,7 @@ import {
   insertSubscriber,
   isRateLimited,
   recordAttempt,
-  refreshPendingToken,
+  restartOptIn,
 } from '../../lib/db'
 
 export const prerender = false
@@ -83,14 +83,25 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
     if (existing.status === 'confirmed') {
       return json({ ok: false, code: 'already_subscribed' }, 409)
     }
-    // pending or previously unsubscribed: re-send confirmation, fresh consent timestamp
-    const token = await refreshPendingToken(env.DB, input.email)
+    // Pending, or previously unsubscribed and now opting back in. Either way
+    // this is fresh express consent, so the row restarts at 'pending' with the
+    // wording shown just now.
+    const token = await restartOptIn(env.DB, {
+      email: input.email,
+      locale: input.locale,
+      consentText: consentText(input.locale),
+      consentVersion: CONSENT_VERSION,
+    })
+    // Only reachable if the row was confirmed between the read above and the
+    // write — the same answer as the confirmed branch.
+    if (!token) return json({ ok: false, code: 'already_subscribed' }, 409)
+
     const resent = await sendConfirmationEmail({
       apiKey: env.RESEND_API_KEY,
       to: input.email,
       locale: input.locale,
       siteUrl,
-      token: token || existing.token,
+      token,
     })
     if (!resent.ok) return emailFailed(resent.error)
     return json({ ok: true })

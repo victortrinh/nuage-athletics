@@ -101,17 +101,56 @@ export async function insertSubscriber(
   return { id, token }
 }
 
-/** Re-issue a token for someone who signed up but never confirmed. */
-export async function refreshPendingToken(db: D1Database, email: string): Promise<string> {
+export interface OptInRestart {
+  email: string
+  locale: Locale
+  consentText: string
+  consentVersion: string
+}
+
+/**
+ * Re-issue a confirmation token for an address that signed up again.
+ *
+ * Covers both the subscriber who never confirmed and the one who previously
+ * unsubscribed. Signing up again is a fresh act of express consent, so the row
+ * returns to 'pending' and records the wording shown *this* time.
+ *
+ * That is not the backfill CLAUDE.md forbids: the subscriber saw the current
+ * wording when they re-consented, and this is the consent we would have to
+ * prove if challenged. `unsubscribed_at` is deliberately left in place as
+ * evidence the earlier withdrawal was honoured.
+ *
+ * Returns null when no row was updated — a confirmed subscriber, or a race
+ * where one confirmed between the read and this write. Never return a token
+ * that isn't in the database: the caller emails it, and a token that resolves
+ * to nothing is a dead confirmation link.
+ */
+export async function restartOptIn(
+  db: D1Database,
+  input: OptInRestart
+): Promise<string | null> {
   const token = crypto.randomUUID().replace(/-/g, '')
   const now = Date.now()
-  await db
+  const result = await db
     .prepare(
-      "UPDATE subscribers SET token = ?, consented_at = ?, token_expires_at = ? WHERE email = ? AND status = 'pending'"
+      `UPDATE subscribers
+          SET token = ?, status = 'pending', locale = ?,
+              consent_text = ?, consent_version = ?, consented_at = ?,
+              token_expires_at = ?, confirmed_at = NULL
+        WHERE email = ? AND status != 'confirmed'`
     )
-    .bind(token, now, now + TOKEN_TTL_MS, email)
+    .bind(
+      token,
+      input.locale,
+      input.consentText,
+      input.consentVersion,
+      now,
+      now + TOKEN_TTL_MS,
+      input.email
+    )
     .run()
-  return token
+
+  return result.meta.changes > 0 ? token : null
 }
 
 export type ConfirmResult =

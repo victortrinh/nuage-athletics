@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { env } from 'cloudflare:test'
 import { POST } from '../src/pages/api/subscribe'
+import { confirmSubscriber, unsubscribe } from '../src/lib/db'
 
 let seq = 0
 function uniqueEmail() {
@@ -127,6 +128,64 @@ describe('POST /api/subscribe', () => {
     const res = await POST(makeContext(body, { ip: '203.0.113.21' }))
     expect(res.status).toBe(502)
     expect(await readJson(res)).toEqual({ ok: false, code: 'email_failed' })
+  })
+
+  it('sends a working confirmation link when an unsubscribed address signs up again', async () => {
+    const body = validBody()
+    const sentHtml: string[] = []
+    vi.stubGlobal('fetch', async (_input: unknown, init: RequestInit) => {
+      sentHtml.push(JSON.parse(init.body as string).html)
+      return new Response('{"id":"test"}', { status: 200 })
+    })
+
+    // Sign up, confirm, then unsubscribe.
+    await POST(makeContext(body, { ip: '203.0.113.30' }))
+    const first = await env.DB.prepare('SELECT token FROM subscribers WHERE email = ?')
+      .bind(body.email)
+      .first<{ token: string }>()
+    await confirmSubscriber(env.DB, first!.token)
+    await unsubscribe(env.DB, first!.token)
+
+    // Sign up again — this is fresh express consent, so it must work.
+    const res = await POST(makeContext(body, { ip: '203.0.113.30' }))
+    expect(res.status).toBe(200)
+
+    const row = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
+      .bind(body.email)
+      .first<{ status: string; token: string }>()
+    expect(row?.status).toBe('pending')
+
+    // The token we actually emailed has to be the one in the database,
+    // otherwise the subscriber clicks a dead link.
+    const emailedToken = sentHtml.at(-1)!.match(/confirm\?token=([a-f0-9]+)/)![1]
+    expect(emailedToken).toBe(row?.token)
+
+    const result = await confirmSubscriber(env.DB, emailedToken)
+    expect(result.ok).toBe(true)
+  })
+
+  it('records the consent wording shown at re-subscribe, not the original', async () => {
+    const body = validBody()
+    await POST(makeContext(body, { ip: '203.0.113.31' }))
+    const before = await env.DB.prepare('SELECT token FROM subscribers WHERE email = ?')
+      .bind(body.email)
+      .first<{ token: string }>()
+    await unsubscribe(env.DB, before!.token)
+
+    // Simulate the row having been captured under older wording.
+    await env.DB.prepare(
+      "UPDATE subscribers SET consent_version = 'ancient.1', consent_text = 'old wording' WHERE email = ?"
+    )
+      .bind(body.email)
+      .run()
+
+    await POST(makeContext(body, { ip: '203.0.113.31' }))
+
+    const row = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
+      .bind(body.email)
+      .first<{ consent_version: string; consent_text: string }>()
+    expect(row?.consent_version).not.toBe('ancient.1')
+    expect(row?.consent_text).not.toBe('old wording')
   })
 
   it('rate limits after 5 attempts from the same IP', async () => {

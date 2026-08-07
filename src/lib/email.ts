@@ -151,9 +151,14 @@ export async function sendOrderConfirmationEmail({
       <p style="font-size:15px;line-height:1.6;margin:0 0 24px;font-weight:600;">${total}</p>`,
   })
 
+  // Same rule as the confirmation email: log in dev, never report a send that
+  // did not happen. The Stripe webhook logs this and still returns 200, so a
+  // missing receipt cannot trigger a retry and reprocess the order.
   if (!apiKey) {
-    console.log(`[email:dev] order confirmation for ${to} -> ${total}`)
-    return { ok: true }
+    if (import.meta.env?.DEV) {
+      console.log(`[email:dev] order confirmation for ${to} -> ${total}`)
+    }
+    return { ok: false, error: 'RESEND_API_KEY is not configured' }
   }
 
   const res = await fetch(RESEND_ENDPOINT, {
