@@ -176,7 +176,7 @@ export function createStripeAdapter(secretKey: string, webhookSecret?: string): 
         params[`line_items[${i}][price_data][currency]`] = product.price.currency.toLowerCase()
         params[`line_items[${i}][price_data][unit_amount]`] = product.price.amount
         params[`line_items[${i}][price_data][product_data][name]`] =
-          `${product.name} — ${variant.label}`
+          `${product.name} (${variant.label})`
         params[`line_items[${i}][price_data][tax_behavior]`] = 'exclusive'
       })
 
