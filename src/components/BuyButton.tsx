@@ -63,7 +63,7 @@ export default function BuyButton({ locale, d, variants }: Props) {
                 : 'border-white/40 hover:border-white'
             }`}
           >
-            {v.inStock ? v.label : `${v.label} — ${d.productOutOfStock}`}
+            {v.inStock ? v.label : `${v.label} (${d.productOutOfStock})`}
           </button>
         ))}
       </div>
