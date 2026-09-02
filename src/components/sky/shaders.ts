@@ -115,6 +115,7 @@ export const CLOUD = /* glsl */ `
   uniform vec2 uMacroOffset;
   uniform float uCoverage;
   uniform float uCoverageSoftness;
+  uniform vec2 uCellDensity;
   uniform float uCloudMin;
   uniform float uCloudMax;
 
@@ -132,23 +133,50 @@ export const CLOUD = /* glsl */ `
     return sum;
   }
 
-  // A single texture2D lookup already sweeps the full 64x64 noise texture,
-  // i.e. 64 independent random texels — so the *coordinate scale* passed in
-  // (not an octave count) is what controls how many soft blobs appear across
-  // the screen: effective spatial frequency is roughly 64 * scale cycles.
-  // A scale around 0.08-0.09 gives a handful of blobs, matching the
-  // "scattered, moderate coverage" cloud placement this is meant to produce.
-  float macroNoise(vec2 p) {
-    // The secondary term only nudges the edges of a region the primary term
-    // has already decided is cloud or clear — too much weight here lets it
-    // independently flip the coverage threshold in small scattered patches
-    // far from any real cloud, which is what read as persistent grain in
-    // supposedly-clear sky.
-    return n(p) * 0.92 + n(p * 2.3 + 11.7) * 0.08;
+  // Thresholding value-noise (independent random texels, bilinearly
+  // interpolated) tends to produce elongated, connected ridge/streak
+  // contours rather than round blobs — that's an inherent property of the
+  // noise, not a tuning knob. Round, countable clouds instead come from an
+  // explicit jittered-grid metaball field: one pseudo-random seed point per
+  // grid cell (hashed from the cell coordinate, so no extra texture/state
+  // needed) with a radial Gaussian falloff, maxed over the 3x3 neighbourhood
+  // so blobs near a cell border still read correctly. Cloud *count* is then
+  // just the grid density (uCellDensity) — directly controllable — and
+  // every blob is round by construction.
+  vec2 hash2(vec2 p) {
+    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+    return fract(sin(p) * 43758.5453123);
+  }
+
+  float cloudField(vec2 uv, vec2 offset) {
+    vec2 p = uv * uCellDensity + offset;
+    // Warp the sample position before splitting into cells, so a blob's
+    // silhouette reads as an irregular, organic shape rather than a perfect
+    // circle — a plain metaball grid alone looks like even polka dots.
+    vec2 warp = (vec2(n(p * 0.7 + 3.1), n(p * 0.7 + 9.4)) - 0.5) * 0.7;
+    p += warp;
+    vec2 cell = floor(p);
+    vec2 f = fract(p);
+    float field = 0.0;
+    for (int y = -1; y <= 1; y++) {
+      for (int x = -1; x <= 1; x++) {
+        vec2 neighbor = vec2(float(x), float(y));
+        vec2 h = hash2(cell + neighbor);
+        // Only some cells actually carry a cloud seed — a real sky isn't
+        // one evenly-spaced blob per grid cell, it's sparse and irregular.
+        float exists = step(0.35, h.x);
+        vec2 seedPos = neighbor + 0.15 + h.yx * 0.7;
+        float radius = mix(0.26, 0.62, fract(h.x * 7.0));
+        vec2 diff = f - seedPos;
+        float d2 = dot(diff, diff);
+        field = max(field, exists * exp(-d2 / (radius * radius)));
+      }
+    }
+    return field;
   }
 
   void main() {
-    float macro = macroNoise(vUv * 0.085 + uMacroOffset);
+    float macro = cloudField(vUv, uMacroOffset);
     float coverage = smoothstep(uCoverage - uCoverageSoftness, uCoverage + uCoverageSoftness, macro);
     // A second easing pass doesn't widen the transition band in screen space,
     // but it does push any lingering faint-but-nonzero coverage within that

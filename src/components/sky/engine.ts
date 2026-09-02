@@ -146,8 +146,9 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       uOffset1: { value: [0, 0] },
       uOffset2: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
-      uCoverage: { value: 0.5 },
-      uCoverageSoftness: { value: 0.05 },
+      uCoverage: { value: 0.46 },
+      uCoverageSoftness: { value: 0.06 },
+      uCellDensity: { value: [9, 5] },
       uCloudMin: { value: 0.72 },
       uCloudMax: { value: 0.99 },
     },
@@ -305,10 +306,10 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     cloudProgram.uniforms.uTime.value = t
     cloudProgram.uniforms.uOffset1.value = [t * 0.008, t * 0.003]
     cloudProgram.uniforms.uOffset2.value = [-t * 0.014, t * 0.006]
-    // Drift is in the same coordinate space as the 0.085 macro scale in the
-    // shader, not screen-uv space, so it has to be far smaller than the
-    // detail-layer offsets above or the clouds would visibly race across.
-    cloudProgram.uniforms.uMacroOffset.value = [t * 0.0002, t * 0.00008]
+    // Drift is in the cloudField's cell-unit space (uv * uCellDensity), not
+    // screen-uv space, so a full unit crosses one whole cell — keep this
+    // slow enough that clouds migrate gradually rather than visibly race.
+    cloudProgram.uniforms.uMacroOffset.value = [t * 0.006, t * 0.0025]
     renderer.render({ scene: cloudMesh, target: cloudTarget })
 
     blitProgram.uniforms.uTex.value = cloudTarget.texture
