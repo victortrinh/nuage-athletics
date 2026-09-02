@@ -39,42 +39,44 @@ const year = new Date().getFullYear()
       {d.skipToContent}
     </a>
     <Sky />
-    <header
-      class="flex items-center justify-between gap-6 border-b border-line px-6 py-4 sm:px-10"
-    >
-      <a
-        href={route('home', locale)}
-        aria-label={d.brand}
-        class="text-xl hover:text-accent-ink"
-      >
-        <Logo variant="wordmark" />
-      </a>
-      <div class="flex items-center gap-6">
-        <button
-          type="button"
-          id="sky-toggle"
-          hidden
-          data-pause-label={d.skyPause}
-          data-resume-label={d.skyResume}
-          class={buttonVariants({ variant: 'quiet' })}
+    <header class="border-b border-line px-6 py-4 sm:px-10">
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-6">
+        <a
+          href={route('home', locale)}
+          aria-label={d.brand}
+          class="text-xl hover:text-accent-ink"
         >
-          {d.skyPause}
-        </button>
-        <LocaleSwitcher {locale} {routeId} href={localeHref} />
+          <Logo variant="wordmark" />
+        </a>
+        <div class="flex items-center gap-6">
+          <button
+            type="button"
+            id="sky-toggle"
+            hidden
+            data-pause-label={d.skyPause}
+            data-resume-label={d.skyResume}
+            class={buttonVariants({ variant: 'quiet' })}
+          >
+            {d.skyPause}
+          </button>
+          <LocaleSwitcher {locale} {routeId} href={localeHref} />
+        </div>
       </div>
     </header>
 
-    <main id="content" class="flex-1 px-6 sm:px-10">
+    <main id="content" class="mx-auto w-full max-w-6xl flex-1 px-6 sm:px-10">
       <slot />
     </main>
 
     <footer class="mt-16 border-t border-line px-6 py-10 text-xs text-mute sm:px-10">
-      <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
-        <a href={route('privacy', locale)} class="hover:text-accent-ink">{d.privacy}</a>
-        <a href={route('terms', locale)} class="hover:text-accent-ink">{d.terms}</a>
-        <a href="mailto:hello@nuageathletics.com" class="hover:text-accent-ink">{d.contact}</a>
-      </nav>
-      <p>© {year} {d.brand}. {d.rights}</p>
+      <div class="mx-auto max-w-6xl">
+        <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
+          <a href={route('privacy', locale)} class="hover:text-accent-ink">{d.privacy}</a>
+          <a href={route('terms', locale)} class="hover:text-accent-ink">{d.terms}</a>
+          <a href="mailto:hello@nuageathletics.com" class="hover:text-accent-ink">{d.contact}</a>
+        </nav>
+        <p>© {year} {d.brand}. {d.rights}</p>
+      </div>
     </footer>
   </body>
 </html>
