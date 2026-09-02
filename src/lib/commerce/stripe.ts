@@ -2,19 +2,22 @@ import type {
   CheckoutInput,
   CommerceAdapter,
   Order,
-  Product,
   WebhookEvent,
 } from './types'
 import type { Locale } from '../../i18n/config'
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config'
+import { CATALOGUE, getCatalogueProduct } from '../catalogue'
+import { hmacHex, timingSafeEqual } from '../crypto'
 
 /**
  * Stripe via REST + fetch rather than the stripe-node SDK: the SDK needs a
  * custom HTTP client to run on Workers, and we use three endpoints.
  *
- * Catalogue is local for now — one SKU does not justify a product API round
- * trip. Move it behind Stripe Products (or Lightspeed) when there is a second
- * product or someone non-technical needs to edit it.
+ * The catalogue is local and lives in src/lib/catalogue.ts — one SKU does not
+ * justify a product API round trip, and the site has to render the product
+ * while Stripe is still switched off. Move it behind Stripe Products (or
+ * Lightspeed) when there is a second product or someone non-technical needs to
+ * edit it.
  */
 
 const API = 'https://api.stripe.com/v1'
@@ -23,47 +26,6 @@ const API = 'https://api.stripe.com/v1'
 // else needs to change.
 const FLAT_SHIPPING_CENTS = 1200 // $12.00 CAD
 const FREE_SHIPPING_THRESHOLD_CENTS = 15000 // $150.00 CAD
-
-const SLUGS: Record<string, Record<Locale, string>> = {
-  'tee-01': { 'fr-CA': 'chandail-01', 'en-CA': 'tee-01' },
-}
-
-const CATALOGUE: Record<Locale, Product[]> = {
-  'fr-CA': [
-    {
-      id: 'tee-01',
-      slug: 'chandail-01',
-      slugs: SLUGS['tee-01'],
-      name: 'Chandail 01',
-      description: 'À venir.',
-      price: { amount: 6500, currency: 'CAD' },
-      images: [],
-      variants: [
-        { id: 'tee-01-s', sku: 'NA-TEE01-S', label: 'S', inStock: true },
-        { id: 'tee-01-m', sku: 'NA-TEE01-M', label: 'M', inStock: true },
-        { id: 'tee-01-l', sku: 'NA-TEE01-L', label: 'L', inStock: true },
-        { id: 'tee-01-xl', sku: 'NA-TEE01-XL', label: 'XL', inStock: true },
-      ],
-    },
-  ],
-  'en-CA': [
-    {
-      id: 'tee-01',
-      slug: 'tee-01',
-      slugs: SLUGS['tee-01'],
-      name: 'Tee 01',
-      description: 'Coming soon.',
-      price: { amount: 6500, currency: 'CAD' },
-      images: [],
-      variants: [
-        { id: 'tee-01-s', sku: 'NA-TEE01-S', label: 'S', inStock: true },
-        { id: 'tee-01-m', sku: 'NA-TEE01-M', label: 'M', inStock: true },
-        { id: 'tee-01-l', sku: 'NA-TEE01-L', label: 'L', inStock: true },
-        { id: 'tee-01-xl', sku: 'NA-TEE01-XL', label: 'XL', inStock: true },
-      ],
-    },
-  ],
-}
 
 function form(params: Record<string, string | number>): string {
   return Object.entries(params)
@@ -96,28 +58,8 @@ async function verifyStripeSignature(
   const age = Math.abs(Date.now() / 1000 - Number(timestamp))
   if (!Number.isFinite(age) || age > SIGNATURE_TOLERANCE_SECONDS) return false
 
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const sigBuffer = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(`${timestamp}.${payload}`)
-  )
-  const expectedHex = [...new Uint8Array(sigBuffer)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-
-  if (expectedHex.length !== signature.length) return false
-  let diff = 0
-  for (let i = 0; i < expectedHex.length; i++) {
-    diff |= expectedHex.charCodeAt(i) ^ signature.charCodeAt(i)
-  }
-  return diff === 0
+  const expectedHex = await hmacHex(secret, `${timestamp}.${payload}`)
+  return timingSafeEqual(expectedHex, signature)
 }
 
 export function createStripeAdapter(secretKey: string, webhookSecret?: string): CommerceAdapter {
@@ -138,7 +80,7 @@ export function createStripeAdapter(secretKey: string, webhookSecret?: string): 
     name: 'stripe',
 
     async getProduct(slug, locale) {
-      return CATALOGUE[locale].find((p) => p.slug === slug) ?? null
+      return getCatalogueProduct(slug, locale)
     },
 
     async createCheckout(input: CheckoutInput) {

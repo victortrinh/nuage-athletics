@@ -31,25 +31,52 @@ export interface NewSubscriber {
 }
 
 const RATE_WINDOW_MS = 10 * 60 * 1000
-const RATE_MAX = 5
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-export async function isRateLimited(db: D1Database, ip: string): Promise<boolean> {
+/**
+ * Signup attempts and password-gate attempts are counted separately.
+ * Sharing one bucket would let someone failing the gate burn a real
+ * visitor's ability to subscribe, and vice versa.
+ */
+export type AttemptScope = 'signup' | 'gate'
+
+/**
+ * A table name cannot be a bound parameter, so the scope resolves through this
+ * literal lookup. Callers pass a union member, never a string that reaches SQL.
+ */
+const ATTEMPTS: Record<AttemptScope, { table: string; max: number }> = {
+  signup: { table: 'signup_attempts', max: 5 },
+  // Tighter: this one guards a password, and a wrong password is not a typo
+  // a visitor needs eight tries to recover from.
+  gate: { table: 'gate_attempts', max: 8 },
+}
+
+export async function isRateLimited(
+  db: D1Database,
+  ip: string,
+  scope: AttemptScope = 'signup'
+): Promise<boolean> {
+  const { table, max } = ATTEMPTS[scope]
   const since = Date.now() - RATE_WINDOW_MS
   const row = await db
-    .prepare('SELECT COUNT(*) AS n FROM signup_attempts WHERE ip = ? AND attempted_at > ?')
+    .prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ip = ? AND attempted_at > ?`)
     .bind(ip, since)
     .first<{ n: number }>()
-  return (row?.n ?? 0) >= RATE_MAX
+  return (row?.n ?? 0) >= max
 }
 
 /** Records this attempt and, in the same round trip, sweeps attempts that have
  * already aged out of the rate-limit window — otherwise the table grows forever. */
-export async function recordAttempt(db: D1Database, ip: string): Promise<void> {
+export async function recordAttempt(
+  db: D1Database,
+  ip: string,
+  scope: AttemptScope = 'signup'
+): Promise<void> {
+  const { table } = ATTEMPTS[scope]
   const now = Date.now()
   await db.batch([
-    db.prepare('INSERT INTO signup_attempts (ip, attempted_at) VALUES (?, ?)').bind(ip, now),
-    db.prepare('DELETE FROM signup_attempts WHERE attempted_at <= ?').bind(now - RATE_WINDOW_MS),
+    db.prepare(`INSERT INTO ${table} (ip, attempted_at) VALUES (?, ?)`).bind(ip, now),
+    db.prepare(`DELETE FROM ${table} WHERE attempted_at <= ?`).bind(now - RATE_WINDOW_MS),
   ])
 }
 

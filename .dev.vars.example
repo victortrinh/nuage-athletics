@@ -1,5 +1,15 @@
 # Copy to .dev.vars for local development (gitignored)
+#
+# Careful: vitest reads this file too (via the Cloudflare pool), so anything
+# set here also applies to the test suite. Setting TURNSTILE_SECRET_KEY makes
+# subscribe.ts start verifying challenges, and the tests post no token — the
+# suite fails with 400s that look like a code bug and are not. Leave it
+# commented out unless you are specifically exercising Turnstile locally.
 RESEND_API_KEY=re_xxxxxxxxxxxx
-TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+# TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
+
+# The pre-launch gate. SITE_LOCKED lives in wrangler.toml [vars]; set it here
+# to "true" to exercise the gate against `wrangler dev`.
+SITE_PASSWORD=let-me-in

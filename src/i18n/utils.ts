@@ -13,6 +13,7 @@ export function localePath(locale: Locale, path: string): string {
  */
 export const ROUTES = {
   home: { 'fr-CA': '/', 'en-CA': '/en/' },
+  gate: { 'fr-CA': '/acces/', 'en-CA': '/en/access/' },
   privacy: { 'fr-CA': '/confidentialite/', 'en-CA': '/en/privacy/' },
   terms: { 'fr-CA': '/conditions/', 'en-CA': '/en/terms/' },
   confirmed: { 'fr-CA': '/inscription-confirmee/', 'en-CA': '/en/confirmed/' },

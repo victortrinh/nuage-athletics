@@ -1,71 +1,18 @@
 ---
-import { env } from 'cloudflare:workers'
-import Base from '../../../layouts/Base.astro'
-import BuyButton from '../../../components/BuyButton.tsx'
-import CpaDisclosure from '../../../components/CpaDisclosure.astro'
-import { t } from '../../../i18n/ui.ts'
-import { getCommerce, commerceEnabled } from '../../../lib/commerce/index.ts'
-import { productAlternates, productPath } from '../../../i18n/utils.ts'
+import { getCatalogueProduct } from '../../../lib/catalogue.ts'
+import { route } from '../../../i18n/utils.ts'
 
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
 export const prerender = false
 
-if (!commerceEnabled(env)) {
-  return new Response('Not found', { status: 404 })
-}
-
+/** See the note in src/pages/produit/[slug].astro. */
 const locale = 'en-CA' as const
-const d = t(locale)
 const { slug } = Astro.params
 
-const commerce = getCommerce(env)
-const product = slug ? await commerce.getProduct(slug, locale) : null
-
-if (!product) {
+if (!slug || !getCatalogueProduct(slug, locale)) {
   return new Response('Not found', { status: 404 })
 }
 
-const alts = productAlternates(product.slugs)
-const priceDisplay = new Intl.NumberFormat('en-CA', {
-  style: 'currency',
-  currency: product.price.currency,
-}).format(product.price.amount / 100)
-
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Product',
-  name: product.name,
-  description: product.description,
-  image: product.images,
-  offers: {
-    '@type': 'Offer',
-    priceCurrency: product.price.currency,
-    price: (product.price.amount / 100).toFixed(2),
-    availability: product.variants.some((v) => v.inStock)
-      ? 'https://schema.org/InStock'
-      : 'https://schema.org/OutOfStock',
-    url: new URL(productPath(locale, product.slug), Astro.site).href,
-  },
-}
+return Astro.redirect(route('home', locale), 301)
 ---
-
-<Base
-  {locale}
-  alternates={alts}
-  localeHref={productPath('fr-CA', product.slugs['fr-CA'])}
-  title={`${product.name} - Nuage Athletics`}
-  description={product.description}
->
-  <script type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
-
-  <section class="max-w-2xl py-16 sm:py-28">
-    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight">{product.name}</h1>
-    <p class="mt-4 text-lg opacity-70">{priceDisplay}</p>
-    <p class="mt-6 opacity-80">{product.description}</p>
-
-    <div class="mt-10">
-      <BuyButton client:load {locale} {d} variants={product.variants} />
-    </div>
-
-    <CpaDisclosure {locale} productName={product.name} />
-  </section>
-</Base>

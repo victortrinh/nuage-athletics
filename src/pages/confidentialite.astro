@@ -4,6 +4,10 @@
 import Base from '../layouts/Base.astro'
 import { SENDER_IDENTITY } from '../lib/consent'
 
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
+export const prerender = false
+
 const locale = 'fr-CA' as const
 ---
 

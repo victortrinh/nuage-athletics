@@ -37,7 +37,19 @@ export type Dict = {
   mailCta: string
   mailIgnore: string
   mailUnsub: string
+  // password gate
+  gateTitle: string
+  gateLede: string
+  gatePasswordLabel: string
+  gateSubmit: string
+  gateErrorBad: string
+  gateSignupLede: string
   // product / checkout
+  productDetails: string
+  productGalleryLabel: string
+  productNotifyTitle: string
+  productNotifyBody: string
+  productComingSoon: string
   productSizeLabel: string
   productOutOfStock: string
   productBuy: string
@@ -86,6 +98,18 @@ export const UI: Record<Locale, Dict> = {
     mailCta: 'Confirmer mon inscription',
     mailIgnore: "Si cette inscription ne vient pas de vous, ignorez ce courriel.",
     mailUnsub: 'Se désabonner',
+    gateTitle: 'Accès restreint',
+    gateLede: 'Ce site n’est pas encore ouvert. Entrez le mot de passe pour continuer.',
+    gatePasswordLabel: 'Mot de passe',
+    gateSubmit: 'Entrer',
+    gateErrorBad: 'Mot de passe incorrect.',
+    gateSignupLede: 'Pas de mot de passe? Soyez averti du lancement.',
+    productDetails: 'Détails',
+    productGalleryLabel: 'Images du produit',
+    productNotifyTitle: 'Soyez averti',
+    productNotifyBody:
+      'Choisissez votre taille et laissez-nous votre courriel. Nous vous écrirons dès que la vente ouvre.',
+    productComingSoon: 'Bientôt',
     productSizeLabel: 'Taille',
     productOutOfStock: 'Épuisé',
     productBuy: 'Acheter',
@@ -131,6 +155,18 @@ export const UI: Record<Locale, Dict> = {
     mailCta: 'Confirm my signup',
     mailIgnore: "If this signup wasn't you, ignore this email.",
     mailUnsub: 'Unsubscribe',
+    gateTitle: 'Restricted access',
+    gateLede: 'This site is not open yet. Enter the password to continue.',
+    gatePasswordLabel: 'Password',
+    gateSubmit: 'Enter',
+    gateErrorBad: 'Incorrect password.',
+    gateSignupLede: 'No password? Get notified at launch.',
+    productDetails: 'Details',
+    productGalleryLabel: 'Product images',
+    productNotifyTitle: 'Get notified',
+    productNotifyBody:
+      'Pick your size and leave us your email. We will write the moment it goes on sale.',
+    productComingSoon: 'Soon',
     productSizeLabel: 'Size',
     productOutOfStock: 'Out of stock',
     productBuy: 'Buy now',

@@ -1,0 +1,109 @@
+---
+import ProductGallery from './ProductGallery.astro'
+import ProductActions from './ProductActions.tsx'
+import CpaDisclosure from './CpaDisclosure.astro'
+import { t } from '../i18n/ui'
+import type { Locale } from '../i18n/config'
+import { editorialFor, featuredProduct } from '../lib/catalogue'
+
+interface Props {
+  locale: Locale
+  commerceEnabled: boolean
+}
+
+const { locale, commerceEnabled } = Astro.props
+const d = t(locale)
+const product = featuredProduct(locale)
+const editorial = editorialFor(product.id, locale)
+const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY
+
+/**
+ * No price is rendered while commerce is off, and the price is left out of the
+ * structured data for the same reason: an advertised price is one a Quebec
+ * merchant is expected to honour, and the number in the catalogue is still a
+ * placeholder. Availability says PreOrder so the omission reads as deliberate.
+ */
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: product.name,
+  description: product.description,
+  brand: { '@type': 'Brand', name: d.brand },
+  material: editorial.specs[0]?.value,
+  ...(commerceEnabled
+    ? {
+        offers: {
+          '@type': 'Offer',
+          priceCurrency: product.price.currency,
+          price: (product.price.amount / 100).toFixed(2),
+          availability: 'https://schema.org/InStock',
+        },
+      }
+    : { offers: { '@type': 'Offer', availability: 'https://schema.org/PreOrder' } }),
+}
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+<article class="grid gap-10 py-8 lg:grid-cols-[1fr_24rem] lg:gap-16 lg:py-12">
+  <ProductGallery slots={editorial.gallery} label={d.productGalleryLabel} />
+
+  <div class="lg:sticky lg:top-8 lg:self-start">
+    <h1 class="wordmark text-3xl leading-none sm:text-4xl">{product.name}</h1>
+
+    {
+      !commerceEnabled && (
+        <p
+          class="mt-4 inline-block border border-ink px-2 py-1 text-[10px] uppercase"
+          style="letter-spacing: var(--tracking-label)"
+        >
+          {d.productComingSoon}
+        </p>
+      )
+    }
+
+    <p class="mt-6 text-base leading-relaxed text-mute">{product.description}</p>
+
+    <div class="mt-10">
+      <ProductActions
+        client:load
+        {locale}
+        {d}
+        productId={product.id}
+        variants={product.variants}
+        {commerceEnabled}
+        turnstileSiteKey={siteKey}
+      />
+    </div>
+
+    <h2
+      class="mt-14 border-t border-line pt-8 text-[11px] uppercase text-mute"
+      style="letter-spacing: var(--tracking-label)"
+    >
+      {d.productDetails}
+    </h2>
+    <dl class="mt-5">
+      {
+        editorial.specs.map((spec) => (
+          <div class="flex justify-between gap-6 border-b border-line py-3 text-sm">
+            <dt class="text-mute">{spec.label}</dt>
+            <dd class="text-right">{spec.value}</dd>
+          </div>
+        ))
+      }
+    </dl>
+
+    {commerceEnabled && <CpaDisclosure {locale} productName={product.name} />}
+  </div>
+</article>
+
+{
+  siteKey && (
+    <script
+      is:inline
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+      async
+      defer
+    />
+  )
+}
