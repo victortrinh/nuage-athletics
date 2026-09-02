@@ -12,6 +12,14 @@ export interface SkyHandle {
 export interface SkyOptions {
   /** Called once the runtime ladder gives up and the canvas is hidden. */
   onGiveUp?: () => void
+  /**
+   * Called when the engine can't mount at all this session — e.g. WebGL2
+   * context creation failed despite passing the earlier capability probe.
+   * Unlike onGiveUp, retrying can't help here: the same canvas would build
+   * the same context the same way, so the caller should treat the sky as
+   * permanently unavailable rather than offering another attempt.
+   */
+  onUnavailable?: () => void
 }
 
 /** Desktop frame-time budget. Loosened on coarse pointers below, where the
@@ -88,11 +96,15 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
       powerPreference: 'low-power',
     })
   } catch {
+    setGaveUp()
+    options.onUnavailable?.()
     return { destroy() {}, setPaused() {} }
   }
   const gl = renderer.gl as OGLRenderingContext
 
-  if (!('drawingBufferWidth' in gl)) {
+  if (!gl || !('drawingBufferWidth' in gl)) {
+    setGaveUp()
+    options.onUnavailable?.()
     return { destroy() {}, setPaused() {} }
   }
 

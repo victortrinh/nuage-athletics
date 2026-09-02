@@ -60,6 +60,13 @@
             onGiveUp: () => {
               handle = null
             },
+            onUnavailable: () => {
+              handle = null
+              // Retrying can't help — the same canvas would fail to build a
+              // context the same way — so don't leave a control that looks
+              // functional but silently does nothing.
+              if (toggle) toggle.hidden = true
+            },
           })
         })
       })
