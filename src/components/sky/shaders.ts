@@ -124,10 +124,10 @@ export const CLOUD = /* glsl */ `
     float sum = 0.0;
     float amp = 0.55;
     float freq = 1.0;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 5; i++) {
       sum += amp * n(p * freq);
       freq *= 2.03;
-      amp *= 0.56;
+      amp *= 0.45;
     }
     return sum;
   }
@@ -165,10 +165,15 @@ export const CLOUD = /* glsl */ `
     vec2 p2 = vUv * 5.2 + uOffset2 + warp * 1.4;
 
     float detail = fbm(p1) * 0.65 + fbm(p2) * 0.35;
+    // A contrast S-curve biases mid-tones toward a solid puff-core or a
+    // soft gap instead of continuous fine marbling — this is what gives
+    // each cloud lobe a rounder, more solid cumulus-like body.
+    detail = smoothstep(0.25, 0.75, detail);
 
     vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.05;
     float detailLit = fbm(p1 - sunDir) * 0.65 + fbm(p2 - sunDir) * 0.35;
-    float light = clamp((detail - detailLit) * 3.0 + 0.5, 0.0, 1.0);
+    detailLit = smoothstep(0.25, 0.75, detailLit);
+    float light = clamp((detail - detailLit) * 2.0 + 0.5, 0.0, 1.0);
 
     float density = coverage * detail;
     density = clamp(density - carve * coverage * 0.6, 0.0, 1.0);

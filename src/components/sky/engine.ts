@@ -288,7 +288,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     fluidProgram.uniforms.uPointerPrev.value = [prevFrameX, prevFrameY]
     fluidProgram.uniforms.uPointerCurr.value = [latestX, latestY]
     fluidProgram.uniforms.uPointerActive.value = movedSinceLastFrame ? 1 : 0
-    fluidProgram.uniforms.uSplatRadius.value = 0.025 + Math.min(speed * 0.01, 0.025)
+    fluidProgram.uniforms.uSplatRadius.value = 0.0125 + Math.min(speed * 0.005, 0.0125)
     fluidProgram.uniforms.uSplatStrength.value = 0.9 + Math.min(speed * 1.5, 1.8)
 
     renderer.render({ scene: fluidMesh, target: write })
