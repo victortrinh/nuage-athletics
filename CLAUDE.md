@@ -7,8 +7,9 @@ Context for AI assistants working in this repo. Read before changing anything.
 Landing page + email capture for a single-SKU Canadian apparel brand. First drop
 fall 2026. Commerce is scaffolded behind an adapter but not wired to any page.
 
-**Stack:** Astro 7 (static output + SSR endpoints) · React islands · Tailwind 4 ·
-Cloudflare Workers · D1 · Resend · Turnstile · Stripe (phase 2)
+**Stack:** Astro 7 (static output + SSR endpoints) · React islands (shadcn/ui on
+React Aria Components) · Tailwind 4 · Cloudflare Workers · D1 · Resend · Turnstile ·
+Stripe (phase 2)
 
 ## Non-negotiables
 
@@ -67,15 +68,75 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 - Tailwind utility classes inline; no component CSS files.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
 
+## Component library
+
+`src/components/ui/` holds shadcn/ui primitives on the React Aria Components base
+(`components.json` has `"base": "aria"`), hand-written rather than CLI-generated —
+`ui.shadcn.com` is blocked by egress policy in the sandboxes this repo has been
+developed in so far; check whether that still holds before assuming `npx shadcn
+add <component>` will work, and if it does, treat the CLI's raw output as a diff
+to reconcile against these files' existing conventions, not a replacement for them.
+
+- **Variant tables (`*-variants.ts`) are plain `.ts`, zero React/RAC imports.**
+  `.astro` files (`GateScreen.astro`, `Base.astro`) import `buttonVariants`,
+  `inputVariants`, `labelVariants`, `fieldErrorVariants` from these directly —
+  never from the `.tsx` primitives, which pull in `react-aria-components`.
+  `scripts/check-guards.sh` (run by `npm run check`) enforces this.
+- **This site has no radii, ever.** `--radius-*` are all `0` in `global.css`,
+  which handles shadcn's own `rounded-*` classes, but a custom one-off
+  (`rounded-[6px]`, say) would slip past that. `check-guards.sh` also greps for
+  any `rounded` utility inside a `class`/`className` attribute — that's what
+  actually catches it.
+- **Focus is a hard offset outline, not a ring** (the WebGL sky washes soft
+  rings out). Defined once as the `focus-block` utility in `global.css`, applied
+  to native `:focus-visible` and to RAC's `data-[focus-visible]` attribute
+  (`checkbox.tsx`, `radio-group.tsx` — their real `<input>` is visually hidden,
+  so native `:focus-visible` never fires on the part you can see).
+- **The CASL consent checkbox uses `isSelected`/`onChange(boolean)`, never
+  `defaultSelected`** (`checked`/`onChange(event)` don't exist on RAC's
+  `Checkbox`, and a stray one is silently dropped, not a type error).
+  `check-guards.sh` greps for `defaultSelected` too.
+- **A custom RAC indicator loses what a native control gets from the OS for
+  free in forced-colors mode.** `checkbox.tsx`'s `forced-colors:` rules exist
+  because of this — see `e2e/forced-colors.e2e.ts` before removing them.
+- Eight shadcn semantic color names (`--color-background`, `--color-primary`,
+  etc.) are aliased onto the six brand tokens in one flat `@theme` block — this
+  site has no dark mode, so skip shadcn's usual two-layer `:root` +
+  `@theme inline` split if a `shadcn add` tries to reintroduce it.
+- No `tailwind-merge`, no `lucide-react`. `cn()` (`src/components/ui/cn.ts`) is
+  `clsx` only — there's no conditional class-conflict resolution in this
+  codebase to merge. Adding either back is a deliberate call, not a default.
+
+## Accessibility
+
+`npm run test:a11y` runs `@axe-core/playwright` across all 16 routes plus
+behavioural assertions in `e2e/`, wired into CI (`.github/workflows/ci.yml`).
+Two things worth knowing before touching it:
+
+- **axe alone does not validate most hand-written accessibility fixes** — it
+  can't know a field is in an error state, and `aria-pressed` on mutually
+  exclusive buttons is valid ARIA even though it's the wrong widget. Treat it
+  as a regression net for markup a component generates, and write an explicit
+  Playwright assertion (`e2e/behavior.e2e.ts`) for anything it can't see.
+- **`e2e/global-setup.ts` logs into the pre-launch gate** and saves
+  `storageState` so the suite scans the real locked site. If you add a page
+  behind the gate, it's covered automatically via `ROUTES` — nothing to update
+  there. If you touch `src/lib/gate.ts` or `src/middleware.ts`, rerun
+  `npm run test:a11y` locally before pushing: a broken gate breaks the whole
+  suite's login step, not just one test.
+
 ## Verify before claiming done
 
 ```bash
-npm run check   # tsc --noEmit
-npm run build   # astro build
-npm test        # vitest
+npm run check     # tsc --noEmit (src/ and e2e/) + scripts/check-guards.sh
+npm run build     # astro build
+npm test          # vitest
+npm run test:a11y # Playwright + axe — builds and runs its own wrangler dev
 ```
 
-All three must pass.
+All four must pass. `test:a11y` is slower (it builds, migrates a throwaway local
+D1, and boots `wrangler dev` itself) — run it before claiming an accessibility or
+`src/components/ui/` change is done, not on every unrelated edit.
 
 Pages are **not** prerendered — every route under `src/pages` sets
 `prerender = false`, because Workers serves a prerendered file straight from
