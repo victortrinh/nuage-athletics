@@ -30,6 +30,44 @@
   --font-display: Futura, "Century Gothic", "Avenir Next", var(--font-sans);
   /* Tiny uppercase labels, the counterweight to the big imagery. */
   --tracking-label: 0.18em;
+
+  /*
+   * shadcn/react-aria-components primitives (src/components/ui/) reference
+   * these semantic names. They're aliases onto the six brand tokens above,
+   * not a parallel palette — this site has no dark mode, so unlike shadcn's
+   * usual two-layer `:root` + `@theme inline` pattern (which exists only to
+   * let `.dark` swap the underlying value), one flat block is enough.
+   * --color-input is deliberately its own alias, not folded into --color-
+   * border: this site's inputs are ink-underlined, not line-grey.
+   */
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-ink);
+  --color-primary: var(--color-ink);
+  --color-primary-foreground: var(--color-paper);
+  --color-border: var(--color-line);
+  --color-input: var(--color-ink);
+  --color-muted-foreground: var(--color-mute);
+  --color-destructive: var(--color-danger);
+
+  /*
+   * Every radius shadcn's primitives ship (rounded-md buttons, rounded-[4px]
+   * checkboxes, rounded-full radios) zeroed at the token level rather than
+   * hand-stripped per file — shadcn's own `--radius-sm: calc(var(--radius) -
+   * 4px)` chain would go negative and silently clamp to 0 by accident with
+   * --radius: 0, and its checkbox/radio radii (rounded-[4px], rounded-full)
+   * aren't reachable from that chain at all. Literal zeros here survive a
+   * future `shadcn add` without relying on either. `grep -rE "rounded" src/`
+   * asserting zero matches in CI is the guardrail that actually holds this.
+   */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+  --radius-full: 0;
 }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -40,10 +78,17 @@ body { background: var(--color-paper); color: var(--color-ink); }
 button, input, textarea, select, img, video { border-radius: 0; }
 
 /* The sky sits behind everything and washes out a faint ring, so focus is
-   drawn as a hard offset block instead. */
-:focus-visible {
+   drawn as a hard offset block instead — defined once as a utility so it
+   can be applied identically to native :focus-visible (below) and to RAC's
+   data-[focus-visible] attribute, which fires on Checkbox/Radio's visible
+   indicator rather than their visually-hidden real <input>. */
+@utility focus-block {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
+}
+
+:focus-visible {
+  @apply focus-block;
 }
 
 ::selection { background: var(--color-ink); color: var(--color-paper); }
