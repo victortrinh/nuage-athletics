@@ -31,6 +31,14 @@ export default defineConfig({
     setupFiles: ['./test/apply-migrations.ts', './test/stub-resend.ts'],
     // Default excludes don't cover nested worktrees under .worktrees/, whose
     // own test/ directories would otherwise be discovered and run twice.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**'],
+    // e2e/ holds Playwright specs, which vitest's default include glob would
+    // otherwise collect and try to run inside the Workers pool.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/e2e/**'],
+  },
+  resolve: {
+    // Astro/Vite read the @/* path from tsconfig automatically; Vite's own
+    // config resolution does not, so it's mirrored here for any test that
+    // ends up importing through the alias.
+    alias: { '@': path.resolve(__dirname, 'src') },
   },
 })
