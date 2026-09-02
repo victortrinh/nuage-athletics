@@ -222,6 +222,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
   }
   document.addEventListener('visibilitychange', onVisibility)
 
+  const mountTime = performance.now()
   let rafId: number | null = null
   let lastTime = performance.now()
   let simAccumulator = 0
@@ -291,7 +292,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       if (simAccumulator > simDt * 4) simAccumulator = 0
     }
 
-    renderCloud(now / 1000)
+    renderCloud((now - mountTime) / 1000)
     scheduleFrame()
   }
 
@@ -330,11 +331,20 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     cloudProgram.uniforms.uFluid.value = fluidRead.texture
     cloudProgram.uniforms.uTime.value = t
     cloudProgram.uniforms.uAspect.value = width / height
-    cloudProgram.uniforms.uOffset1.value = [t * 0.008, t * 0.003]
+    // Ease the ambient drift in from a standstill over the first several
+    // seconds after mount (t is time-since-mount, not absolute page time).
+    // Without this, the clouds drift at full, constant speed from the very
+    // first rendered frame — the exact moment a visitor's eyes are on the
+    // canvas as it fades in, so a slow *ambient* drift reads instead as an
+    // unwanted "everything just slid" jump. Quadratic-out keeps the first
+    // second or two essentially motionless.
+    const driftEase = Math.min(1, t / 5) ** 2
+    const dt = t * driftEase
+    cloudProgram.uniforms.uOffset1.value = [dt * 0.008, dt * 0.003]
     // Placement samples at a much lower coordinate scale (~0.1) than the
     // detail layer, so the same drift speed would cross the whole field
     // far faster — keep it slow enough that clouds migrate gradually.
-    cloudProgram.uniforms.uMacroOffset.value = [t * 0.00025, t * 0.0001]
+    cloudProgram.uniforms.uMacroOffset.value = [dt * 0.00025, dt * 0.0001]
     renderer.render({ scene: cloudMesh, target: cloudTarget })
 
     blitProgram.uniforms.uTex.value = cloudTarget.texture
@@ -343,7 +353,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
 
   // Fade the canvas in once the first real frame has painted.
   requestAnimationFrame(() => {
-    renderCloud(performance.now() / 1000)
+    renderCloud((performance.now() - mountTime) / 1000)
     canvas.style.opacity = '1'
     lastTime = performance.now()
     scheduleFrame()
