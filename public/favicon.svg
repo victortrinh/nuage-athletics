@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Nuage Athletics">
+  <!-- The brand mark: a lowercase "n" drawn as an arch, plus the dot.
+       Stroked primitives rather than a font so it renders identically
+       everywhere and stays legible at 16px. Replace with the real vector
+       when it lands. -->
+  <path d="M6 26 V15 a7 7 0 0 1 14 0 V26"
+        fill="none" stroke="#0a0a0a" stroke-width="5.5" stroke-linecap="round" />
+  <circle cx="27" cy="26" r="2.75" fill="#0a0a0a" />
+</svg>

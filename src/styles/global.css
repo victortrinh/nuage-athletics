@@ -41,10 +41,12 @@ button, input, textarea, select, img, video { border-radius: 0; }
 ::selection { background: var(--color-ink); color: var(--color-paper); }
 
 /* The one wordmark treatment, used for the brand mark and page headings —
-   nothing else on the site carries a display typeface. */
+   nothing else on the site carries a display typeface.
+   Set upright and tightly tracked to sit with the logo, which is a rounded
+   geometric lowercase; the previous oblique read as a different brand. */
 .wordmark {
   font-family: var(--font-display);
   font-weight: 800;
-  font-style: italic;
-  letter-spacing: -0.01em;
+  font-style: normal;
+  letter-spacing: -0.03em;
 }

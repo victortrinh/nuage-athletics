@@ -1,27 +1,51 @@
 ---
 /**
- * The brand mark.
+ * The brand mark: a rounded lowercase "nuage" followed by a dot, reduced for
+ * the small mark to "n" + dot.
  *
- * Victor's logo is a rounded lowercase "nuage" followed by a dot, with the
- * mark reducing that to "n" + dot. The supplied artwork arrived as flat
- * images rather than vectors, so what ships here is the type treatment the
- * site already used, holding the slot.
+ * The artwork arrived as flat images rather than vectors, so the mark is drawn
+ * here from primitives — an arch and a circle, which is what the real one is —
+ * and the wordmark uses the display stack. Neither is the genuine file.
  *
- * When the real SVGs land, drop them in public/ and swap the markup below —
+ * When the real SVGs land, drop them in public/ and swap the markup below;
  * nothing outside this file needs to change. Keep `currentColor` on every
- * fill so the mark inherits ink here and can be flipped to paper anywhere it
- * sits on a dark ground.
+ * stroke and fill so the mark inherits ink here and can be flipped to paper
+ * anywhere it sits on a dark ground.
  */
 interface Props {
   variant?: 'mark' | 'wordmark'
   class?: string
+  title?: string
 }
 
-const { variant = 'wordmark', class: className = '' } = Astro.props
+const { variant = 'wordmark', class: className = '', title } = Astro.props
 ---
 
-<span class={`wordmark inline-flex items-baseline leading-none ${className}`}>
-  {variant === 'wordmark' ? 'nuage' : 'n'}<span
-    class="ml-[0.06em] inline-block h-[0.19em] w-[0.19em] translate-y-[-0.02em] rounded-full bg-current"
-    aria-hidden="true"></span>
-</span>
+{
+  variant === 'mark' ? (
+    <svg
+      viewBox="0 0 32 32"
+      class={`inline-block h-[1em] w-[1em] ${className}`}
+      fill="none"
+      aria-hidden={title ? undefined : 'true'}
+      role={title ? 'img' : undefined}
+      aria-label={title}
+    >
+      <path
+        d="M6 26 V15 a7 7 0 0 1 14 0 V26"
+        stroke="currentColor"
+        stroke-width="5.5"
+        stroke-linecap="round"
+      />
+      <circle cx="27" cy="26" r="2.75" fill="currentColor" />
+    </svg>
+  ) : (
+    <span class={`wordmark inline-flex items-baseline leading-none ${className}`}>
+      nuage
+      <span
+        class="ml-[0.08em] inline-block h-[0.2em] w-[0.2em] rounded-full bg-current"
+        aria-hidden="true"
+      />
+    </span>
+  )
+}

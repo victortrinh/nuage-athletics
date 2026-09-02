@@ -34,7 +34,13 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 
 5. **Nothing under `src/pages` imports Stripe directly.** Commerce goes through
    `CommerceAdapter` (`src/lib/commerce/`). Lightspeed may replace Stripe later;
-   the swap should be one line in `src/lib/commerce/index.ts`.
+   the swap should be one line in `src/lib/commerce/index.ts`. Product data lives
+   in `src/lib/catalogue.ts`, which imports no payment provider — pages read it
+   directly and the Stripe adapter reads it too.
+
+5.5 **Never render a price while `COMMERCE_ENABLED` is off.** The number in
+   `catalogue.ts` is a placeholder, and an advertised price is one a Quebec
+   merchant is expected to honour. Set the real one before flipping the flag.
 
 6. **Every commercial email needs sender name, mailing address and unsubscribe.**
    See `SENDER_IDENTITY` in `src/lib/consent.ts`. CASL requires all three.
@@ -66,7 +72,26 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 ```bash
 npm run check   # tsc --noEmit
 npm run build   # astro build
+npm test        # vitest
 ```
 
-Both must pass. `dist/client/index.html` should contain `<html lang="fr-CA">`
-and three hreflang links.
+All three must pass.
+
+Pages are **not** prerendered — every route under `src/pages` sets
+`prerender = false`, because Workers serves a prerendered file straight from
+static assets without invoking the Worker, and the password gate in
+`src/middleware.ts` would never see it. So there is no `dist/client/index.html`
+to inspect. Check the rendered response instead:
+
+```bash
+npx wrangler dev --local
+curl -s localhost:8787/ | grep -o 'lang="fr-CA"\|hreflang="[^"]*"'
+```
+
+The French root must report `lang="fr-CA"` and carry three `rel="alternate"`
+links (`fr-CA`, `en-CA`, `x-default`).
+
+**`.dev.vars` is read by vitest too.** Setting `TURNSTILE_SECRET_KEY` there makes
+`subscribe.ts` start verifying challenges the tests never send, and the suite
+fails with 400s that look like a code bug. Leave it commented out unless you are
+deliberately exercising Turnstile.

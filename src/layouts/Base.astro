@@ -2,6 +2,7 @@
 import '../styles/global.css'
 import Seo from '../components/Seo.astro'
 import Sky from '../components/Sky.astro'
+import Logo from '../components/Logo.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
@@ -31,9 +32,15 @@ const year = new Date().getFullYear()
   </head>
   <body class="min-h-dvh flex flex-col font-sans antialiased">
     <Sky />
-    <header class="flex items-center justify-between gap-6 px-6 py-6 sm:px-10">
-      <a href={route('home', locale)} class="wordmark text-sm uppercase hover:text-accent-ink">
-        {d.brand}
+    <header
+      class="flex items-center justify-between gap-6 border-b border-line px-6 py-4 sm:px-10"
+    >
+      <a
+        href={route('home', locale)}
+        aria-label={d.brand}
+        class="text-xl hover:text-accent-ink"
+      >
+        <Logo variant="wordmark" />
       </a>
       <div class="flex items-center gap-6">
         <button
@@ -54,7 +61,7 @@ const year = new Date().getFullYear()
       <slot />
     </main>
 
-    <footer class="px-6 py-10 sm:px-10 text-xs opacity-60">
+    <footer class="mt-16 border-t border-line px-6 py-10 text-xs text-mute sm:px-10">
       <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
         <a href={route('privacy', locale)} class="hover:text-accent-ink">{d.privacy}</a>
         <a href={route('terms', locale)} class="hover:text-accent-ink">{d.terms}</a>
