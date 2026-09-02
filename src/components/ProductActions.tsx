@@ -65,12 +65,7 @@ export default function ProductActions({
 
   return (
     <div>
-      <p
-        className="text-[11px] uppercase text-mute"
-        style={{ letterSpacing: 'var(--tracking-label)' }}
-      >
-        {d.productSizeLabel}
-      </p>
+      <p className="text-[11px] uppercase tracking-label text-mute">{d.productSizeLabel}</p>
 
       <div className="mt-3 grid grid-cols-3 gap-px bg-line sm:grid-cols-6 lg:grid-cols-3">
         {variants.map((v) => (
@@ -80,10 +75,9 @@ export default function ProductActions({
             disabled={!v.inStock}
             onClick={() => setVariantId(variantId === v.id ? '' : v.id)}
             aria-pressed={variantId === v.id}
-            className={`bg-paper px-3 py-3 text-xs uppercase transition-colors disabled:cursor-not-allowed disabled:text-mute disabled:line-through ${
+            className={`bg-paper px-3 py-3 text-xs uppercase tracking-label transition-colors disabled:cursor-not-allowed disabled:text-mute disabled:line-through ${
               variantId === v.id ? 'bg-ink text-paper' : 'hover:bg-ink hover:text-paper'
             }`}
-            style={{ letterSpacing: 'var(--tracking-label)' }}
           >
             {v.label}
           </button>
@@ -96,8 +90,7 @@ export default function ProductActions({
             type="button"
             onClick={onBuy}
             disabled={loading}
-            className="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase text-paper transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
-            style={{ letterSpacing: 'var(--tracking-label)' }}
+            className="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase tracking-label text-paper transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
           >
             {loading ? d.submitting : d.productBuy}
           </button>
@@ -109,12 +102,7 @@ export default function ProductActions({
         </>
       ) : (
         <div className="mt-10 border-t border-line pt-8">
-          <p
-            className="text-[11px] uppercase text-mute"
-            style={{ letterSpacing: 'var(--tracking-label)' }}
-          >
-            {d.productNotifyTitle}
-          </p>
+          <p className="text-[11px] uppercase tracking-label text-mute">{d.productNotifyTitle}</p>
           <p className="mt-3 text-sm leading-relaxed">{d.productNotifyBody}</p>
           <div className="mt-6">
             {/*

@@ -26,18 +26,14 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
 <section class="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center py-16">
   <Logo variant="mark" class="text-5xl" />
 
-  <h1 class="mt-10 text-[11px] uppercase" style={`letter-spacing: var(--tracking-label)`}>
+  <h1 class="mt-10 text-[11px] uppercase tracking-label">
     {d.gateTitle}
   </h1>
   <p class="mt-3 text-lg leading-snug">{d.gateLede}</p>
 
   <form method="POST" action="/api/gate" class="mt-10">
     <input type="hidden" name="to" value={to} />
-    <label
-      for="gate-password"
-      class="block text-[11px] uppercase text-mute"
-      style={`letter-spacing: var(--tracking-label)`}
-    >
+    <label for="gate-password" class="block text-[11px] uppercase tracking-label text-mute">
       {d.gatePasswordLabel}
     </label>
     <input
@@ -62,8 +58,7 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
 
     <button
       type="submit"
-      class="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase text-paper transition-colors hover:bg-paper hover:text-ink"
-      style={`letter-spacing: var(--tracking-label)`}
+      class="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase tracking-label text-paper transition-colors hover:bg-paper hover:text-ink"
     >
       {d.gateSubmit}
     </button>
@@ -71,7 +66,7 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
 
   <hr class="mt-14 border-line" />
 
-  <p class="mt-8 text-[11px] uppercase text-mute" style={`letter-spacing: var(--tracking-label)`}>
+  <p class="mt-8 text-[11px] uppercase tracking-label text-mute">
     {d.gateSignupLede}
   </p>
   <div class="mt-5">

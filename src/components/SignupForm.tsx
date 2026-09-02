@@ -161,11 +161,7 @@ export default function SignupForm({
         className="absolute -left-[9999px] h-0 w-0 opacity-0"
       />
 
-      <label
-        htmlFor="email"
-        className="block text-[11px] uppercase text-mute"
-        style={{ letterSpacing: 'var(--tracking-label)' }}
-      >
+      <label htmlFor="email" className="block text-[11px] uppercase tracking-label text-mute">
         {d.emailLabel}
       </label>
       <input
@@ -202,8 +198,7 @@ export default function SignupForm({
       <button
         type="submit"
         disabled={state.kind === 'submitting'}
-        className="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase text-paper transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
-        style={{ letterSpacing: 'var(--tracking-label)' }}
+        className="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase tracking-label text-paper transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
       >
         {state.kind === 'submitting' ? d.submitting : (submitLabel ?? d.submit)}
       </button>
