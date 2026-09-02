@@ -145,6 +145,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       uNoiseSharp: { value: noiseSharpTexture },
       uFluid: { value: null },
       uTime: { value: 0 },
+      uAspect: { value: 1 },
       uOffset1: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
       uCoverage: { value: 0.42 },
@@ -312,6 +313,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     const fluidRead = fluidReadIsA ? fluidA : fluidB
     cloudProgram.uniforms.uFluid.value = fluidRead.texture
     cloudProgram.uniforms.uTime.value = t
+    cloudProgram.uniforms.uAspect.value = width / height
     cloudProgram.uniforms.uOffset1.value = [t * 0.008, t * 0.003]
     // Placement samples at a much lower coordinate scale (~0.1) than the
     // detail layer, so the same drift speed would cross the whole field

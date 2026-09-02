@@ -125,6 +125,7 @@ export const CLOUD = /* glsl */ `
   uniform sampler2D uNoiseSharp;
   uniform sampler2D uFluid;
   uniform float uTime;
+  uniform float uAspect;
   uniform vec2 uOffset1;
   uniform vec2 uMacroOffset;
   uniform float uCoverage;
@@ -193,15 +194,22 @@ export const CLOUD = /* glsl */ `
   }
 
   void main() {
-    // Placement: one low-frequency noise sample — stretched wider than tall
-    // so cloud regions read as sky-like horizontal bands rather than
-    // isotropic dots — combined through a wide-ish smoothstep. Gradual, not
-    // tight: real clouds don't have an edge, they thin out. A single
-    // texture2D lookup already sweeps the full 64x64 texture, so it's the
-    // *coordinate scale* that sets how many regions appear across the
-    // screen (effective frequency is roughly 64 * scale cycles) — ~0.08-0.1
-    // gives a handful, matching the placement analysis this was tuned from.
-    vec2 placementPos = vUv * vec2(0.1, 0.065) + uMacroOffset;
+    // vUv is always 0..1 on both axes regardless of the canvas's actual
+    // pixel aspect ratio, so sampling noise directly from it means cloud
+    // *feature size* stretches with window shape — on a wide/ultrawide
+    // window the pattern spreads out horizontally and leaves large empty
+    // gaps, since the same 0..1 span now covers far more physical pixels.
+    // Scaling x by the real aspect ratio first keeps feature size (and so
+    // coverage) consistent across any window shape.
+    vec2 auv = vec2(vUv.x * uAspect, vUv.y);
+
+    // Placement: one low-frequency noise sample, combined through a
+    // wide-ish smoothstep. Gradual, not tight: real clouds don't have an
+    // edge, they thin out. A single texture2D lookup already sweeps the
+    // full 64x64 texture, so it's the *coordinate scale* that sets how many
+    // regions appear across the screen (effective frequency is roughly
+    // 64 * scale cycles) — ~0.06-0.07 gives a handful.
+    vec2 placementPos = auv * 0.064 + uMacroOffset;
     float placement = placementNoise(placementPos);
     float mask = smoothstep(uCoverage - uCoverageSoftness, uCoverage + uCoverageSoftness, placement);
 
@@ -213,9 +221,7 @@ export const CLOUD = /* glsl */ `
     // says "cloud" — evaluated before this warp is applied, so there's no
     // feedback loop.
     vec2 warp = vel * 0.6 * mask;
-    // Larger-scale than before — bigger, calmer blobs of tone rather than
-    // small, busy repetition.
-    vec2 detailPos = vUv * vec2(2.4, 1.5) + uOffset1 + warp;
+    vec2 detailPos = auv * 1.5 + uOffset1 + warp;
 
     float shape = warpedCloud(detailPos);
     // Wider still than the already-wide curve this had — softer transitions
