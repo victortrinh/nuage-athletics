@@ -2,15 +2,26 @@ import { Renderer, Program, Mesh, Triangle, RenderTarget, Texture } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { BLIT, CLOUD, FLUID_SEED, FLUID_STEP, VERTEX } from './shaders'
 import { buildNoiseTextures } from './noise'
+import { hasGivenUp, setGaveUp } from './prefs'
 
 export interface SkyHandle {
   destroy(): void
   setPaused(paused: boolean): void
 }
 
-const GAVE_UP_KEY = 'na-sky-gaveup'
+export interface SkyOptions {
+  /** Called once the runtime ladder gives up and the canvas is hidden. */
+  onGiveUp?: () => void
+}
+
+/** Desktop frame-time budget. Loosened on coarse pointers below, where the
+ * sim already runs at a lower target rate by design. */
 const SLOW_FRAME_MS = 22
-const SLOW_FRAMES_TO_DEGRADE = 90
+/** Accumulated slow time before stepping down a degrade tier. */
+const SLOW_MS_TO_DEGRADE = 1000
+/** Accumulated slow time, still above budget, before skipping straight to
+ * giving up rather than walking the remaining tiers. */
+const SLOW_MS_HARD_CEILING = 3000
 
 /** Grayscale range the cloud pass writes within. */
 const CLOUD_MIN = 0.82
@@ -41,8 +52,8 @@ function isCoarsePointer(): boolean {
   }
 }
 
-export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
-  if (sessionStorage.getItem(GAVE_UP_KEY) === '1') {
+export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): SkyHandle {
+  if (hasGivenUp()) {
     return { destroy() {}, setPaused() {} }
   }
 
@@ -50,6 +61,10 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
   let cloudScale = coarse ? 0.4 : 0.55
   const dprCap = coarse ? 1.0 : 1.5
   let simHz = coarse ? 30 : 60
+  // The coarse-pointer sim already targets a lower rate by design (30Hz vs
+  // 60Hz), so judging it against the desktop frame budget would degrade
+  // touch devices that are running exactly as tuned.
+  const slowFrameMs = coarse ? 30 : SLOW_FRAME_MS
   // The wake can never be finer than one texel of this buffer. At the old
   // 320 a single texel already covered ~5 screen px, which put a floor under
   // how thin the streak could be drawn; 640 halves that so a genuinely
@@ -277,31 +292,27 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
   let lastTime = performance.now()
   let simAccumulator = 0
   let emaFrameMs = 16
-  let slowFrameCount = 0
+  let slowMs = 0
   let degradeTier = 0
 
-  function degrade() {
+  function degrade(hardCeiling: boolean) {
     degradeTier += 1
-    slowFrameCount = 0
-    if (degradeTier === 1) {
+    slowMs = 0
+    if (hardCeiling || degradeTier > 2) {
+      giveUp()
+    } else if (degradeTier === 1) {
       cloudScale *= 0.7
       // Give back the resolution the finer wake costs before giving up
       // anything else — a slightly coarser streak beats a dropped frame.
       fluidBaseWidth = Math.round(fluidBaseWidth * 0.7)
       allocateTargets()
-    } else if (degradeTier === 2) {
-      simHz = Math.max(15, simHz / 2)
     } else {
-      giveUp()
+      simHz = Math.max(15, simHz / 2)
     }
   }
 
   function giveUp() {
-    try {
-      sessionStorage.setItem(GAVE_UP_KEY, '1')
-    } catch {
-      // ignore
-    }
+    setGaveUp()
     canvas.style.opacity = '0'
     stop()
     try {
@@ -310,6 +321,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     } catch {
       // ignore
     }
+    options.onGiveUp?.()
   }
 
   function stop() {
@@ -330,11 +342,12 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     const dt = Math.min(rawDt, 1 / 15)
 
     emaFrameMs = emaFrameMs * 0.9 + rawDt * 1000 * 0.1
-    if (emaFrameMs > SLOW_FRAME_MS) {
-      slowFrameCount += 1
-      if (slowFrameCount > SLOW_FRAMES_TO_DEGRADE) degrade()
+    if (emaFrameMs > slowFrameMs) {
+      slowMs += rawDt * 1000
+      if (slowMs > SLOW_MS_HARD_CEILING) degrade(true)
+      else if (slowMs > SLOW_MS_TO_DEGRADE) degrade(false)
     } else {
-      slowFrameCount = Math.max(0, slowFrameCount - 1)
+      slowMs = Math.max(0, slowMs - rawDt * 1000)
     }
 
     simAccumulator += dt
