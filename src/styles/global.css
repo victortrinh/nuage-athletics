@@ -18,9 +18,11 @@
   /* Error text. Matches Tailwind's red-700, which the codebase used directly
      in three places before this token existed — 6.2:1 on paper. */
   --color-danger: #b91c1c;
-  /* Draft-notice text (CpaDisclosure). Matches Tailwind's amber-700 — 4.81:1
-     on paper, the tightest of this palette's text colors but still AA. */
-  --color-warn: #b45309;
+  /* Draft-notice text. Tailwind's amber-700 (#b45309, 4.81:1 computed) measured
+     only 4.05:1 in an actual axe/Chromium scan at this text's size — small
+     anti-aliased text samples lighter than its nominal fill color — so this
+     uses amber-800 instead, for real margin rather than a borderline pass. */
+  --color-warn: #92400e;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   /* Wordmark + headings only — reads closest to Futura Bold Oblique without
      shipping a webfont. Falls back through other geometric sans before the
