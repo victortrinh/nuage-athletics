@@ -48,7 +48,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
       if (!el || !window.turnstile || widgetId.current !== null) return
       widgetId.current = window.turnstile.render(el, {
         sitekey: turnstileSiteKey,
-        theme: 'dark',
+        theme: 'light',
       })
     }
 
@@ -153,7 +153,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
         placeholder={d.emailPlaceholder}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mt-2 w-full bg-transparent border-b border-white/30 py-2 text-base outline-none focus:border-accent transition-colors"
+        className="mt-2 w-full bg-transparent border-b border-ink/25 py-2 text-base outline-none focus:border-accent-ink transition-colors"
       />
 
       {/*
@@ -166,7 +166,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
           name="consent"
           checked={consent}
           onChange={(e) => setConsent(e.target.checked)}
-          className="mt-1 shrink-0 accent-white"
+          className="mt-1 shrink-0 accent-ink"
         />
         <span className="opacity-80">{d.consentLabel}</span>
       </label>
@@ -177,13 +177,13 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
       <button
         type="submit"
         disabled={state.kind === 'submitting'}
-        className="mt-8 border border-white/40 px-6 py-3 text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-colors disabled:opacity-40"
+        className="mt-8 border border-ink/40 px-6 py-3 text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-colors disabled:opacity-40"
       >
         {state.kind === 'submitting' ? d.submitting : d.submit}
       </button>
 
       {state.kind === 'error' && (
-        <p role="alert" className="mt-4 text-sm text-red-400">
+        <p role="alert" className="mt-4 text-sm text-red-700">
           {state.message}
         </p>
       )}
