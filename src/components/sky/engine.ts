@@ -148,8 +148,13 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       uAspect: { value: 1 },
       uOffset1: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
-      uCoverage: { value: 0.4 },
-      uCoverageSoftness: { value: 0.12 },
+      // Measured offline (scanning the actual noise field across
+      // scanlines): 0.4/0.12 still left ~23% of a typical window as flat
+      // clear sky, with reports that it still read as "too much white."
+      // 0.32/0.14 brings clear sky down to ~6% at the same window shapes —
+      // still a little open sky, not full overcast.
+      uCoverage: { value: 0.32 },
+      uCoverageSoftness: { value: 0.14 },
       // Raised from 0.72 — a calmer, softer grey floor. The old value read
       // as glaring/harsh against the near-white sky; there's ample contrast
       // margin against ink text to spare (was 19.3:1/11.35:1, both far past
@@ -189,11 +194,22 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
   let latestY = 0.5
   let prevFrameX = 0.5
   let prevFrameY = 0.5
+  let hasPointerPosition = false
   let movedSinceLastFrame = false
 
   function onPointerMove(e: PointerEvent) {
     latestX = e.clientX / window.innerWidth
     latestY = 1 - e.clientY / window.innerHeight
+    if (!hasPointerPosition) {
+      // Otherwise the very first pointer sample after mount computes a
+      // splat segment from the default center position to wherever the
+      // real cursor already was — reads as an unintended streak tearing
+      // across the sky the instant the page loads, before the visitor has
+      // moved the mouse at all.
+      prevFrameX = latestX
+      prevFrameY = latestY
+      hasPointerPosition = true
+    }
     movedSinceLastFrame = true
   }
   window.addEventListener('pointermove', onPointerMove, { passive: true })
