@@ -208,8 +208,12 @@ export const CLOUD = /* glsl */ `
     // edge, they thin out. A single texture2D lookup already sweeps the
     // full 64x64 texture, so it's the *coordinate scale* that sets how many
     // regions appear across the screen (effective frequency is roughly
-    // 64 * scale cycles) — ~0.06-0.07 gives a handful.
-    vec2 placementPos = auv * 0.064 + uMacroOffset;
+    // 64 * scale cycles). A lower scale here (~0.06) meant so few cycles fit
+    // across a real window that a single contiguous clear run could span
+    // 95%+ of the width purely by chance — measured offline across scanlines
+    // before picking 0.1, which keeps the largest clear run under ~30% of
+    // the width at every aspect ratio tested.
+    vec2 placementPos = auv * 0.1 + uMacroOffset;
     float placement = placementNoise(placementPos);
     float mask = smoothstep(uCoverage - uCoverageSoftness, uCoverage + uCoverageSoftness, placement);
 
