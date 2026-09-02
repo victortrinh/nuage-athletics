@@ -3,6 +3,13 @@
 @theme {
   --color-ink: #0a0a0a;
   --color-paper: #fafafa;
+  /* Secondary text. The brand grey (#9BA1A6) is only 2.3:1 on paper — fine
+     for a logo, nowhere near enough for words — so type uses this darkened
+     sibling at 5.0:1 instead. */
+  --color-mute: #63696e;
+  /* Hairline rules are the structural device the whole layout hangs on:
+     no cards, no shadows, no radii, just ruled edges. */
+  --color-line: #dcdcdc;
   /* The one accent: everything else on the site stays ink/paper. Bright
      value is for the sky glow; #4f7cff on paper is only 3.57:1 as text, so
      links/focus rings use the darkened sibling instead (5.35:1). */
@@ -13,10 +20,25 @@
      shipping a webfont. Falls back through other geometric sans before the
      system default. */
   --font-display: Futura, "Century Gothic", "Avenir Next", var(--font-sans);
+  /* Tiny uppercase labels, the counterweight to the big imagery. */
+  --tracking-label: 0.18em;
 }
 
 html { -webkit-text-size-adjust: 100%; }
 body { background: var(--color-paper); color: var(--color-ink); }
+
+/* Nothing on this site is rounded. Stated once here rather than fighting it
+   with rounded-none on every control. */
+button, input, textarea, select, img, video { border-radius: 0; }
+
+/* The sky sits behind everything and washes out a faint ring, so focus is
+   drawn as a hard offset block instead. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+
+::selection { background: var(--color-ink); color: var(--color-paper); }
 
 /* The one wordmark treatment, used for the brand mark and page headings —
    nothing else on the site carries a display typeface. */

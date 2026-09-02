@@ -6,6 +6,14 @@ interface Props {
   locale: Locale
   d: Dict
   turnstileSiteKey?: string
+  /**
+   * Where this signup came from — recorded on the subscriber row. The product
+   * page passes the selected size so a "notify me" tells us which size to
+   * restock first. Falls back to the referrer when the caller says nothing.
+   */
+  source?: string
+  /** Overrides the button copy where "sign up" is the wrong verb. */
+  submitLabel?: string
 }
 
 type State =
@@ -26,7 +34,13 @@ declare global {
 
 const TURNSTILE_SRC = 'script[src*="turnstile/v0/api.js"]'
 
-export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
+export default function SignupForm({
+  locale,
+  d,
+  turnstileSiteKey,
+  source,
+  submitLabel,
+}: Props) {
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [email, setEmail] = useState('')
   const [consent, setConsent] = useState(false)
@@ -92,7 +106,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
           locale,
           consent,
           turnstileToken: form.get('cf-turnstile-response') ?? undefined,
-          source: typeof document !== 'undefined' ? document.referrer || null : null,
+          source: source ?? (typeof document !== 'undefined' ? document.referrer || null : null),
         }),
       })
 
@@ -123,7 +137,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
     return (
       <div role="status" className="max-w-md">
         <p className="text-lg font-medium">{d.successTitle}</p>
-        <p className="mt-2 text-sm opacity-70">{d.successBody}</p>
+        <p className="mt-2 text-sm text-mute">{d.successBody}</p>
       </div>
     )
   }
@@ -140,7 +154,11 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
         className="absolute -left-[9999px] h-0 w-0 opacity-0"
       />
 
-      <label htmlFor="email" className="block text-xs uppercase tracking-widest opacity-70">
+      <label
+        htmlFor="email"
+        className="block text-[11px] uppercase text-mute"
+        style={{ letterSpacing: 'var(--tracking-label)' }}
+      >
         {d.emailLabel}
       </label>
       <input
@@ -153,7 +171,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
         placeholder={d.emailPlaceholder}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mt-2 w-full bg-transparent border-b border-ink/25 py-2 text-base outline-none focus:border-accent-ink transition-colors"
+        className="mt-2 w-full border-0 border-b border-ink bg-transparent px-0 py-2 text-base transition-colors focus:outline-none focus-visible:border-accent-ink"
       />
 
       {/*
@@ -168,7 +186,7 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
           onChange={(e) => setConsent(e.target.checked)}
           className="mt-1 shrink-0 accent-ink"
         />
-        <span className="opacity-80">{d.consentLabel}</span>
+        <span className="text-mute">{d.consentLabel}</span>
       </label>
 
       {/* Left empty on the server; the effect above fills it after hydration. */}
@@ -177,9 +195,10 @@ export default function SignupForm({ locale, d, turnstileSiteKey }: Props) {
       <button
         type="submit"
         disabled={state.kind === 'submitting'}
-        className="mt-8 border border-ink/40 px-6 py-3 text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-colors disabled:opacity-40"
+        className="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase text-paper transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
+        style={{ letterSpacing: 'var(--tracking-label)' }}
       >
-        {state.kind === 'submitting' ? d.submitting : d.submit}
+        {state.kind === 'submitting' ? d.submitting : (submitLabel ?? d.submit)}
       </button>
 
       {state.kind === 'error' && (

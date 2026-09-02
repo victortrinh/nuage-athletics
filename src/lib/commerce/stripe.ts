@@ -7,6 +7,7 @@ import type {
 import type { Locale } from '../../i18n/config'
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config'
 import { CATALOGUE, getCatalogueProduct } from '../catalogue'
+import { hmacHex, timingSafeEqual } from '../crypto'
 
 /**
  * Stripe via REST + fetch rather than the stripe-node SDK: the SDK needs a
@@ -57,28 +58,8 @@ async function verifyStripeSignature(
   const age = Math.abs(Date.now() / 1000 - Number(timestamp))
   if (!Number.isFinite(age) || age > SIGNATURE_TOLERANCE_SECONDS) return false
 
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const sigBuffer = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(`${timestamp}.${payload}`)
-  )
-  const expectedHex = [...new Uint8Array(sigBuffer)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-
-  if (expectedHex.length !== signature.length) return false
-  let diff = 0
-  for (let i = 0; i < expectedHex.length; i++) {
-    diff |= expectedHex.charCodeAt(i) ^ signature.charCodeAt(i)
-  }
-  return diff === 0
+  const expectedHex = await hmacHex(secret, `${timestamp}.${payload}`)
+  return timingSafeEqual(expectedHex, signature)
 }
 
 export function createStripeAdapter(secretKey: string, webhookSecret?: string): CommerceAdapter {

@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro'
+import GateScreen from '../components/GateScreen.astro'
+import { t } from '../i18n/ui'
+
+export const prerender = false
+
+// Reached only by rewrite from the middleware, which keeps the visitor's
+// original URL. 401 rather than 200: it is the honest status, and it keeps
+// the page out of any index that ignores the noindex.
+Astro.response.status = 401
+
+const locale = 'fr-CA' as const
+const d = t(locale)
+---
+
+<Base {locale} routeId="gate" noindex title={`${d.gateTitle} - ${d.brand}`} description={d.gateLede}>
+  <GateScreen {locale} />
+</Base>
