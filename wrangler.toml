@@ -25,7 +25,7 @@ COMMERCE_ENABLED = "false"
 # "true" puts the entire site behind the password gate. Ignored unless the
 # SITE_PASSWORD secret is also set — a lock with no key would brick the site,
 # so it fails open rather than shut. See src/lib/gate.ts.
-SITE_LOCKED = "false"
+SITE_LOCKED = "true"
 
 # Secrets — set with `wrangler secret put <NAME>`, never commit:
 #   RESEND_API_KEY
