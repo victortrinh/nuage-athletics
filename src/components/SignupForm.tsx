@@ -96,6 +96,10 @@ export default function SignupForm({
 
     setState({ kind: 'submitting' })
     const form = new FormData(e.currentTarget)
+    // A real visitor never fills the honeypot. Read it straight from the DOM —
+    // consent stays a React boolean (see the comment on the checkbox below),
+    // this is the one field that's safe to source from FormData.
+    const company = String(form.get('company') ?? '') || undefined
 
     try {
       const res = await fetch('/api/subscribe', {
@@ -105,6 +109,7 @@ export default function SignupForm({
           email,
           locale,
           consent,
+          company,
           turnstileToken: form.get('cf-turnstile-response') ?? undefined,
           source: source ?? (typeof document !== 'undefined' ? document.referrer || null : null),
         }),
@@ -122,6 +127,8 @@ export default function SignupForm({
         consent_required: d.errorConsent,
         rate_limited: d.errorRate,
         already_subscribed: d.alreadySubscribed,
+        challenge_failed: d.errorChallenge,
+        email_failed: d.errorEmailSend,
       }
       // Turnstile tokens are single use. Without a reset, retrying after an
       // error submits the spent token and fails the challenge every time.

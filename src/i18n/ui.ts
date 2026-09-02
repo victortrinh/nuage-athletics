@@ -20,6 +20,8 @@ export type Dict = {
   errorEmail: string
   errorConsent: string
   errorRate: string
+  errorChallenge: string
+  errorEmailSend: string
   alreadySubscribed: string
   confirmTitle: string
   confirmBody: string
@@ -81,6 +83,8 @@ export const UI: Record<Locale, Dict> = {
     errorEmail: 'Entrez une adresse courriel valide.',
     errorConsent: 'Vous devez accepter de recevoir nos courriels.',
     errorRate: 'Trop de tentatives. Réessayez dans quelques minutes.',
+    errorChallenge: 'La vérification a échoué. Réessayez.',
+    errorEmailSend: "L'envoi du courriel a échoué. Réessayez dans un moment.",
     alreadySubscribed: 'Cette adresse est déjà inscrite.',
     confirmTitle: 'Inscription confirmée',
     confirmBody: 'Merci. Vous serez parmi les premiers avertis.',
@@ -139,6 +143,8 @@ export const UI: Record<Locale, Dict> = {
     errorEmail: 'Enter a valid email address.',
     errorConsent: 'You need to agree to receive our emails.',
     errorRate: 'Too many attempts. Try again in a few minutes.',
+    errorChallenge: 'Verification failed. Try again.',
+    errorEmailSend: 'Sending the email failed. Try again in a moment.',
     alreadySubscribed: 'That address is already signed up.',
     confirmTitle: 'Signup confirmed',
     confirmBody: "Thanks. You'll be among the first to know.",
