@@ -66,5 +66,9 @@ export function buildNoiseTextures(size = 64, seed = 1337): NoiseTextures {
     data[i * 4 + 2] = Math.floor(rand() * 256)
     data[i * 4 + 3] = Math.floor(rand() * 256)
   }
-  return { detail: boxBlur(data, size), placement: data }
+  // Two passes (not one) for the detail texture — a single 3x3 blur still
+  // leaves enough high-frequency content to read as fine grain/sparkle once
+  // it's driving several fbm octaves; a second pass smooths that into calm,
+  // soft tonal blobs instead.
+  return { detail: boxBlur(boxBlur(data, size), size), placement: data }
 }

@@ -160,16 +160,18 @@ export const CLOUD = /* glsl */ `
     return sum;
   }
 
-  // Full 5-octave fbm — only the final warped read uses this; every
-  // intermediate warp step above uses the cheaper fbm3.
+  // 3-octave fbm for the final warped read — fewer octaves and a steeper
+  // falloff than the original 5, so the fine, grainy frequencies drop out
+  // entirely instead of just being faint. Those were reading as sparkle/
+  // glare rather than the soft, calm blobs of tone a real cloud shows.
   float fbm5(vec2 p) {
     float sum = 0.0;
-    float amp = 0.55;
+    float amp = 0.6;
     float freq = 1.0;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 3; i++) {
       sum += amp * n(p * freq);
-      freq *= 2.03;
-      amp *= 0.45;
+      freq *= 2.0;
+      amp *= 0.35;
     }
     return sum;
   }
@@ -178,14 +180,16 @@ export const CLOUD = /* glsl */ `
   // displace the position fed into the next fbm sample. Nothing here is
   // thresholded or gated by a cell/seed — the whole thing is one continuous,
   // flowing function, which is what gives it curling, wispy structure
-  // instead of tiled shapes.
+  // instead of tiled shapes. The warp magnitude is kept modest (not the
+  // aggressive displacement typical of this technique) so the flow reads as
+  // calm, soft blobs rather than a busy, agitated swirl.
   float warpedCloud(vec2 p) {
     vec2 q = vec2(fbm3(p), fbm3(p + vec2(5.2, 1.3)));
     vec2 r = vec2(
-      fbm3(p + 1.8 * q + vec2(1.7, 9.2)),
-      fbm3(p + 1.8 * q + vec2(8.3, 2.8))
+      fbm3(p + 1.3 * q + vec2(1.7, 9.2)),
+      fbm3(p + 1.3 * q + vec2(8.3, 2.8))
     );
-    return fbm5(p + 1.6 * r);
+    return fbm5(p + 1.1 * r);
   }
 
   void main() {
@@ -209,15 +213,17 @@ export const CLOUD = /* glsl */ `
     // says "cloud" — evaluated before this warp is applied, so there's no
     // feedback loop.
     vec2 warp = vel * 0.6 * mask;
-    vec2 detailPos = vUv * vec2(3.2, 1.9) + uOffset1 + warp;
+    // Larger-scale than before — bigger, calmer blobs of tone rather than
+    // small, busy repetition.
+    vec2 detailPos = vUv * vec2(2.4, 1.5) + uOffset1 + warp;
 
     float shape = warpedCloud(detailPos);
-    // A wide S-curve, not a tight one — this is what keeps each cloud's own
-    // edges soft and frayed instead of a solid core with a hard rim.
-    shape = smoothstep(0.28, 0.72, shape);
+    // Wider still than the already-wide curve this had — softer transitions
+    // between a blob's core tone and the sky around it.
+    shape = smoothstep(0.22, 0.78, shape);
 
     vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.06;
-    float shapeLit = smoothstep(0.28, 0.72, warpedCloud(detailPos - sunDir));
+    float shapeLit = smoothstep(0.22, 0.78, warpedCloud(detailPos - sunDir));
     float light = clamp((shape - shapeLit) * 2.0 + 0.5, 0.0, 1.0);
 
     float density = mask * shape;
@@ -228,7 +234,7 @@ export const CLOUD = /* glsl */ `
     // term can't modulate brightness in pixels that are already at zero
     // density — the same class of bug that leaked detail-shaped texture
     // into clear sky before.
-    lum *= mix(1.0, mix(0.9, 1.0, light), density);
+    lum *= mix(1.0, mix(0.95, 1.0, light), density);
     lum = clamp(lum, uCloudMin, uCloudMax);
 
     gl_FragColor = vec4(vec3(lum), 1.0);

@@ -149,7 +149,11 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       uMacroOffset: { value: [0, 0] },
       uCoverage: { value: 0.42 },
       uCoverageSoftness: { value: 0.1 },
-      uCloudMin: { value: 0.72 },
+      // Raised from 0.72 — a calmer, softer grey floor. The old value read
+      // as glaring/harsh against the near-white sky; there's ample contrast
+      // margin against ink text to spare (was 19.3:1/11.35:1, both far past
+      // the 4.5:1 AA floor), so this trades some of that margin for comfort.
+      uCloudMin: { value: 0.82 },
       uCloudMax: { value: 0.99 },
     },
   })
