@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import { I18nProvider } from 'react-aria-components'
 import SignupForm from './SignupForm.tsx'
+import { Button } from './ui/button'
+import { RadioGroup, Radio } from './ui/radio-group'
 import type { Locale } from '../i18n/config'
 import type { Dict } from '../i18n/ui'
 
@@ -31,7 +34,7 @@ export default function ProductActions({
   commerceEnabled,
   turnstileSiteKey,
 }: Props) {
-  const [variantId, setVariantId] = useState('')
+  const [variantId, setVariantId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -63,62 +66,78 @@ export default function ProductActions({
     }
   }
 
+  const sizeLabelId = `size-label-${productId}`
+
   return (
-    <div>
-      <p className="text-[11px] uppercase tracking-label text-mute">{d.productSizeLabel}</p>
+    <I18nProvider locale={locale}>
+      <div>
+        <p id={sizeLabelId} className="text-[11px] uppercase tracking-label text-mute">
+          {d.productSizeLabel}
+        </p>
 
-      <div className="mt-3 grid grid-cols-3 gap-px bg-line sm:grid-cols-6 lg:grid-cols-3">
-        {variants.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            disabled={!v.inStock}
-            onClick={() => setVariantId(variantId === v.id ? '' : v.id)}
-            aria-pressed={variantId === v.id}
-            className={`bg-paper px-3 py-3 text-xs uppercase tracking-label transition-colors disabled:cursor-not-allowed disabled:text-mute disabled:line-through ${
-              variantId === v.id ? 'bg-ink text-paper' : 'hover:bg-ink hover:text-paper'
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
+        {/*
+          RadioGroup, not five independently-toggled buttons: exactly one
+          size can be selected, which is what role="radiogroup" and arrow-key
+          roving tabindex mean, and aria-pressed on plain buttons never gave
+          screen-reader/keyboard users either. One real behaviour change from
+          the old buttons: clicking the selected size no longer deselects it
+          (a radio group can't represent "none" once one is picked) — same
+          as any native <input type="radio"> group.
 
-      {commerceEnabled ? (
-        <>
-          <button
-            type="button"
-            onClick={onBuy}
-            disabled={loading}
-            className="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase tracking-label text-paper transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
-          >
-            {loading ? d.submitting : d.productBuy}
-          </button>
-          {error && (
-            <p role="alert" className="mt-4 text-sm text-danger">
-              {error}
-            </p>
-          )}
-        </>
-      ) : (
-        <div className="mt-10 border-t border-line pt-8">
-          <p className="text-[11px] uppercase tracking-label text-mute">{d.productNotifyTitle}</p>
-          <p className="mt-3 text-sm leading-relaxed">{d.productNotifyBody}</p>
-          <div className="mt-6">
-            {/*
-              The consent checkbox inside SignupForm stays visible and
-              unchecked. Wanting to be told when something ships is not consent
-              to be emailed, and /api/subscribe requires a literal true.
-            */}
-            <SignupForm
-              locale={locale}
-              d={d}
-              turnstileSiteKey={turnstileSiteKey}
-              source={`product:${productId}:${selected?.label ?? 'unspecified'}`}
-            />
+          catalogue.ts hardcodes every variant inStock today, so isDisabled
+          is always false in practice and the sr-only out-of-stock text below
+          is dormant — both are wired correctly for whenever real stock data
+          lands. Note RAC's RadioGroup skips disabled radios during arrow
+          navigation, so that text is reachable in browse mode but not by
+          arrow keys — the visual `line-through` (in radio-group.tsx) is
+          still the primary signal for sighted users either way.
+        */}
+        <RadioGroup
+          aria-labelledby={sizeLabelId}
+          value={variantId}
+          onChange={setVariantId}
+          className="mt-3 grid grid-cols-3 gap-px bg-line sm:grid-cols-6 lg:grid-cols-3"
+        >
+          {variants.map((v) => (
+            <Radio key={v.id} value={v.id} isDisabled={!v.inStock}>
+              {v.label}
+              {!v.inStock && <span className="sr-only"> — {d.productOutOfStock}</span>}
+            </Radio>
+          ))}
+        </RadioGroup>
+
+        {commerceEnabled ? (
+          <>
+            <Button onPress={onBuy} isDisabled={loading} className="mt-8">
+              {loading ? d.submitting : d.productBuy}
+            </Button>
+            {error && (
+              <p role="alert" className="mt-4 text-sm text-danger">
+                {error}
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="mt-10 border-t border-line pt-8">
+            <p className="text-[11px] uppercase tracking-label text-mute">{d.productNotifyTitle}</p>
+            <p className="mt-3 text-sm leading-relaxed">{d.productNotifyBody}</p>
+            <div className="mt-6">
+              {/*
+                The consent checkbox inside SignupForm stays visible and
+                unchecked. Wanting to be told when something ships is not consent
+                to be emailed, and /api/subscribe requires a literal true.
+              */}
+              <SignupForm
+                locale={locale}
+                d={d}
+                turnstileSiteKey={turnstileSiteKey}
+                source={`product:${productId}:${selected?.label ?? 'unspecified'}`}
+                idPrefix={`signup-${productId}`}
+              />
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </I18nProvider>
   )
 }

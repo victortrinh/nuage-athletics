@@ -62,3 +62,27 @@ test('focus moves into the success panel, and the live region announces it', asy
   await expect(page.locator('p[tabindex="-1"]')).toBeFocused()
   await expect(page.locator('[role="status"].sr-only')).toHaveText('Vérifiez vos courriels')
 })
+
+test('size selector is a real radiogroup with roving-tabindex arrow navigation', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const group = page.getByRole('radiogroup')
+  await expect(group).toBeVisible()
+  // Named via aria-labelledby at the visible "Taille" label, not a
+  // redundant separate aria-label — see ProductActions.tsx.
+  await expect(group).toHaveAccessibleName('Taille')
+
+  const radios = page.getByRole('radio')
+  const count = await radios.count()
+  expect(count).toBeGreaterThan(1)
+
+  await radios.first().focus()
+  await expect(radios.first()).not.toBeChecked()
+
+  await page.keyboard.press('ArrowRight')
+  await expect(radios.nth(1)).toBeChecked()
+  await expect(radios.nth(1)).toBeFocused()
+  await expect(radios.first()).not.toBeChecked()
+})
