@@ -24,6 +24,15 @@ const DENSITY_FLOOR = 0.25
  */
 const CARVE_LUM = CLOUD_MAX + (CLOUD_MIN - CLOUD_MAX) * DENSITY_FLOOR
 
+/**
+ * Share of the wake (both the carve and the velocity driving it) still
+ * present one second later — a twentieth. The visible trace is effectively
+ * gone within about half a second of the pointer moving on, against roughly
+ * 3.5s under the old fixed 0.986-per-step decay, so the cloud closes back
+ * over behind the pointer instead of holding the mark.
+ */
+const WAKE_RETENTION_PER_SEC = 0.05
+
 function isCoarsePointer(): boolean {
   try {
     return window.matchMedia('(pointer: coarse)').matches
@@ -149,7 +158,9 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     uniforms: {
       uSource: { value: null },
       uDt: { value: 1 / 60 },
-      uDissipation: { value: 0.986 },
+      // Overwritten every step from WAKE_RETENTION_PER_SEC and the step's
+      // own duration — see stepFluid.
+      uDissipation: { value: 1 },
       uAspect: { value: 1 },
       uPointerPrev: { value: [0.5, 0.5] },
       uPointerCurr: { value: [0.5, 0.5] },
@@ -350,6 +361,12 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     fluidProgram.uniforms.uSource.value = read.texture
     fluidProgram.uniforms.uDt.value = simDt
     fluidProgram.uniforms.uAspect.value = width / height
+    // Raised to a per-*second* rate rather than a fixed per-step factor: the
+    // sim runs at 60Hz normally, 30Hz on coarse pointers and as low as 15Hz
+    // after the degrade path steps in, and a per-step constant would make the
+    // wake linger two or four times as long on exactly the devices least able
+    // to carry it.
+    fluidProgram.uniforms.uDissipation.value = Math.pow(WAKE_RETENTION_PER_SEC, simDt)
     fluidProgram.uniforms.uPointerPrev.value = [prevFrameX, prevFrameY]
     fluidProgram.uniforms.uPointerCurr.value = [latestX, latestY]
     fluidProgram.uniforms.uPointerActive.value = movedSinceLastFrame ? 1 : 0
