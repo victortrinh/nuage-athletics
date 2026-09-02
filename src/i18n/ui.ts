@@ -46,6 +46,9 @@ export type Dict = {
   orderConfirmedBody: string
   orderCancelledTitle: string
   orderCancelledBody: string
+  // background sky effect
+  skyPause: string
+  skyResume: string
 }
 
 export const UI: Record<Locale, Dict> = {
@@ -92,6 +95,8 @@ export const UI: Record<Locale, Dict> = {
       'Merci pour votre commande. Un courriel de confirmation vous a été envoyé.',
     orderCancelledTitle: 'Commande annulée',
     orderCancelledBody: "Votre commande n'a pas été complétée. Aucun montant n'a été prélevé.",
+    skyPause: 'Figer le ciel',
+    skyResume: 'Animer le ciel',
   },
   'en-CA': {
     brand: 'Nuage Athletics',
@@ -134,6 +139,8 @@ export const UI: Record<Locale, Dict> = {
     orderConfirmedBody: 'Thanks for your order. A confirmation email is on its way.',
     orderCancelledTitle: 'Order cancelled',
     orderCancelledBody: 'Your order was not completed. You have not been charged.',
+    skyPause: 'Pause the sky',
+    skyResume: 'Animate the sky',
   },
 }
 

@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css'
 import Seo from '../components/Seo.astro'
+import Sky from '../components/Sky.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
@@ -29,11 +30,24 @@ const year = new Date().getFullYear()
     <slot name="head" />
   </head>
   <body class="min-h-dvh flex flex-col font-sans antialiased">
-    <header class="flex items-center justify-between px-6 py-6 sm:px-10">
+    <Sky />
+    <header class="flex items-center justify-between gap-6 px-6 py-6 sm:px-10">
       <a href={route('home', locale)} class="wordmark text-sm uppercase hover:text-accent-ink">
         {d.brand}
       </a>
-      <LocaleSwitcher {locale} {routeId} href={localeHref} />
+      <div class="flex items-center gap-6">
+        <button
+          type="button"
+          id="sky-toggle"
+          hidden
+          data-pause-label={d.skyPause}
+          data-resume-label={d.skyResume}
+          class="text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100"
+        >
+          {d.skyPause}
+        </button>
+        <LocaleSwitcher {locale} {routeId} href={localeHref} />
+      </div>
     </header>
 
     <main class="flex-1 px-6 sm:px-10">

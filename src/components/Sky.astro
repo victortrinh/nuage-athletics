@@ -1,0 +1,74 @@
+---
+// Fixed full-page cloud background. Renders behind everything (z-[-10]) and
+// never intercepts pointer events — the pointer-tracking listeners the
+// engine attaches live on `window`, not the canvas, so the wake still
+// carves even though clicks pass straight through to the page underneath.
+// The gradient div is both the pre-JS paint and the permanent fallback for
+// prefers-reduced-motion / low-power devices: the canvas only ever fades in
+// on top of it, so there's never a blank frame or a layout shift.
+---
+
+<div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden="true">
+  <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_15%,#ffffff_0%,#f1f1f1_45%,#e2e2e2_100%)]">
+  </div>
+  <canvas class="sky-canvas absolute inset-0 h-full w-full opacity-0 transition-opacity duration-[600ms] ease-in-out">
+  </canvas>
+</div>
+
+<script>
+  import { skyDisabledByPrefs, osPrefersNoMotion, getStoredPause, setStoredPause } from './sky/prefs'
+  import type { SkyHandle } from './sky/engine'
+
+  const canvas = document.querySelector<HTMLCanvasElement>('.sky-canvas')
+  const toggle = document.getElementById('sky-toggle')
+  if (canvas) {
+    let handle: SkyHandle | null = null
+    let paused = getStoredPause()
+
+    function applyLabel() {
+      if (!toggle) return
+      const key = paused ? 'resumeLabel' : 'pauseLabel'
+      toggle.textContent = toggle.dataset[key] ?? ''
+    }
+
+    function requestIdle(cb: () => void) {
+      if ('requestIdleCallback' in window) {
+        ;(
+          window as unknown as { requestIdleCallback: (cb: () => void) => void }
+        ).requestIdleCallback(cb)
+      } else {
+        setTimeout(cb, 200)
+      }
+    }
+
+    function start() {
+      if (handle || paused || skyDisabledByPrefs()) return
+      requestIdle(() => {
+        import('./sky/engine').then(({ mountSky }) => {
+          if (paused || handle) return
+          handle = mountSky(canvas)
+        })
+      })
+    }
+
+    if (!skyDisabledByPrefs()) start()
+
+    if (toggle) {
+      // The toggle only overrides the soft, JS-level preferences (data
+      // saver, its own past state, device capability). An OS-level
+      // reduced-motion/contrast/forced-colors signal is never something a
+      // page control should offer to override, so the button hides itself
+      // when the effect couldn't run for that reason.
+      if (!osPrefersNoMotion()) toggle.hidden = false
+
+      applyLabel()
+      toggle.addEventListener('click', () => {
+        paused = !paused
+        setStoredPause(paused)
+        applyLabel()
+        if (handle) handle.setPaused(paused)
+        else if (!paused) start()
+      })
+    }
+  }
+</script>
