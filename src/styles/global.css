@@ -3,8 +3,11 @@
 @theme {
   --color-ink: #0a0a0a;
   --color-paper: #fafafa;
-  /* The one accent: everything else on the site stays ink/paper. */
+  /* The one accent: everything else on the site stays ink/paper. Bright
+     value is for the sky glow; #4f7cff on paper is only 3.57:1 as text, so
+     links/focus rings use the darkened sibling instead (5.35:1). */
   --color-accent: #4f7cff;
+  --color-accent-ink: #3a5fd9;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   /* Wordmark + headings only — reads closest to Futura Bold Oblique without
      shipping a webfont. Falls back through other geometric sans before the
@@ -13,7 +16,7 @@
 }
 
 html { -webkit-text-size-adjust: 100%; }
-body { background: var(--color-ink); color: var(--color-paper); }
+body { background: var(--color-paper); color: var(--color-ink); }
 
 /* The one wordmark treatment, used for the brand mark and page headings —
    nothing else on the site carries a display typeface. */

@@ -59,8 +59,8 @@ export default function BuyButton({ locale, d, variants }: Props) {
             aria-pressed={variantId === v.id}
             className={`border px-4 py-2 text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
               variantId === v.id
-                ? 'border-white bg-white text-black'
-                : 'border-white/40 hover:border-white'
+                ? 'border-ink bg-ink text-paper'
+                : 'border-ink/40 hover:border-ink'
             }`}
           >
             {v.inStock ? v.label : `${v.label} (${d.productOutOfStock})`}
@@ -72,13 +72,13 @@ export default function BuyButton({ locale, d, variants }: Props) {
         type="button"
         onClick={onBuy}
         disabled={loading}
-        className="mt-8 border border-white/40 px-6 py-3 text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-colors disabled:opacity-40"
+        className="mt-8 border border-ink/40 px-6 py-3 text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-colors disabled:opacity-40"
       >
         {loading ? d.submitting : d.productBuy}
       </button>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-400">
+        <p role="alert" className="mt-4 text-sm text-red-700">
           {error}
         </p>
       )}
