@@ -50,7 +50,7 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
 
     {
       errorMessage && (
-        <p id="gate-error" role="alert" class="mt-3 text-sm text-red-700">
+        <p id="gate-error" role="alert" class="mt-3 text-sm text-danger">
           {errorMessage}
         </p>
       )

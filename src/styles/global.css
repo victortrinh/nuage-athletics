@@ -15,6 +15,12 @@
      links/focus rings use the darkened sibling instead (5.35:1). */
   --color-accent: #4f7cff;
   --color-accent-ink: #3a5fd9;
+  /* Error text. Matches Tailwind's red-700, which the codebase used directly
+     in three places before this token existed — 6.2:1 on paper. */
+  --color-danger: #b91c1c;
+  /* Draft-notice text (CpaDisclosure). Matches Tailwind's amber-700 — 4.81:1
+     on paper, the tightest of this palette's text colors but still AA. */
+  --color-warn: #b45309;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   /* Wordmark + headings only — reads closest to Futura Bold Oblique without
      shipping a webfont. Falls back through other geometric sans before the

@@ -17,7 +17,7 @@ const { locale, productName } = Astro.props
 {
   locale === 'fr-CA' ? (
     <div class="mt-16 border-t border-ink/15 pt-8 text-sm leading-relaxed opacity-90">
-      <p class="text-xs uppercase tracking-wide text-amber-700">
+      <p class="text-xs uppercase tracking-wide text-warn">
         Brouillon, en attente de révision juridique. Ne reflète pas nécessairement le texte
         final.
       </p>
@@ -67,7 +67,7 @@ const { locale, productName } = Astro.props
     </div>
   ) : (
     <div class="mt-16 border-t border-ink/15 pt-8 text-sm leading-relaxed opacity-90">
-      <p class="text-xs uppercase tracking-wide text-amber-700">
+      <p class="text-xs uppercase tracking-wide text-warn">
         Draft, pending legal review. May not reflect the final text.
       </p>
       <h2 class="mt-3 text-base font-semibold opacity-100">Pre-contract information</h2>
