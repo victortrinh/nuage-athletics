@@ -7,6 +7,7 @@ import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
+import { buttonVariants } from '../components/ui/button-variants'
 
 interface Props {
   locale: Locale
@@ -55,7 +56,7 @@ const year = new Date().getFullYear()
           hidden
           data-pause-label={d.skyPause}
           data-resume-label={d.skyResume}
-          class="text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100"
+          class={buttonVariants({ variant: 'quiet' })}
         >
           {d.skyPause}
         </button>

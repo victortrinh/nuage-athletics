@@ -4,6 +4,9 @@ import Logo from './Logo.astro'
 import SignupForm from './SignupForm.tsx'
 import { t } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
+import { cn } from './ui/cn'
+import { buttonVariants } from './ui/button-variants'
+import { inputVariants, labelVariants, fieldErrorVariants } from './ui/field-variants'
 
 interface Props {
   locale: Locale
@@ -33,7 +36,7 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
 
   <form method="POST" action="/api/gate" class="mt-10">
     <input type="hidden" name="to" value={to} />
-    <label for="gate-password" class="block text-[11px] uppercase tracking-label text-mute">
+    <label for="gate-password" class={labelVariants()}>
       {d.gatePasswordLabel}
     </label>
     <input
@@ -45,21 +48,18 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
       autocomplete="current-password"
       aria-invalid={errorMessage ? 'true' : undefined}
       aria-describedby={errorMessage ? 'gate-error' : undefined}
-      class="mt-2 w-full border-0 border-b border-ink bg-transparent px-0 py-2 font-mono text-lg tracking-[0.25em] focus:outline-none focus-visible:border-accent-ink"
+      class={cn(inputVariants({ variant: 'mono' }), 'mt-2')}
     />
 
     {
       errorMessage && (
-        <p id="gate-error" role="alert" class="mt-3 text-sm text-danger">
+        <p id="gate-error" role="alert" class={cn(fieldErrorVariants(), 'mt-3')}>
           {errorMessage}
         </p>
       )
     }
 
-    <button
-      type="submit"
-      class="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase tracking-label text-paper transition-colors hover:bg-paper hover:text-ink"
-    >
+    <button type="submit" class={cn(buttonVariants(), 'mt-8')}>
       {d.gateSubmit}
     </button>
   </form>
