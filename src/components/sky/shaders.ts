@@ -86,9 +86,19 @@ export const FLUID_STEP = /* glsl */ `
  * Cloud density field: a low-res texture-sampled fBm (bilinear-filtered
  * noise doubles as the smooth base value, so each octave is one fetch) at
  * two scales/speeds for parallax. A second fBm sample offset toward a fixed
- * sun direction gives a cheap self-shadow term without raymarching. The wake
- * field domain-warps the lookup (the streak curls the cloud) and subtracts
- * density directly (the cut, revealing brighter sky through the gap).
+ * sun direction gives a cheap self-shadow term without raymarching.
+ *
+ * A separate, coarser "macro" noise (fewer octaves, lower frequency — a
+ * placement mask needs to stay smooth, not grainy) is thresholded into a
+ * soft-edged `coverage` value: ~0 is clear sky, ~1 is solidly cloud. The fine
+ * detail fbm is multiplied by it, so clear regions collapse to flat bright
+ * sky regardless of what the detail layer is doing there — this is what
+ * splits the single continuous field into separate, gapped clouds.
+ *
+ * The wake field domain-warps the detail lookup and subtracts density, both
+ * scaled by that same `coverage` value (evaluated at the plain screen
+ * position, so there's no feedback loop) — a swipe through a clear gap does
+ * nothing, since there's no cloud there to cut.
  *
  * Output is clamped to [uCloudMin, uCloudMax] grayscale so no pixel ever
  * gets dark enough to threaten text contrast against the ink foreground.
@@ -102,6 +112,9 @@ export const CLOUD = /* glsl */ `
   uniform float uTime;
   uniform vec2 uOffset1;
   uniform vec2 uOffset2;
+  uniform vec2 uMacroOffset;
+  uniform float uCoverage;
+  uniform float uCoverageSoftness;
   uniform float uCloudMin;
   uniform float uCloudMax;
 
@@ -119,22 +132,36 @@ export const CLOUD = /* glsl */ `
     return sum;
   }
 
+  // A single texture2D lookup already sweeps the full 64x64 noise texture,
+  // i.e. 64 independent random texels — so the *coordinate scale* passed in
+  // (not an octave count) is what controls how many soft blobs appear across
+  // the screen: effective spatial frequency is roughly 64 * scale cycles.
+  // A scale around 0.08-0.09 gives a handful of blobs, matching the
+  // "scattered, moderate coverage" cloud placement this is meant to produce.
+  float macroNoise(vec2 p) {
+    return n(p) * 0.75 + n(p * 2.3 + 11.7) * 0.25;
+  }
+
   void main() {
+    float macro = macroNoise(vUv * 0.085 + uMacroOffset);
+    float coverage = smoothstep(uCoverage - uCoverageSoftness, uCoverage + uCoverageSoftness, macro);
+
     vec4 fluidData = texture2D(uFluid, vUv);
     vec2 vel = fluidData.rg * 2.0 - 1.0;
     float carve = fluidData.b;
 
-    vec2 warp = vel * 0.5;
+    vec2 warp = vel * 0.5 * coverage;
     vec2 p1 = vUv * 2.6 + uOffset1 + warp;
     vec2 p2 = vUv * 5.2 + uOffset2 + warp * 1.4;
 
-    float density = fbm(p1) * 0.65 + fbm(p2) * 0.35;
+    float detail = fbm(p1) * 0.65 + fbm(p2) * 0.35;
 
     vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.05;
-    float densityLit = fbm(p1 - sunDir) * 0.65 + fbm(p2 - sunDir) * 0.35;
-    float light = clamp((density - densityLit) * 3.0 + 0.5, 0.0, 1.0);
+    float detailLit = fbm(p1 - sunDir) * 0.65 + fbm(p2 - sunDir) * 0.35;
+    float light = clamp((detail - detailLit) * 3.0 + 0.5, 0.0, 1.0);
 
-    density = clamp(density - carve * 0.6, 0.0, 1.0);
+    float density = coverage * detail;
+    density = clamp(density - carve * coverage * 0.6, 0.0, 1.0);
 
     float lum = mix(uCloudMax, uCloudMin, density);
     lum *= mix(0.9, 1.0, light);
