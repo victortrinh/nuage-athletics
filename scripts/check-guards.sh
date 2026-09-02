@@ -27,9 +27,10 @@ fi
 
 # CASL requires express consent (CLAUDE.md non-negotiable #3). RAC's
 # Checkbox uses isSelected/defaultSelected, not checked — defaultSelected
-# would pre-check the consent box, which must never happen.
-if grep -rn "defaultSelected" src/; then
-  echo "✘ found 'defaultSelected' — the consent checkbox must never be pre-checked" >&2
+# would pre-check the consent box, which must never happen. Matches the
+# prop being set (=) or used as an object key (:), not prose mentioning it.
+if grep -rnE 'defaultSelected(=|:)' src/; then
+  echo "✘ found 'defaultSelected' set — the consent checkbox must never be pre-checked" >&2
   fail=1
 fi
 
