@@ -32,6 +32,7 @@ export type Dict = {
   contact: string
   rights: string
   switchTo: string
+  skipToContent: string
   // transactional email
   mailSubject: string
   mailHeading: string
@@ -95,6 +96,7 @@ export const UI: Record<Locale, Dict> = {
     contact: 'Contact',
     rights: 'Tous droits réservés.',
     switchTo: 'English',
+    skipToContent: 'Passer au contenu',
     mailSubject: 'Confirmez votre inscription',
     mailHeading: 'Confirmez votre inscription',
     mailBody:
@@ -155,6 +157,7 @@ export const UI: Record<Locale, Dict> = {
     contact: 'Contact',
     rights: 'All rights reserved.',
     switchTo: 'Français',
+    skipToContent: 'Skip to content',
     mailSubject: 'Confirm your signup',
     mailHeading: 'Confirm your signup',
     mailBody: "Confirm that you want our emails. It's the only step left.",

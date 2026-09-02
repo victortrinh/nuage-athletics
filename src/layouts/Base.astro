@@ -31,6 +31,12 @@ const year = new Date().getFullYear()
     <slot name="head" />
   </head>
   <body class="min-h-dvh flex flex-col font-sans antialiased">
+    <a
+      href="#content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:border focus:border-ink focus:bg-paper focus:px-4 focus:py-2 focus:text-sm"
+    >
+      {d.skipToContent}
+    </a>
     <Sky />
     <header
       class="flex items-center justify-between gap-6 border-b border-line px-6 py-4 sm:px-10"
@@ -57,7 +63,7 @@ const year = new Date().getFullYear()
       </div>
     </header>
 
-    <main class="flex-1 px-6 sm:px-10">
+    <main id="content" class="flex-1 px-6 sm:px-10">
       <slot />
     </main>
 
