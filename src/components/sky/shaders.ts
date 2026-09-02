@@ -139,12 +139,22 @@ export const CLOUD = /* glsl */ `
   // A scale around 0.08-0.09 gives a handful of blobs, matching the
   // "scattered, moderate coverage" cloud placement this is meant to produce.
   float macroNoise(vec2 p) {
-    return n(p) * 0.75 + n(p * 2.3 + 11.7) * 0.25;
+    // The secondary term only nudges the edges of a region the primary term
+    // has already decided is cloud or clear — too much weight here lets it
+    // independently flip the coverage threshold in small scattered patches
+    // far from any real cloud, which is what read as persistent grain in
+    // supposedly-clear sky.
+    return n(p) * 0.92 + n(p * 2.3 + 11.7) * 0.08;
   }
 
   void main() {
     float macro = macroNoise(vUv * 0.085 + uMacroOffset);
     float coverage = smoothstep(uCoverage - uCoverageSoftness, uCoverage + uCoverageSoftness, macro);
+    // A second easing pass doesn't widen the transition band in screen space,
+    // but it does push any lingering faint-but-nonzero coverage within that
+    // band decisively toward 0 — this is what actually flattens "clear" sky
+    // to true white instead of leaving faint detail-texture grain visible.
+    coverage = coverage * coverage * (3.0 - 2.0 * coverage);
 
     vec4 fluidData = texture2D(uFluid, vUv);
     vec2 vel = fluidData.rg * 2.0 - 1.0;
@@ -164,7 +174,11 @@ export const CLOUD = /* glsl */ `
     density = clamp(density - carve * coverage * 0.6, 0.0, 1.0);
 
     float lum = mix(uCloudMax, uCloudMin, density);
-    lum *= mix(0.9, 1.0, light);
+    // The self-shadow term has to be gated by coverage too — otherwise it
+    // modulates brightness by the fine detail fbm's own shape everywhere,
+    // including where density is already 0, which is what was injecting
+    // detail-shaped texture into supposedly-flat clear sky.
+    lum *= mix(1.0, mix(0.9, 1.0, light), coverage);
     lum = clamp(lum, uCloudMin, uCloudMax);
 
     gl_FragColor = vec4(vec3(lum), 1.0);

@@ -147,9 +147,9 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       uOffset2: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
       uCoverage: { value: 0.5 },
-      uCoverageSoftness: { value: 0.15 },
+      uCoverageSoftness: { value: 0.05 },
       uCloudMin: { value: 0.72 },
-      uCloudMax: { value: 0.97 },
+      uCloudMax: { value: 0.99 },
     },
   })
   const cloudMesh = new Mesh(gl, { geometry, program: cloudProgram })
