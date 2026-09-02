@@ -70,6 +70,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
   }
   const noiseTexture = new Texture(gl, { image: noiseData.detail, ...textureDefaults })
   const noiseSharpTexture = new Texture(gl, { image: noiseData.placement, ...textureDefaults })
+  const noiseShapeTexture = new Texture(gl, { image: noiseData.shape, ...textureDefaults })
 
   let fluidA: RenderTarget
   let fluidB: RenderTarget
@@ -143,16 +144,18 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     uniforms: {
       uNoise: { value: noiseTexture },
       uNoiseSharp: { value: noiseSharpTexture },
+      uNoiseShape: { value: noiseShapeTexture },
       uFluid: { value: null },
       uTime: { value: 0 },
       uAspect: { value: 1 },
+      uIntensity: { value: 0 },
       uOffset1: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
-      // Measured offline (scanning the actual noise field across
-      // scanlines): 0.4/0.12 still left ~23% of a typical window as flat
-      // clear sky, with reports that it still read as "too much white."
-      // 0.32/0.14 brings clear sky down to ~6% at the same window shapes —
-      // still a little open sky, not full overcast.
+      // Governs how much of the screen the placement mask alone marks as
+      // candidate-cloud region (separate from how solid each cloud's own
+      // interior reads — see uNoiseShape in noise.ts/shaders.ts). Measured
+      // offline across scanlines at several aspect ratios: 0.32/0.14 keeps
+      // the largest fully-clear run under ~30% of the width.
       uCoverage: { value: 0.32 },
       uCoverageSoftness: { value: 0.14 },
       // Raised from 0.72 — a calmer, softer grey floor. The old value read
@@ -331,6 +334,15 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     cloudProgram.uniforms.uFluid.value = fluidRead.texture
     cloudProgram.uniforms.uTime.value = t
     cloudProgram.uniforms.uAspect.value = width / height
+    // Fades the cloud layer in from fully-transparent over the first ~2.2s
+    // after mount (smootherstep, so it eases at both ends). The canvas's own
+    // CSS opacity transition (Sky.astro) only takes 600ms and just fades the
+    // *element* in — the full-contrast pattern is already sitting there
+    // underneath from the very first frame, so without this the whole sky
+    // effectively "switches on" the instant that transition finishes. This
+    // ramp is what makes it read as clouds that were quietly already there.
+    const introT = Math.min(1, t / 2.2)
+    cloudProgram.uniforms.uIntensity.value = introT * introT * introT * (introT * (introT * 6 - 15) + 10)
     // Ease the ambient drift in from a standstill over the first several
     // seconds after mount (t is time-since-mount, not absolute page time).
     // Without this, the clouds drift at full, constant speed from the very

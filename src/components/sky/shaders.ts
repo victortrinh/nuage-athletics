@@ -97,19 +97,26 @@ export const FLUID_STEP = /* glsl */ `
  * metaball has a defined edge, and real clouds don't: they fray into wisps
  * with no boundary at all.
  *
- * What's here instead is domain-warped fbm (the standard technique for
- * painterly clouds/smoke/fire): a low-frequency fbm's output is used to
- * offset the sampling position of a second fbm, twice, before the final
- * detail fbm reads from that twice-displaced position. Every step is still
- * a continuous field — there is no cell, seed, or boundary anywhere in this
- * pipeline — so the result flows and curls organically instead of tiling
- * into discrete shapes.
+ * A domain-warped single-sample read is what's here instead: the shape
+ * comes from one lookup into `uNoiseShape` (blurred four times, then
+ * contrast-stretched back to the full 0..1 range at build time — see
+ * noise.ts), so a cloud's core can actually reach a real solid tone and a
+ * gap between clouds can actually reach real clear sky, rather than a
+ * multi-octave fbm sum's central-limit-compressed midtone that never gets
+ * close to either. That position is displaced first by a *small*, smooth,
+ * low-frequency offset sampled from the ordinary (un-stretched) `uNoise`
+ * texture — the offset is what gives the shape its organic, curling
+ * boundary instead of a bland radial blob. That offset field has to stay
+ * low-contrast: warping with anything itself contrast-stretched turns a
+ * small position jitter into a large, noisy swing once it lands on the
+ * shape texture's now-steep gradient — the same grain earlier rounds fixed
+ * by widening thresholds, reintroduced through a different door.
  *
- * A separate, cheap, low-frequency "placement" fbm decides which broad
- * regions lean cloudy at all; it's combined with the warped detail through
- * a wide smoothstep (not a tight threshold), so clouds fade into clear sky
+ * A separate, cheap, low-frequency "placement" field decides which broad
+ * regions lean cloudy at all; it's combined with the shape through a wide
+ * smoothstep (not a tight threshold), so clouds fade into clear sky
  * gradually over a real gradient instead of stopping at a crisp edge. The
- * wake still domain-warps the detail sample and subtracts density, both
+ * wake still domain-warps the shape sample and subtracts density, both
  * scaled by that placement mask (evaluated at the plain screen position, so
  * there's no feedback loop) — a swipe through a clear gap still does
  * nothing, since there's no cloud there to cut.
@@ -123,9 +130,11 @@ export const CLOUD = /* glsl */ `
 
   uniform sampler2D uNoise;
   uniform sampler2D uNoiseSharp;
+  uniform sampler2D uNoiseShape;
   uniform sampler2D uFluid;
   uniform float uTime;
   uniform float uAspect;
+  uniform float uIntensity;
   uniform vec2 uOffset1;
   uniform vec2 uMacroOffset;
   uniform float uCoverage;
@@ -135,62 +144,25 @@ export const CLOUD = /* glsl */ `
 
   float n(vec2 p) { return texture2D(uNoise, fract(p)).r; }
   float nSharp(vec2 p) { return texture2D(uNoiseSharp, fract(p)).r; }
+  float nShape(vec2 p) { return texture2D(uNoiseShape, fract(p)).r; }
 
-  // A blurred multi-octave fbm sum (used everywhere else in this shader)
-  // averages many values together, which by the central limit theorem
-  // compresses its own range toward the mean — it almost never gets close
-  // to a genuine 0 or 1. Whether sky is "clearly clear" or "clearly cloud"
-  // needs that full range, so placement reads the *un*blurred texture and
-  // stays dominated by one low-frequency sample (a small second term only
-  // roughens the edge) rather than averaging several octaves together.
+  // A blurred multi-octave fbm sum averages many values together, which by
+  // the central limit theorem compresses its own range toward the mean — it
+  // almost never gets close to a genuine 0 or 1. Whether sky is "clearly
+  // clear" or "clearly cloud" needs that full range, so placement reads the
+  // *un*blurred texture and stays dominated by one low-frequency sample (a
+  // small second term only roughens the edge) rather than averaging several
+  // octaves together.
   float placementNoise(vec2 p) {
     return nSharp(p) * 0.9 + nSharp(p * 2.3 + 11.7) * 0.1;
   }
 
-  // Cheap 3-octave fbm — used both as the placement field and as the inner
-  // building block of the warp chain below, where full detail is wasted.
-  float fbm3(vec2 p) {
-    float sum = 0.0;
-    float amp = 0.5;
-    float freq = 1.0;
-    for (int i = 0; i < 3; i++) {
-      sum += amp * n(p * freq);
-      freq *= 2.1;
-      amp *= 0.5;
-    }
-    return sum;
-  }
-
-  // 3-octave fbm for the final warped read — fewer octaves and a steeper
-  // falloff than the original 5, so the fine, grainy frequencies drop out
-  // entirely instead of just being faint. Those were reading as sparkle/
-  // glare rather than the soft, calm blobs of tone a real cloud shows.
-  float fbm5(vec2 p) {
-    float sum = 0.0;
-    float amp = 0.6;
-    float freq = 1.0;
-    for (int i = 0; i < 3; i++) {
-      sum += amp * n(p * freq);
-      freq *= 2.0;
-      amp *= 0.35;
-    }
-    return sum;
-  }
-
-  // Domain-warped fbm: q and r are each a 2D fbm field used purely to
-  // displace the position fed into the next fbm sample. Nothing here is
-  // thresholded or gated by a cell/seed — the whole thing is one continuous,
-  // flowing function, which is what gives it curling, wispy structure
-  // instead of tiled shapes. The warp magnitude is kept modest (not the
-  // aggressive displacement typical of this technique) so the flow reads as
-  // calm, soft blobs rather than a busy, agitated swirl.
+  // See the block comment above for why the offset and the final read pull
+  // from two different textures.
   float warpedCloud(vec2 p) {
-    vec2 q = vec2(fbm3(p), fbm3(p + vec2(5.2, 1.3)));
-    vec2 r = vec2(
-      fbm3(p + 1.3 * q + vec2(1.7, 9.2)),
-      fbm3(p + 1.3 * q + vec2(8.3, 2.8))
-    );
-    return fbm5(p + 1.1 * r);
+    vec2 q = vec2(n(p * 0.7) - 0.5, n(p * 0.7 + vec2(5.2, 1.3)) - 0.5);
+    vec2 warped = p + 0.5 * q;
+    return nShape(warped);
   }
 
   void main() {
@@ -228,16 +200,25 @@ export const CLOUD = /* glsl */ `
     vec2 detailPos = auv * 1.5 + uOffset1 + warp;
 
     float shape = warpedCloud(detailPos);
-    // Wider still than the already-wide curve this had — softer transitions
-    // between a blob's core tone and the sky around it.
-    shape = smoothstep(0.22, 0.78, shape);
+    // Matches the real spread of warpedCloud's output (measured offline:
+    // ~0.00-0.96, with the bulk between 0.26-0.62) — wide enough that both
+    // ends are actually reachable, so real cores and real gaps both occur,
+    // not just a compressed middle.
+    shape = smoothstep(0.30, 0.60, shape);
 
     vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.06;
-    float shapeLit = smoothstep(0.22, 0.78, warpedCloud(detailPos - sunDir));
+    float shapeLit = smoothstep(0.30, 0.60, warpedCloud(detailPos - sunDir));
     float light = clamp((shape - shapeLit) * 2.0 + 0.5, 0.0, 1.0);
 
     float density = mask * shape;
     density = clamp(density - carve * mask * 0.9, 0.0, 1.0);
+    // Fades the whole layer in from nothing over the first couple seconds
+    // after mount (see engine.ts) — without this, the very first rendered
+    // frame already carries the full-contrast pattern this round just made
+    // much more visible, so it reads as the whole sky "switching on" at
+    // once the moment the canvas's own CSS opacity fade finishes, rather
+    // than clouds that were already quietly there.
+    density *= uIntensity;
 
     float lum = mix(uCloudMax, uCloudMin, density);
     // Gated by density itself (not just the placement mask) so the shadow
