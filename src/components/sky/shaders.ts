@@ -90,6 +90,26 @@ export const FLUID_STEP = /* glsl */ `
 `
 
 /**
+ * Seeds a fluid target to its neutral state.
+ *
+ * This is not cosmetic. Velocity lives in rg as `v * 0.5 + 0.5`, so zero
+ * velocity encodes to 0.5 — but a freshly allocated render target is
+ * *zero*-filled, and 0.0 decodes back to -1.0. Left alone, every fluid
+ * buffer therefore starts out claiming a full-magnitude (-1,-1) velocity
+ * across the entire field, which the cloud pass reads as a position warp of
+ * (-0.6,-0.6) — around a quarter of the screen — that then slides back to
+ * true over the several seconds the bogus velocity takes to dissipate. That
+ * was the diagonal sweep the whole sky appeared to perform on every page
+ * load, and no amount of fading the canvas in could have hidden it.
+ */
+export const FLUID_SEED = /* glsl */ `
+  precision highp float;
+  void main() {
+    gl_FragColor = vec4(0.5, 0.5, 0.0, 1.0);
+  }
+`
+
+/**
  * Cloud density field, built the way production volumetric-cloud shaders
  * build one: big smooth masses first, then *erode* their edges with fine
  * noise. Several other approaches were tried and rejected here — thresholded
@@ -138,6 +158,8 @@ export const CLOUD = /* glsl */ `
   uniform vec2 uMacroOffset;
   uniform float uCoverage;
   uniform float uCoverageSoftness;
+  uniform float uCoverageBite;
+  uniform float uDensityFloor;
   uniform float uCloudMin;
   uniform float uCloudMax;
 
@@ -207,27 +229,31 @@ export const CLOUD = /* glsl */ `
     vec2 vel = fluidData.rg * 2.0 - 1.0;
     float carve = fluidData.b;
 
-    // The wake only visibly warps/cuts where the placement mask already
-    // says "cloud" — evaluated before this warp is applied, so there's no
-    // feedback loop.
-    vec2 warp = vel * 0.6 * mask;
+    vec2 warp = vel * 0.6;
     vec2 detailPos = auv * 1.5 + uOffset1 + warp;
 
-    // Coverage cut: where the mask says clear, only a very solid base
-    // reading survives; where it says cloudy, nearly all of it does.
-    float shape = remapFloor(baseShape(detailPos), 1.0 - mask);
+    // Coverage cut. uCoverageBite caps how much the mask is allowed to eat,
+    // so a "clear" region thins to haze rather than to bare sky — the deck
+    // is unbroken, with the mask only deciding where it runs thick or thin.
+    float coverFloor = (1.0 - mask) * uCoverageBite;
+    float shape = remapFloor(baseShape(detailPos), coverFloor);
     // Edge erosion — the step that makes this read as cloud rather than as
     // smooth blobs. Cores (shape near 1) are untouched; thin edges get eaten
     // into billowy, frayed wisps.
     float density = remapFloor(shape, erosionNoise(detailPos * 3.0) * 0.42);
-    density = clamp(density - carve * mask * 0.9, 0.0, 1.0);
+    // The wake removes a share of whatever cloud is actually here, so it
+    // still can't do anything where there's nothing to cut.
+    density *= 1.0 - carve * 0.9;
+    // Applied last, so even a full-strength carve parts the deck down to
+    // haze instead of punching a hole of bare white through it.
+    density = uDensityFloor + (1.0 - uDensityFloor) * density;
 
     // Self-shadow: compare against the un-eroded shape a short step toward
     // the sun. Skipping erosion in this second sample costs three texture
     // fetches less per pixel and is visually indistinguishable — the shading
     // term is low-frequency anyway.
     vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.09;
-    float shapeLit = remapFloor(baseShape(detailPos - sunDir), 1.0 - mask);
+    float shapeLit = remapFloor(baseShape(detailPos - sunDir), coverFloor);
     float light = clamp((density - shapeLit) * 2.2 + 0.5, 0.0, 1.0);
 
     float lum = mix(uCloudMax, uCloudMin, density);

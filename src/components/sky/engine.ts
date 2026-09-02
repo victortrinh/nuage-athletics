@@ -1,6 +1,6 @@
 import { Renderer, Program, Mesh, Triangle, RenderTarget, Texture } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
-import { BLIT, CLOUD, FLUID_STEP, VERTEX } from './shaders'
+import { BLIT, CLOUD, FLUID_SEED, FLUID_STEP, VERTEX } from './shaders'
 import { buildNoiseTextures } from './noise'
 
 export interface SkyHandle {
@@ -119,6 +119,11 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       Math.max(1, Math.round(height * cloudScale))
     )
     fluidReadIsA = true
+    // Both buffers must be written to their neutral encoding before anything
+    // samples them — see FLUID_SEED. A zero-filled target is not a still
+    // fluid, it is one moving diagonally at full speed.
+    renderer.render({ scene: seedMesh, target: fluidA })
+    renderer.render({ scene: seedMesh, target: fluidB })
   }
 
   const fluidProgram = new Program(gl, {
@@ -150,13 +155,19 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       uAspect: { value: 1 },
       uOffset1: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
-      // This is a *threshold* on the placement field, so lower means more
-      // cloud. It now also feeds the shader's coverage remap rather than
-      // multiplying density, which makes it bite harder for the same number
-      // — 0.24/0.14 measured offline at ~24% fully-clear sky across aspect
-      // ratios, with clouds reading as distinct masses rather than overcast.
-      uCoverage: { value: 0.24 },
+      // A *threshold* on the placement field, so lower means more cloud.
+      // With uCoverageBite below capping how far the mask can cut, this now
+      // only decides where the deck runs thick versus thin.
+      uCoverage: { value: 0.3 },
       uCoverageSoftness: { value: 0.14 },
+      // Together these are what guarantee no bare-white sky anywhere:
+      // uCoverageBite caps the mask's cut so thin regions stay hazy rather
+      // than going clear, and uDensityFloor puts a little cloud in every
+      // pixel regardless. Measured offline across four aspect ratios:
+      // exactly zero pixels at the flat-white ceiling, while the deck still
+      // reads as billowy structure rather than a flat grey wash.
+      uCoverageBite: { value: 0.5 },
+      uDensityFloor: { value: 0.25 },
       // Raised from 0.72 — a calmer, softer grey floor. The old value read
       // as glaring/harsh against the near-white sky; there's ample contrast
       // margin against ink text to spare (was 19.3:1/11.35:1, both far past
@@ -173,6 +184,11 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     uniforms: { uTex: { value: null } },
   })
   const blitMesh = new Mesh(gl, { geometry, program: blitProgram })
+
+  // Must exist before the first allocateTargets() call below, which seeds
+  // each freshly created fluid buffer with it.
+  const seedProgram = new Program(gl, { vertex: VERTEX, fragment: FLUID_SEED })
+  const seedMesh = new Mesh(gl, { geometry, program: seedProgram })
 
   function resize() {
     const w = Math.round(window.innerWidth)
