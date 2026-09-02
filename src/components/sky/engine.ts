@@ -9,9 +9,20 @@ export interface SkyHandle {
 }
 
 const GAVE_UP_KEY = 'na-sky-gaveup'
-const FLUID_BASE_WIDTH = 320
 const SLOW_FRAME_MS = 22
 const SLOW_FRAMES_TO_DEGRADE = 90
+
+/** Grayscale range the cloud pass writes within. */
+const CLOUD_MIN = 0.82
+const CLOUD_MAX = 0.99
+/** Cloud kept in every pixel, so the deck never opens to bare white. */
+const DENSITY_FLOOR = 0.25
+/**
+ * The tone a full-strength wake thins the deck to — exactly the luminance
+ * the density floor alone produces, so a cut parts the cloud to haze and
+ * stops there rather than punching through to white.
+ */
+const CARVE_LUM = CLOUD_MAX + (CLOUD_MIN - CLOUD_MAX) * DENSITY_FLOOR
 
 function isCoarsePointer(): boolean {
   try {
@@ -30,6 +41,12 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
   let cloudScale = coarse ? 0.4 : 0.55
   const dprCap = coarse ? 1.0 : 1.5
   let simHz = coarse ? 30 : 60
+  // The wake can never be finer than one texel of this buffer. At the old
+  // 320 a single texel already covered ~5 screen px, which put a floor under
+  // how thin the streak could be drawn; 640 halves that so a genuinely
+  // hairline trail survives the sim. The step itself is two texture fetches
+  // per texel, so even quadrupled it stays a small fraction of the cloud pass.
+  let fluidBaseWidth = coarse ? 384 : 640
 
   let renderer: Renderer
   try {
@@ -105,13 +122,13 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
 
   let width = 1
   let height = 1
-  let fluidWidth = FLUID_BASE_WIDTH
-  let fluidHeight = FLUID_BASE_WIDTH
+  let fluidWidth = fluidBaseWidth
+  let fluidHeight = fluidBaseWidth
 
   function allocateTargets() {
     const aspect = width / height
-    fluidWidth = FLUID_BASE_WIDTH
-    fluidHeight = Math.max(90, Math.round(FLUID_BASE_WIDTH / aspect))
+    fluidWidth = fluidBaseWidth
+    fluidHeight = Math.max(90, Math.round(fluidBaseWidth / aspect))
     fluidA = makeFluidTarget(fluidWidth, fluidHeight)
     fluidB = makeFluidTarget(fluidWidth, fluidHeight)
     cloudTarget = makeCloudTarget(
@@ -167,13 +184,13 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       // exactly zero pixels at the flat-white ceiling, while the deck still
       // reads as billowy structure rather than a flat grey wash.
       uCoverageBite: { value: 0.5 },
-      uDensityFloor: { value: 0.25 },
+      uDensityFloor: { value: DENSITY_FLOOR },
       // Raised from 0.72 — a calmer, softer grey floor. The old value read
       // as glaring/harsh against the near-white sky; there's ample contrast
       // margin against ink text to spare (was 19.3:1/11.35:1, both far past
       // the 4.5:1 AA floor), so this trades some of that margin for comfort.
-      uCloudMin: { value: 0.82 },
-      uCloudMax: { value: 0.99 },
+      uCloudMin: { value: CLOUD_MIN },
+      uCloudMax: { value: CLOUD_MAX },
     },
   })
   const cloudMesh = new Mesh(gl, { geometry, program: cloudProgram })
@@ -181,7 +198,11 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
   const blitProgram = new Program(gl, {
     vertex: VERTEX,
     fragment: BLIT,
-    uniforms: { uTex: { value: null } },
+    uniforms: {
+      uTex: { value: null },
+      uFluid: { value: null },
+      uCarveLum: { value: CARVE_LUM },
+    },
   })
   const blitMesh = new Mesh(gl, { geometry, program: blitProgram })
 
@@ -253,6 +274,9 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     slowFrameCount = 0
     if (degradeTier === 1) {
       cloudScale *= 0.7
+      // Give back the resolution the finer wake costs before giving up
+      // anything else — a slightly coarser streak beats a dropped frame.
+      fluidBaseWidth = Math.round(fluidBaseWidth * 0.7)
       allocateTargets()
     } else if (degradeTier === 2) {
       simHz = Math.max(15, simHz / 2)
@@ -329,11 +353,16 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     fluidProgram.uniforms.uPointerPrev.value = [prevFrameX, prevFrameY]
     fluidProgram.uniforms.uPointerCurr.value = [latestX, latestY]
     fluidProgram.uniforms.uPointerActive.value = movedSinceLastFrame ? 1 : 0
-    // A precise pointer is good, but the mark still has to be visible enough
-    // to read as a contrail cutting through cloud rather than disappear
-    // against it — a prior round shrank this specifically for precision,
-    // but that now works against "look like a plane going through it."
-    fluidProgram.uniforms.uSplatRadius.value = 0.02 + Math.min(speed * 0.008, 0.018)
+    // Radius is in the aspect-corrected space the splat is measured in,
+    // where one unit spans the viewport's *height* — so on a 950px-tall
+    // window 0.004 is a hair under 4px, and the visible mark (the falloff
+    // reaches ~0.37 at exactly this radius) lands around 6-10px wide
+    // depending on speed. Deliberately hairline: it should read as a wire
+    // drawn through the deck, not a swathe.
+    fluidProgram.uniforms.uSplatRadius.value = 0.005 + Math.min(speed * 0.0015, 0.003)
+    // Strength is left where it was. The impulse is what makes a mark this
+    // thin still register — a narrower splat carrying a weaker push would
+    // simply vanish into the cloud.
     fluidProgram.uniforms.uSplatStrength.value = 1.0 + Math.min(speed * 1.5, 1.8)
 
     renderer.render({ scene: fluidMesh, target: write })
@@ -363,6 +392,7 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     renderer.render({ scene: cloudMesh, target: cloudTarget })
 
     blitProgram.uniforms.uTex.value = cloudTarget.texture
+    blitProgram.uniforms.uFluid.value = fluidRead.texture
     renderer.render({ scene: blitMesh })
   }
 

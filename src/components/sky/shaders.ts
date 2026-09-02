@@ -225,9 +225,9 @@ export const CLOUD = /* glsl */ `
     float placement = placementNoise(placementPos);
     float mask = smoothstep(uCoverage - uCoverageSoftness, uCoverage + uCoverageSoftness, placement);
 
-    vec4 fluidData = texture2D(uFluid, vUv);
-    vec2 vel = fluidData.rg * 2.0 - 1.0;
-    float carve = fluidData.b;
+    // Only the velocity is read here. The wake's actual clearing cut is made
+    // in the blit pass instead, at full display resolution — see BLIT.
+    vec2 vel = texture2D(uFluid, vUv).rg * 2.0 - 1.0;
 
     vec2 warp = vel * 0.6;
     vec2 detailPos = auv * 1.5 + uOffset1 + warp;
@@ -241,11 +241,8 @@ export const CLOUD = /* glsl */ `
     // smooth blobs. Cores (shape near 1) are untouched; thin edges get eaten
     // into billowy, frayed wisps.
     float density = remapFloor(shape, erosionNoise(detailPos * 3.0) * 0.42);
-    // The wake removes a share of whatever cloud is actually here, so it
-    // still can't do anything where there's nothing to cut.
-    density *= 1.0 - carve * 0.9;
-    // Applied last, so even a full-strength carve parts the deck down to
-    // haze instead of punching a hole of bare white through it.
+    // Every pixel keeps at least this much cloud, so the deck never opens to
+    // bare white anywhere.
     density = uDensityFloor + (1.0 - uDensityFloor) * density;
 
     // Self-shadow: compare against the un-eroded shape a short step toward
@@ -269,12 +266,32 @@ export const CLOUD = /* glsl */ `
   }
 `
 
-/** Upsamples the low-res cloud render target to the display canvas. */
+/**
+ * Upsamples the low-res cloud render target to the display canvas, and cuts
+ * the wake's clearing line while doing it.
+ *
+ * The cut lives here rather than in the cloud pass for a resolution reason:
+ * the cloud pass runs at a fraction of the display size, so a wake drawn
+ * only a few pixels wide is thinner than one of its texels and dissolves
+ * into nothing. This pass runs per display pixel, so the line stays crisp
+ * however fine it gets. The velocity warp stays in the cloud pass — that
+ * part *wants* to be soft and low-frequency.
+ *
+ * uCarveLum is the haze tone the deck thins to, never bare white: a swipe
+ * parts the cloud, it doesn't punch a hole through to nothing. Cutting
+ * toward max() also means the line can only ever lighten, so it can't leave
+ * a dark seam where it crosses sky already lighter than that tone.
+ */
 export const BLIT = /* glsl */ `
   precision highp float;
   varying vec2 vUv;
   uniform sampler2D uTex;
+  uniform sampler2D uFluid;
+  uniform float uCarveLum;
   void main() {
-    gl_FragColor = texture2D(uTex, vUv);
+    float lum = texture2D(uTex, vUv).r;
+    float carve = clamp(texture2D(uFluid, vUv).b, 0.0, 1.0);
+    lum = mix(lum, max(lum, uCarveLum), carve * 0.9);
+    gl_FragColor = vec4(vec3(lum), 1.0);
   }
 `
