@@ -49,6 +49,11 @@ export default defineConfig({
   projects: [
     {
       name: 'a11y',
+      // Without this, the default testMatch ('**/*.e2e.ts') also picks up
+      // the other two projects' spec files and runs them here too — under
+      // this project's reducedMotion: 'reduce', which is exactly the
+      // condition sky-motion.e2e.ts exists to assert is NOT the case.
+      testIgnore: ['**/sky-motion.e2e.ts', '**/forced-colors.e2e.ts'],
       use: {
         ...devices['Desktop Chrome'],
         storageState: STORAGE_STATE,
