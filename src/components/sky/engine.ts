@@ -148,15 +148,14 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
       uFluid: { value: null },
       uTime: { value: 0 },
       uAspect: { value: 1 },
-      uIntensity: { value: 0 },
       uOffset1: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
-      // Governs how much of the screen the placement mask alone marks as
-      // candidate-cloud region (separate from how solid each cloud's own
-      // interior reads — see uNoiseShape in noise.ts/shaders.ts). Measured
-      // offline across scanlines at several aspect ratios: 0.32/0.14 keeps
-      // the largest fully-clear run under ~30% of the width.
-      uCoverage: { value: 0.32 },
+      // This is a *threshold* on the placement field, so lower means more
+      // cloud. It now also feeds the shader's coverage remap rather than
+      // multiplying density, which makes it bite harder for the same number
+      // — 0.24/0.14 measured offline at ~24% fully-clear sky across aspect
+      // ratios, with clouds reading as distinct masses rather than overcast.
+      uCoverage: { value: 0.24 },
       uCoverageSoftness: { value: 0.14 },
       // Raised from 0.72 — a calmer, softer grey floor. The old value read
       // as glaring/harsh against the near-white sky; there's ample contrast
@@ -334,29 +333,17 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     cloudProgram.uniforms.uFluid.value = fluidRead.texture
     cloudProgram.uniforms.uTime.value = t
     cloudProgram.uniforms.uAspect.value = width / height
-    // Fades the cloud layer in from fully-transparent over the first ~2.2s
-    // after mount (smootherstep, so it eases at both ends). The canvas's own
-    // CSS opacity transition (Sky.astro) only takes 600ms and just fades the
-    // *element* in — the full-contrast pattern is already sitting there
-    // underneath from the very first frame, so without this the whole sky
-    // effectively "switches on" the instant that transition finishes. This
-    // ramp is what makes it read as clouds that were quietly already there.
-    const introT = Math.min(1, t / 2.2)
-    cloudProgram.uniforms.uIntensity.value = introT * introT * introT * (introT * (introT * 6 - 15) + 10)
-    // Ease the ambient drift in from a standstill over the first several
-    // seconds after mount (t is time-since-mount, not absolute page time).
-    // Without this, the clouds drift at full, constant speed from the very
-    // first rendered frame — the exact moment a visitor's eyes are on the
-    // canvas as it fades in, so a slow *ambient* drift reads instead as an
-    // unwanted "everything just slid" jump. Quadratic-out keeps the first
-    // second or two essentially motionless.
-    const driftEase = Math.min(1, t / 5) ** 2
-    const dt = t * driftEase
-    cloudProgram.uniforms.uOffset1.value = [dt * 0.008, dt * 0.003]
+    // Drift is deliberately constant from the first frame — no fade-in, no
+    // ease-in ramp. Anything that changes over the first seconds after mount
+    // reads as an animation playing at page load, which is exactly what this
+    // background should not do: the clouds should simply already be there,
+    // drifting as slowly as they always will. The speed below is slow enough
+    // that nothing appears to "start".
+    cloudProgram.uniforms.uOffset1.value = [t * 0.008, t * 0.003]
     // Placement samples at a much lower coordinate scale (~0.1) than the
     // detail layer, so the same drift speed would cross the whole field
     // far faster — keep it slow enough that clouds migrate gradually.
-    cloudProgram.uniforms.uMacroOffset.value = [dt * 0.00025, dt * 0.0001]
+    cloudProgram.uniforms.uMacroOffset.value = [t * 0.00025, t * 0.0001]
     renderer.render({ scene: cloudMesh, target: cloudTarget })
 
     blitProgram.uniforms.uTex.value = cloudTarget.texture

@@ -90,39 +90,39 @@ export const FLUID_STEP = /* glsl */ `
 `
 
 /**
- * Cloud density field. Two earlier approaches were tried and rejected here:
- * thresholded value-noise produced connected ridge/streak contours (not
- * clouds), and a jittered-grid metaball field produced round but evenly
- * bounded blobs that read as cells/viruses rather than atmosphere — a
- * metaball has a defined edge, and real clouds don't: they fray into wisps
- * with no boundary at all.
+ * Cloud density field, built the way production volumetric-cloud shaders
+ * build one: big smooth masses first, then *erode* their edges with fine
+ * noise. Several other approaches were tried and rejected here — thresholded
+ * value-noise gave connected ridge/streak contours; a jittered-grid metaball
+ * field gave round but evenly bounded blobs that read as cells; and simply
+ * blending fine detail *into* the body (adding octaves, or steepening a
+ * threshold over a multi-octave sum) either reads as grain/TV static or, if
+ * softened enough to kill the grain, collapses into a pale flowing marble
+ * with no cloud structure at all.
  *
- * A domain-warped single-sample read is what's here instead: the shape
- * comes from one lookup into `uNoiseShape` (blurred four times, then
- * contrast-stretched back to the full 0..1 range at build time — see
- * noise.ts), so a cloud's core can actually reach a real solid tone and a
- * gap between clouds can actually reach real clear sky, rather than a
- * multi-octave fbm sum's central-limit-compressed midtone that never gets
- * close to either. That position is displaced first by a *small*, smooth,
- * low-frequency offset sampled from the ordinary (un-stretched) `uNoise`
- * texture — the offset is what gives the shape its organic, curling
- * boundary instead of a bland radial blob. That offset field has to stay
- * low-contrast: warping with anything itself contrast-stretched turns a
- * small position jitter into a large, noisy swing once it lands on the
- * shape texture's now-steep gradient — the same grain earlier rounds fixed
- * by widening thresholds, reintroduced through a different door.
+ * Erosion is what avoids that trade-off. `shape` is a coverage-remapped read
+ * of `uNoiseShape` (blurred four times, then contrast-stretched back to the
+ * full 0..1 range at build time — see noise.ts), so it has real solid cores
+ * and real clear gaps and is smooth everywhere. `erosionNoise` — fine,
+ * three-octave, and far too high-frequency to ever be added to the body — is
+ * then used as the *low end* of a second remap. That makes the fine noise
+ * bite hardest where the shape is already thin (the edges, which fray into
+ * billowy cauliflower wisps, exactly what a real cloud boundary looks like)
+ * while leaving cores at 1.0 untouched and perfectly smooth. Same detail
+ * texture that used to produce static; it just can't, in this position.
  *
  * A separate, cheap, low-frequency "placement" field decides which broad
- * regions lean cloudy at all; it's combined with the shape through a wide
- * smoothstep (not a tight threshold), so clouds fade into clear sky
- * gradually over a real gradient instead of stopping at a crisp edge. The
- * wake still domain-warps the shape sample and subtracts density, both
- * scaled by that placement mask (evaluated at the plain screen position, so
- * there's no feedback loop) — a swipe through a clear gap still does
- * nothing, since there's no cloud there to cut.
+ * regions lean cloudy at all, and feeds the first remap's threshold — so a
+ * region the mask calls clear needs a very solid base reading to show any
+ * cloud, and a region it calls cloudy shows nearly all of it. The wake
+ * displaces the shape sample and subtracts density, both scaled by that
+ * mask (evaluated at the plain screen position, so there's no feedback
+ * loop) — a swipe through a clear gap still does nothing, since there's no
+ * cloud there to cut.
  *
- * Output is clamped to [uCloudMin, uCloudMax] grayscale so no pixel ever
- * gets dark enough to threaten text contrast against the ink foreground.
+ * Output is clamped so no pixel ever gets dark enough to threaten text
+ * contrast against the ink foreground (measured: the deepest shadowed core
+ * still clears AAA).
  */
 export const CLOUD = /* glsl */ `
   precision highp float;
@@ -134,7 +134,6 @@ export const CLOUD = /* glsl */ `
   uniform sampler2D uFluid;
   uniform float uTime;
   uniform float uAspect;
-  uniform float uIntensity;
   uniform vec2 uOffset1;
   uniform vec2 uMacroOffset;
   uniform float uCoverage;
@@ -145,6 +144,13 @@ export const CLOUD = /* glsl */ `
   float n(vec2 p) { return texture2D(uNoise, fract(p)).r; }
   float nSharp(vec2 p) { return texture2D(uNoiseSharp, fract(p)).r; }
   float nShape(vec2 p) { return texture2D(uNoiseShape, fract(p)).r; }
+
+  // Rescales v so that everything at or below lo becomes 0 and 1.0 stays 1.0.
+  // Both the coverage cut and the edge erosion are this same operation: it
+  // eats into a field from below without ever touching what's already solid.
+  float remapFloor(float v, float lo) {
+    return clamp((v - lo) / max(1e-4, 1.0 - lo), 0.0, 1.0);
+  }
 
   // A blurred multi-octave fbm sum averages many values together, which by
   // the central limit theorem compresses its own range toward the mean — it
@@ -157,12 +163,20 @@ export const CLOUD = /* glsl */ `
     return nSharp(p) * 0.9 + nSharp(p * 2.3 + 11.7) * 0.1;
   }
 
-  // See the block comment above for why the offset and the final read pull
-  // from two different textures.
-  float warpedCloud(vec2 p) {
-    vec2 q = vec2(n(p * 0.7) - 0.5, n(p * 0.7 + vec2(5.2, 1.3)) - 0.5);
-    vec2 warped = p + 0.5 * q;
-    return nShape(warped);
+  // The cloud masses themselves. One full-range read, softly displaced by a
+  // low-frequency, *low-contrast* offset so masses lean and curl instead of
+  // sitting there as bland ovals. The offset field has to stay low-contrast:
+  // warping with anything itself contrast-stretched turns small position
+  // jitter into large noisy swings once it lands on this texture's steep
+  // gradient.
+  float baseShape(vec2 p) {
+    vec2 q = vec2(n(p * 0.6) - 0.5, n(p * 0.6 + vec2(5.2, 1.3)) - 0.5);
+    return nShape(p + 0.35 * q);
+  }
+
+  // Fine three-octave detail, used *only* as the erosion floor above.
+  float erosionNoise(vec2 p) {
+    return (n(p) * 0.6 + n(p * 2.4) * 0.27 + n(p * 5.76) * 0.1215) / 0.9915;
   }
 
   void main() {
@@ -199,34 +213,31 @@ export const CLOUD = /* glsl */ `
     vec2 warp = vel * 0.6 * mask;
     vec2 detailPos = auv * 1.5 + uOffset1 + warp;
 
-    float shape = warpedCloud(detailPos);
-    // Matches the real spread of warpedCloud's output (measured offline:
-    // ~0.00-0.96, with the bulk between 0.26-0.62) — wide enough that both
-    // ends are actually reachable, so real cores and real gaps both occur,
-    // not just a compressed middle.
-    shape = smoothstep(0.30, 0.60, shape);
-
-    vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.06;
-    float shapeLit = smoothstep(0.30, 0.60, warpedCloud(detailPos - sunDir));
-    float light = clamp((shape - shapeLit) * 2.0 + 0.5, 0.0, 1.0);
-
-    float density = mask * shape;
+    // Coverage cut: where the mask says clear, only a very solid base
+    // reading survives; where it says cloudy, nearly all of it does.
+    float shape = remapFloor(baseShape(detailPos), 1.0 - mask);
+    // Edge erosion — the step that makes this read as cloud rather than as
+    // smooth blobs. Cores (shape near 1) are untouched; thin edges get eaten
+    // into billowy, frayed wisps.
+    float density = remapFloor(shape, erosionNoise(detailPos * 3.0) * 0.42);
     density = clamp(density - carve * mask * 0.9, 0.0, 1.0);
-    // Fades the whole layer in from nothing over the first couple seconds
-    // after mount (see engine.ts) — without this, the very first rendered
-    // frame already carries the full-contrast pattern this round just made
-    // much more visible, so it reads as the whole sky "switching on" at
-    // once the moment the canvas's own CSS opacity fade finishes, rather
-    // than clouds that were already quietly there.
-    density *= uIntensity;
+
+    // Self-shadow: compare against the un-eroded shape a short step toward
+    // the sun. Skipping erosion in this second sample costs three texture
+    // fetches less per pixel and is visually indistinguishable — the shading
+    // term is low-frequency anyway.
+    vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.09;
+    float shapeLit = remapFloor(baseShape(detailPos - sunDir), 1.0 - mask);
+    float light = clamp((density - shapeLit) * 2.2 + 0.5, 0.0, 1.0);
 
     float lum = mix(uCloudMax, uCloudMin, density);
-    // Gated by density itself (not just the placement mask) so the shadow
-    // term can't modulate brightness in pixels that are already at zero
-    // density — the same class of bug that leaked detail-shaped texture
-    // into clear sky before.
-    lum *= mix(1.0, mix(0.95, 1.0, light), density);
-    lum = clamp(lum, uCloudMin, uCloudMax);
+    // Volume shading. Scaled by density so it can't tint pixels that hold no
+    // cloud at all — the same class of bug that once leaked detail-shaped
+    // texture into clear sky. This is where the puffiness comes from: it
+    // darkens undersides without making the field as a whole any greyer,
+    // which is what "glaring" felt like when the flat tone was pushed instead.
+    lum *= 1.0 - density * 0.18 * (1.0 - light);
+    lum = clamp(lum, uCloudMin - 0.18, uCloudMax);
 
     gl_FragColor = vec4(vec3(lum), 1.0);
   }
