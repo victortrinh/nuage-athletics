@@ -36,13 +36,28 @@ function boxBlur(data: Uint8Array, size: number): Uint8Array {
   return out
 }
 
+export interface NoiseTextures {
+  /** Blurred — smooth gradients, no texel-boundary ramp. Used for fbm detail/warp. */
+  detail: Uint8Array
+  /**
+   * Unblurred. The box blur averages 9 independent random values together,
+   * which (central limit theorem) compresses the value range by roughly 3x —
+   * fine for smooth detail texture, but it means a low-frequency sample of
+   * the blurred texture almost never gets close to 0 or 1, so nothing built
+   * on it can ever resolve to a *genuinely* clear or *genuinely* solid
+   * region. The cloud placement mask needs that full range to tell clear
+   * sky from cloud at all, so it reads from this sharp version instead.
+   */
+  placement: Uint8Array
+}
+
 /**
  * A small tiling RGBA noise texture, one random value per channel. Sampled
  * with wrap and bilinear filtering, this is what the fBm octaves in the
  * cloud shader read from — a texture fetch per octave is much cheaper than
  * an ALU hash, and it ships as zero network bytes since it's built at runtime.
  */
-export function buildNoiseTexture(size = 64, seed = 1337): Uint8Array {
+export function buildNoiseTextures(size = 64, seed = 1337): NoiseTextures {
   const rand = mulberry32(seed)
   const data = new Uint8Array(size * size * 4)
   for (let i = 0; i < size * size; i++) {
@@ -51,5 +66,5 @@ export function buildNoiseTexture(size = 64, seed = 1337): Uint8Array {
     data[i * 4 + 2] = Math.floor(rand() * 256)
     data[i * 4 + 3] = Math.floor(rand() * 256)
   }
-  return boxBlur(data, size)
+  return { detail: boxBlur(data, size), placement: data }
 }

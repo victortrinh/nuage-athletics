@@ -1,7 +1,7 @@
 import { Renderer, Program, Mesh, Triangle, RenderTarget, Texture } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { BLIT, CLOUD, FLUID_STEP, VERTEX } from './shaders'
-import { buildNoiseTexture } from './noise'
+import { buildNoiseTextures } from './noise'
 
 export interface SkyHandle {
   destroy(): void
@@ -57,9 +57,8 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
 
   const geometry = new Triangle(gl)
 
-  const noiseData = buildNoiseTexture(64)
-  const noiseTexture = new Texture(gl, {
-    image: noiseData,
+  const noiseData = buildNoiseTextures(64)
+  const textureDefaults = {
     width: 64,
     height: 64,
     generateMipmaps: false,
@@ -68,7 +67,9 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     minFilter: gl.LINEAR,
     magFilter: gl.LINEAR,
     flipY: false,
-  })
+  }
+  const noiseTexture = new Texture(gl, { image: noiseData.detail, ...textureDefaults })
+  const noiseSharpTexture = new Texture(gl, { image: noiseData.placement, ...textureDefaults })
 
   let fluidA: RenderTarget
   let fluidB: RenderTarget
@@ -141,14 +142,13 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     fragment: CLOUD,
     uniforms: {
       uNoise: { value: noiseTexture },
+      uNoiseSharp: { value: noiseSharpTexture },
       uFluid: { value: null },
       uTime: { value: 0 },
       uOffset1: { value: [0, 0] },
-      uOffset2: { value: [0, 0] },
       uMacroOffset: { value: [0, 0] },
-      uCoverage: { value: 0.46 },
-      uCoverageSoftness: { value: 0.06 },
-      uCellDensity: { value: [9, 5] },
+      uCoverage: { value: 0.42 },
+      uCoverageSoftness: { value: 0.1 },
       uCloudMin: { value: 0.72 },
       uCloudMax: { value: 0.99 },
     },
@@ -289,8 +289,12 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     fluidProgram.uniforms.uPointerPrev.value = [prevFrameX, prevFrameY]
     fluidProgram.uniforms.uPointerCurr.value = [latestX, latestY]
     fluidProgram.uniforms.uPointerActive.value = movedSinceLastFrame ? 1 : 0
-    fluidProgram.uniforms.uSplatRadius.value = 0.0125 + Math.min(speed * 0.005, 0.0125)
-    fluidProgram.uniforms.uSplatStrength.value = 0.9 + Math.min(speed * 1.5, 1.8)
+    // A precise pointer is good, but the mark still has to be visible enough
+    // to read as a contrail cutting through cloud rather than disappear
+    // against it — a prior round shrank this specifically for precision,
+    // but that now works against "look like a plane going through it."
+    fluidProgram.uniforms.uSplatRadius.value = 0.02 + Math.min(speed * 0.008, 0.018)
+    fluidProgram.uniforms.uSplatStrength.value = 1.0 + Math.min(speed * 1.5, 1.8)
 
     renderer.render({ scene: fluidMesh, target: write })
 
@@ -305,11 +309,10 @@ export function mountSky(canvas: HTMLCanvasElement): SkyHandle {
     cloudProgram.uniforms.uFluid.value = fluidRead.texture
     cloudProgram.uniforms.uTime.value = t
     cloudProgram.uniforms.uOffset1.value = [t * 0.008, t * 0.003]
-    cloudProgram.uniforms.uOffset2.value = [-t * 0.014, t * 0.006]
-    // Drift is in the cloudField's cell-unit space (uv * uCellDensity), not
-    // screen-uv space, so a full unit crosses one whole cell — keep this
-    // slow enough that clouds migrate gradually rather than visibly race.
-    cloudProgram.uniforms.uMacroOffset.value = [t * 0.006, t * 0.0025]
+    // Placement samples at a much lower coordinate scale (~0.1) than the
+    // detail layer, so the same drift speed would cross the whole field
+    // far faster — keep it slow enough that clouds migrate gradually.
+    cloudProgram.uniforms.uMacroOffset.value = [t * 0.00025, t * 0.0001]
     renderer.render({ scene: cloudMesh, target: cloudTarget })
 
     blitProgram.uniforms.uTex.value = cloudTarget.texture
