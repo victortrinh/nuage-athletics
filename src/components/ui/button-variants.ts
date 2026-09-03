@@ -17,7 +17,10 @@ export const buttonVariants = cva('transition-colors', {
     variant: {
       solid:
         'w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase tracking-label text-paper hover:bg-paper hover:text-ink disabled:opacity-40',
-      quiet: 'text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100',
+      // The icon-only sky pause/resume toggle — accessible name comes from
+      // aria-label, not visible text, so this is purely the dim/undim hover
+      // treatment.
+      quiet: 'opacity-70 hover:opacity-100',
     },
   },
   defaultVariants: {
