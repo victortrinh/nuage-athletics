@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers'
 import ProductGallery from './ProductGallery.astro'
 import ProductActions from './ProductActions.tsx'
 import CpaDisclosure from './CpaDisclosure.astro'
@@ -15,7 +16,11 @@ const { locale, commerceEnabled } = Astro.props
 const d = t(locale)
 const product = featuredProduct(locale)
 const editorial = editorialFor(product.id, locale)
-const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY
+// PUBLIC_TURNSTILE_SITE_KEY is a [vars] entry in wrangler.toml, i.e. a Worker
+// runtime binding — not a Vite build-time value, so it must come from the
+// `env` import, not `import.meta.env` (which is never populated here and
+// silently produced undefined, disabling the widget on every request).
+const siteKey = env.PUBLIC_TURNSTILE_SITE_KEY
 
 /**
  * No price is rendered while commerce is off, and the price is left out of the
@@ -53,10 +58,7 @@ const jsonLd = {
 
     {
       !commerceEnabled && (
-        <p
-          class="mt-4 inline-block border border-ink px-2 py-1 text-[10px] uppercase"
-          style="letter-spacing: var(--tracking-label)"
-        >
+        <p class="mt-4 inline-block border border-ink px-2 py-1 text-[10px] uppercase tracking-label">
           {d.productComingSoon}
         </p>
       )
@@ -76,10 +78,7 @@ const jsonLd = {
       />
     </div>
 
-    <h2
-      class="mt-14 border-t border-line pt-8 text-[11px] uppercase text-mute"
-      style="letter-spacing: var(--tracking-label)"
-    >
+    <h2 class="mt-14 border-t border-line pt-8 text-[11px] uppercase tracking-label text-mute">
       {d.productDetails}
     </h2>
     <dl class="mt-5">

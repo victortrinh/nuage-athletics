@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # tsc --noEmit. `astro check` is unusable under TypeScript 7 — see
+      # CLAUDE.md — so this is the only type gate.
+      - run: npm run check
+
+      # @cloudflare/vitest-pool-workers runs these against real Miniflare
+      # workerd + D1, not mocks.
+      - run: npm test
+
+      - run: npm run build
+
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts's webServer builds, migrates a throwaway local
+      # D1, and starts `wrangler dev` itself — nothing to start here.
+      - run: npm run test:a11y
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

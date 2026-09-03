@@ -10,3 +10,7 @@ dist/
 *.log
 .git-broken/
 .worktrees/
+.wrangler-e2e/
+e2e/.auth/
+playwright-report/
+test-results/

@@ -1,8 +1,12 @@
 ---
+import { env } from 'cloudflare:workers'
 import Logo from './Logo.astro'
 import SignupForm from './SignupForm.tsx'
 import { t } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
+import { cn } from './ui/cn'
+import { buttonVariants } from './ui/button-variants'
+import { inputVariants, labelVariants, fieldErrorVariants } from './ui/field-variants'
 
 interface Props {
   locale: Locale
@@ -10,6 +14,9 @@ interface Props {
 
 const { locale } = Astro.props
 const d = t(locale)
+// A Worker runtime binding ([vars] in wrangler.toml), not a Vite build-time
+// value — see the matching comment in ProductView.astro.
+const turnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY
 
 // The middleware rewrites here while preserving the URL the visitor asked
 // for, and passes it along so unlocking returns them to it rather than
@@ -22,18 +29,14 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
 <section class="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center py-16">
   <Logo variant="mark" class="text-5xl" />
 
-  <h1 class="mt-10 text-[11px] uppercase" style={`letter-spacing: var(--tracking-label)`}>
+  <h1 class="mt-10 text-[11px] uppercase tracking-label">
     {d.gateTitle}
   </h1>
   <p class="mt-3 text-lg leading-snug">{d.gateLede}</p>
 
   <form method="POST" action="/api/gate" class="mt-10">
     <input type="hidden" name="to" value={to} />
-    <label
-      for="gate-password"
-      class="block text-[11px] uppercase text-mute"
-      style={`letter-spacing: var(--tracking-label)`}
-    >
+    <label for="gate-password" class={labelVariants()}>
       {d.gatePasswordLabel}
     </label>
     <input
@@ -45,29 +48,25 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
       autocomplete="current-password"
       aria-invalid={errorMessage ? 'true' : undefined}
       aria-describedby={errorMessage ? 'gate-error' : undefined}
-      class="mt-2 w-full border-0 border-b border-ink bg-transparent px-0 py-2 font-mono text-lg tracking-[0.25em] focus:outline-none focus-visible:border-accent-ink"
+      class={cn(inputVariants({ variant: 'mono' }), 'mt-2')}
     />
 
     {
       errorMessage && (
-        <p id="gate-error" role="alert" class="mt-3 text-sm text-red-700">
+        <p id="gate-error" role="alert" class={cn(fieldErrorVariants(), 'mt-3')}>
           {errorMessage}
         </p>
       )
     }
 
-    <button
-      type="submit"
-      class="mt-8 w-full border border-ink bg-ink px-6 py-3 text-[11px] uppercase text-paper transition-colors hover:bg-paper hover:text-ink"
-      style={`letter-spacing: var(--tracking-label)`}
-    >
+    <button type="submit" class={cn(buttonVariants(), 'mt-8')}>
       {d.gateSubmit}
     </button>
   </form>
 
   <hr class="mt-14 border-line" />
 
-  <p class="mt-8 text-[11px] uppercase text-mute" style={`letter-spacing: var(--tracking-label)`}>
+  <p class="mt-8 text-[11px] uppercase tracking-label text-mute">
     {d.gateSignupLede}
   </p>
   <div class="mt-5">
@@ -75,14 +74,14 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
       client:load
       {locale}
       {d}
-      turnstileSiteKey={import.meta.env.PUBLIC_TURNSTILE_SITE_KEY}
+      {turnstileSiteKey}
       source="gate"
     />
   </div>
 </section>
 
 {
-  import.meta.env.PUBLIC_TURNSTILE_SITE_KEY && (
+  turnstileSiteKey && (
     <script
       is:inline
       src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"

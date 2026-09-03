@@ -44,10 +44,7 @@ const { slots, label } = Astro.props
             role="img"
             aria-label={slot.alt}
           >
-            <span
-              class="absolute bottom-3 left-3 text-[10px] uppercase text-mute"
-              style="letter-spacing: var(--tracking-label)"
-            >
+            <span class="absolute bottom-3 left-3 text-[10px] uppercase tracking-label text-mute">
               {String(i + 1).padStart(2, '0')} / {String(slots.length).padStart(2, '0')}
             </span>
           </div>

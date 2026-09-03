@@ -7,6 +7,7 @@ import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
+import { buttonVariants } from '../components/ui/button-variants'
 
 interface Props {
   locale: Locale
@@ -31,43 +32,51 @@ const year = new Date().getFullYear()
     <slot name="head" />
   </head>
   <body class="min-h-dvh flex flex-col font-sans antialiased">
-    <Sky />
-    <header
-      class="flex items-center justify-between gap-6 border-b border-line px-6 py-4 sm:px-10"
+    <a
+      href="#content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:border focus:border-ink focus:bg-paper focus:px-4 focus:py-2 focus:text-sm"
     >
-      <a
-        href={route('home', locale)}
-        aria-label={d.brand}
-        class="text-xl hover:text-accent-ink"
-      >
-        <Logo variant="wordmark" />
-      </a>
-      <div class="flex items-center gap-6">
-        <button
-          type="button"
-          id="sky-toggle"
-          hidden
-          data-pause-label={d.skyPause}
-          data-resume-label={d.skyResume}
-          class="text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100"
+      {d.skipToContent}
+    </a>
+    <Sky />
+    <header class="border-b border-line px-6 py-4 sm:px-10">
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-6">
+        <a
+          href={route('home', locale)}
+          aria-label={d.brand}
+          class="text-xl hover:text-accent-ink"
         >
-          {d.skyPause}
-        </button>
-        <LocaleSwitcher {locale} {routeId} href={localeHref} />
+          <Logo variant="wordmark" />
+        </a>
+        <div class="flex items-center gap-6">
+          <button
+            type="button"
+            id="sky-toggle"
+            hidden
+            data-pause-label={d.skyPause}
+            data-resume-label={d.skyResume}
+            class={buttonVariants({ variant: 'quiet' })}
+          >
+            {d.skyPause}
+          </button>
+          <LocaleSwitcher {locale} {routeId} href={localeHref} />
+        </div>
       </div>
     </header>
 
-    <main class="flex-1 px-6 sm:px-10">
+    <main id="content" class="mx-auto w-full max-w-6xl flex-1 px-6 sm:px-10">
       <slot />
     </main>
 
     <footer class="mt-16 border-t border-line px-6 py-10 text-xs text-mute sm:px-10">
-      <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
-        <a href={route('privacy', locale)} class="hover:text-accent-ink">{d.privacy}</a>
-        <a href={route('terms', locale)} class="hover:text-accent-ink">{d.terms}</a>
-        <a href="mailto:hello@nuageathletics.com" class="hover:text-accent-ink">{d.contact}</a>
-      </nav>
-      <p>© {year} {d.brand}. {d.rights}</p>
+      <div class="mx-auto max-w-6xl">
+        <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
+          <a href={route('privacy', locale)} class="hover:text-accent-ink">{d.privacy}</a>
+          <a href={route('terms', locale)} class="hover:text-accent-ink">{d.terms}</a>
+          <a href="mailto:hello@nuageathletics.com" class="hover:text-accent-ink">{d.contact}</a>
+        </nav>
+        <p>© {year} {d.brand}. {d.rights}</p>
+      </div>
     </footer>
   </body>
 </html>
