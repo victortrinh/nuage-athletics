@@ -71,7 +71,36 @@
 }
 
 html { -webkit-text-size-adjust: 100%; }
-body { background: var(--color-paper); color: var(--color-ink); }
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  /* viewport-fit=cover (Seo.astro) lets content reach the notch in
+     landscape; Sky.astro is `fixed`, so its containing block is the
+     viewport, not this padding box — the clouds stay full-bleed and only
+     text insets. */
+  padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+}
+
+:root {
+  /* The sticky header's total height, excluding the safe-area inset: 2x the
+     header's py-4 plus the wordmark's line box. Read by #content's
+     scroll-margin and the product buy panel's sticky offset so all three
+     move together if the header's padding ever changes. */
+  --header-h: 3.75rem;
+}
+
+/* Anchor jumps — the skip link, any in-page hash — would otherwise land
+   under the sticky header (Base.astro). */
+#content {
+  scroll-margin-top: calc(var(--header-h) + env(safe-area-inset-top, 0px));
+}
+
+/* The sticky header's top inset on notched iPhones. Without
+   viewport-fit=cover (Seo.astro) env() resolves to 0px and this is a
+   harmless no-op. */
+@utility pt-safe {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
 
 /* Nothing on this site is rounded. Stated once here rather than fighting it
    with rounded-none on every control. */
