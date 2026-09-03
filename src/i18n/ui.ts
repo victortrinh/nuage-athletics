@@ -17,7 +17,8 @@ import type { Locale } from './config.ts'
  *
  *   - Anything that names a control or is read by a screen reader —
  *     emailLabel, gatePasswordLabel, productSizeLabel, productFitLabel,
- *     productGalleryLabel, productImagePosition, skipToContent, switchTo.
+ *     productGalleryLabel, productImagePosition, productImagePrev,
+ *     productImageNext, skipToContent, switchTo.
  *     A weather word in an accessible name is a broken accessible name.
  *   - Errors that tell you how to fix the thing — errorEmail, errorConsent,
  *     productSelectSizeError, errorChallenge, errorEmailSend. Cute is hostile
@@ -90,6 +91,8 @@ export type Dict = {
   productSelectSizeError: string
   productFitLabel: string
   productImagePosition: string
+  productImagePrev: string
+  productImageNext: string
   orderConfirmedTitle: string
   orderConfirmedBody: string
   orderCancelledTitle: string
@@ -155,6 +158,8 @@ export const UI: Record<Locale, Dict> = {
     productSelectSizeError: 'Choisissez une taille.',
     productFitLabel: 'Coupe',
     productImagePosition: 'Image {n} de {total}',
+    productImagePrev: 'Image précédente',
+    productImageNext: 'Image suivante',
     orderConfirmedTitle: 'Commande confirmée',
     orderConfirmedBody:
       'Merci. Un courriel de confirmation est en route.',
@@ -217,6 +222,8 @@ export const UI: Record<Locale, Dict> = {
     productSelectSizeError: 'Choose a size.',
     productFitLabel: 'Fit',
     productImagePosition: 'Image {n} of {total}',
+    productImagePrev: 'Previous image',
+    productImageNext: 'Next image',
     orderConfirmedTitle: 'Order confirmed',
     orderConfirmedBody: 'Thanks. A confirmation email is on its way.',
     orderCancelledTitle: 'Order cancelled',
