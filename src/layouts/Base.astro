@@ -40,15 +40,16 @@ const year = new Date().getFullYear()
     </a>
     <Sky />
     <header class="sticky top-0 z-40 border-b border-line bg-paper px-6 pt-safe pb-4 sm:px-10">
-      <div class="mx-auto flex max-w-6xl items-center justify-between gap-6">
+      <div class="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-6">
+        <div aria-hidden="true"></div>
         <a
           href={route('home', locale)}
           aria-label={d.brand}
-          class="text-xl hover:text-accent-ink"
+          class="justify-self-center text-xl hover:text-accent-ink"
         >
           <Logo variant="wordmark" />
         </a>
-        <div class="flex items-center gap-6">
+        <div class="flex items-center justify-end gap-6">
           <button
             type="button"
             id="sky-toggle"
