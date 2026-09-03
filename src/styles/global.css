@@ -106,6 +106,20 @@ body {
    with rounded-none on every control. */
 button, input, textarea, select, img, video { border-radius: 0; }
 
+/* Tailwind v4's preflight deliberately stopped restoring `cursor: pointer`
+   on buttons — it matches the browser default instead, which is an arrow.
+   Every <button> on this site therefore looked inert to a mouse, which is
+   how the carousel arrows, the numbered pagination and the sky toggle all
+   ended up reading as decoration. Two files had already patched around it
+   one control at a time (the <summary> in GateScreen.astro, the <label>
+   RAC renders for a Radio); this states it once for everything.
+
+   <label> is not in the list: a label is only a control when it wraps or
+   points at one, which the selector can't know — radio-group.tsx and
+   checkbox.tsx say so themselves. */
+button, summary, [role='button'] { cursor: pointer; }
+button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
+
 /* The sky sits behind everything and washes out a faint ring, so focus is
    drawn as a hard offset block instead — defined once as a utility so it
    can be applied identically to native :focus-visible (below) and to RAC's
@@ -120,6 +134,70 @@ button, input, textarea, select, img, video { border-radius: 0; }
   @apply focus-block;
 }
 
+/*
+ * How a control answers the pointer, stated once for the same reason
+ * focus-block is: the site has one press gesture, not one per component.
+ * Colour, border and opacity ease over 150ms instead of snapping, and the
+ * control sinks 1px while it is held so a click has a bottom to it.
+ *
+ * The sink is the only part gated on prefers-reduced-motion — it is the
+ * only part that moves anything. A 150ms tint is a transition between two
+ * states, not motion across the screen, and removing it would make the
+ * hover feedback harsher for reduced-motion users, not gentler.
+ *
+ * Replaces `transition-colors` at its call sites rather than joining it:
+ * both set transition-property, so applying both would leave whichever
+ * Tailwind happens to emit last silently dropping the other's.
+ */
+@utility press {
+  transition-property: color, background-color, border-color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+  @media (prefers-reduced-motion: no-preference) {
+    transition-property: color, background-color, border-color, opacity, transform;
+    &:active { transform: translateY(1px); }
+  }
+}
+
+/*
+ * A hairline that draws itself in from the left — the same rule the whole
+ * layout is built from, arriving rather than blinking on. Drawn as a
+ * background gradient, not text-decoration, because only background-size
+ * animates; it also sits clear of descenders at a fixed 1px, which a
+ * transitioning underline-offset can't promise.
+ *
+ * On :focus-visible as well as :hover, so the keyboard gets the same
+ * affordance the pointer does — the focus outline says "you are here", this
+ * says "this is a link".
+ *
+ * Carries its own colour easing rather than being paired with `press`:
+ * every transition declaration here and there sets transition-property, so
+ * two of them on one element means one silently wins. Links get this one;
+ * controls get press.
+ */
+@utility underline-sweep {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0 1px;
+  transition: color 150ms ease-out;
+  @media (prefers-reduced-motion: no-preference) {
+    transition: color 150ms ease-out, background-size 250ms ease-out;
+  }
+  &:hover,
+  &:focus-visible {
+    background-size: 100% 1px;
+  }
+  /* forced-colors strips background images entirely, so the sweep would
+     leave nothing behind. Fall back to the underline it stands in for. */
+  @media (forced-colors: active) {
+    &:hover,
+    &:focus-visible {
+      text-decoration: underline;
+    }
+  }
+}
+
 ::selection { background: var(--color-ink); color: var(--color-paper); }
 
 /* The one wordmark treatment, used for the brand mark and page headings —
@@ -131,4 +209,35 @@ button, input, textarea, select, img, video { border-radius: 0; }
   font-weight: 800;
   font-style: normal;
   letter-spacing: -0.03em;
+}
+
+/*
+ * Cross-document view transitions: a short cross-fade between pages, most
+ * of all between the two locales, which are the same page in two languages
+ * and used to swap with a white flash.
+ *
+ * Native CSS, not <ClientRouter /> — Astro's router would turn every
+ * navigation into client-side JS on a site whose default is zero of it, and
+ * would have to be taught about the password gate's 401s. Browsers without
+ * @view-transition simply navigate as they always did.
+ *
+ * Motion-gated at the animation, not at the at-rule: `@view-transition`
+ * inside `@media` is not reliably supported, so the transition is always
+ * declared and its animations are cancelled instead, which resolves it
+ * immediately and lands on the new page with no cross-fade at all.
+ */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

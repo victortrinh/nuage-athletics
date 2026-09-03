@@ -33,7 +33,10 @@ export function Radio({ className, ...props }: RadioProps) {
     <AriaRadio
       className={(renderProps) =>
         cn(
-          'cursor-pointer bg-paper px-3 py-3 text-xs uppercase tracking-label transition-colors',
+          // cursor-pointer stays local: the global rule in global.css
+          // covers button/summary, and cannot know that this particular
+          // <label> is the control itself.
+          'press cursor-pointer bg-paper px-3 py-3 text-xs uppercase tracking-label',
           'hover:bg-ink hover:text-paper',
           'data-[selected]:bg-ink data-[selected]:text-paper',
           // In forced-colors mode bg-ink/text-paper are both flattened to

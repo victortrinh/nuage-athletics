@@ -80,7 +80,10 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
   <details class="mt-12 border-t border-line pt-6">
     <summary
       class={cn(
-        'cursor-pointer list-none text-[11px] uppercase tracking-label text-mute hover:text-accent-ink',
+        // cursor-pointer is global now (global.css) — <summary> is a
+        // control in every browser and was the one place already patching
+        // around Tailwind v4's preflight by hand.
+        'press list-none text-[11px] uppercase tracking-label text-mute hover:text-accent-ink',
         // list-none kills the marker in every engine but WebKit, which
         // needs its own pseudo-element hidden.
         '[&::-webkit-details-marker]:hidden',

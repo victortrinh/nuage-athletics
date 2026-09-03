@@ -58,6 +58,11 @@ These look like arbitrary choices and are not. Do not "simplify" them.
   output exists.
 - **`astro check` does not work.** TypeScript 7 dropped the programmatic API the
   Astro language server needs. Use `npm run check` (`tsc --noEmit`).
+- **Tailwind 4's preflight does not restore `cursor: pointer` on buttons.** It
+  matches the browser default (an arrow) instead. `global.css` states the rule
+  once for `button`/`summary`/`[role=button]`; a `<label>` that *is* the control
+  (checkbox.tsx, radio-group.tsx) still has to say `cursor-pointer` itself,
+  because no selector can tell those apart from an ordinary label.
 
 ## Conventions
 
@@ -114,6 +119,17 @@ to reconcile against these files' existing conventions, not a replacement for th
   etc.) are aliased onto the six brand tokens in one flat `@theme` block — this
   site has no dark mode, so skip shadcn's usual two-layer `:root` +
   `@theme inline` split if a `shadcn add` tries to reintroduce it.
+- **Hover and press live in two utilities, not per-component classes.** `press`
+  (global.css) is the whole pointer response for a control — eased colour and a
+  1px sink — and *replaces* `transition-colors` rather than joining it, since
+  both set `transition-property` and one would silently win. `underline-sweep`
+  is the link equivalent and carries its own colour easing for the same reason.
+- **Anything that moves is gated with `motion-safe:`, never
+  `motion-reduce:transition-none`.** Removing the transition still leaves the
+  element jumping to the offset; a reduced-motion preference is about the
+  movement, not its timing. `e2e/behavior.e2e.ts` asserts the wordmark's dot
+  doesn't move under `reduce`, `e2e/sky-motion.e2e.ts` that it does otherwise —
+  that project is the only one running with real motion preferences.
 - No `tailwind-merge`, no `lucide-react`. `cn()` (`src/components/ui/cn.ts`) is
   `clsx` only — there's no conditional class-conflict resolution in this
   codebase to merge. Adding either back is a deliberate call, not a default.

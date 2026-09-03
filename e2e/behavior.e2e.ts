@@ -284,3 +284,69 @@ test('notify-me source tag records fit and size', async ({ page }) => {
 
   await expect.poll(() => posted.source).toBe('product:ls-01:crop:M')
 })
+
+/**
+ * Tailwind v4's preflight stopped restoring `cursor: pointer` on buttons,
+ * so every <button> on the site rendered with an arrow — nothing in axe or
+ * in the markup can see that, and it is exactly the kind of regression a
+ * future `shadcn add` or preflight change reintroduces silently. The rule
+ * lives in global.css; this is what holds it there.
+ */
+test('controls report a pointer cursor', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const cursorOf = (locator: ReturnType<Page['locator']>) =>
+    locator.evaluate((el) => getComputedStyle(el).cursor)
+
+  expect(await cursorOf(page.getByRole('button', { name: 'Image suivante' }))).toBe('pointer')
+  expect(await cursorOf(page.getByRole('button', { name: 'Image 2 de 4' }))).toBe('pointer')
+  // The <label> RAC renders for a Radio isn't reachable from a global
+  // selector — radio-group.tsx sets cursor-pointer itself.
+  expect(
+    await cursorOf(page.getByRole('radiogroup', { name: 'Coupe' }).locator('label').first())
+  ).toBe('pointer')
+
+  await page.goto(ROUTES.gate['fr-CA'])
+  expect(await cursorOf(page.locator('details > summary'))).toBe('pointer')
+})
+
+/**
+ * The carousel's swipe is invisible to a desktop visitor unless the cursor
+ * says so, and the cursor is driven by the same `dragging` state the track
+ * is — not by :active — so it has to survive pointer capture and let go
+ * with the gesture.
+ */
+test('the carousel photo advertises its drag with a grab cursor', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const stage = page.locator('div.touch-pan-y')
+  await expect(stage).toHaveCSS('cursor', 'grab')
+
+  const box = (await stage.boundingBox())!
+  const y = box.y + box.height / 2
+  const from = box.x + box.width / 2
+  await page.mouse.move(from, y)
+  await page.mouse.down()
+  for (let step = 1; step <= 5; step++) await page.mouse.move(from - (100 * step) / 5, y)
+  await expect(stage).toHaveCSS('cursor', 'grabbing')
+
+  await page.mouse.up()
+  await expect(stage).toHaveCSS('cursor', 'grab')
+})
+
+/**
+ * Every hover animation on the site is gated on `motion-safe` rather than
+ * having its transition removed, so that a reduced-motion visitor sees no
+ * travel at all instead of the same displacement arriving instantly. This
+ * project runs under reducedMotion: 'reduce' (playwright.config.ts), which
+ * makes it the place that can prove it; the matching positive assertion —
+ * that the dot does move when motion is allowed — is in sky-motion.e2e.ts,
+ * the one project that runs with real motion preferences.
+ */
+test('the wordmark dot stays put on hover under prefers-reduced-motion', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const dot = page.locator('header .logo-dot')
+  await page.getByRole('link', { name: 'Nuage Athletics' }).hover()
+  await expect(dot).toHaveCSS('translate', 'none')
+})

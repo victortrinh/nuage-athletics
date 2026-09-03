@@ -219,7 +219,16 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
           */}
           <div
             ref={stageRef}
-            className="absolute inset-0 touch-pan-y select-none overflow-hidden"
+            // A swipe that nothing announces is a swipe nobody on a desktop
+            // ever finds: the grab cursor is the only affordance the drag
+            // has there, and it is driven by the same `dragging` state the
+            // track is, not by :active, so it holds for the whole gesture —
+            // pointer capture included — and lets go exactly when the
+            // gesture does.
+            className={cn(
+              'absolute inset-0 touch-pan-y select-none overflow-hidden',
+              dragging ? 'cursor-grabbing' : 'cursor-grab'
+            )}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerEnd}
@@ -284,7 +293,7 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
             type="button"
             aria-label={d.productImagePrev}
             onClick={() => goTo(index - 1)}
-            className="mr-2 flex size-8 items-center justify-center border border-line text-mute transition-colors hover:border-ink hover:text-ink"
+            className="group press mr-2 flex size-8 items-center justify-center border border-line text-mute hover:border-ink hover:text-ink"
           >
             <Chevron dir="left" />
           </button>
@@ -301,7 +310,7 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
               aria-current={i === index ? 'true' : undefined}
               onClick={() => goTo(i)}
               className={cn(
-                'size-8 border text-xs tabular-nums transition-colors',
+                'press size-8 border text-xs tabular-nums',
                 i === index
                   ? 'border-ink bg-ink text-paper forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]'
                   : 'border-line text-mute hover:border-ink hover:text-ink'
@@ -315,7 +324,7 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
             type="button"
             aria-label={d.productImageNext}
             onClick={() => goTo(index + 1)}
-            className="ml-2 flex size-8 items-center justify-center border border-line text-mute transition-colors hover:border-ink hover:text-ink"
+            className="group press ml-2 flex size-8 items-center justify-center border border-line text-mute hover:border-ink hover:text-ink"
           >
             <Chevron dir="right" />
           </button>
@@ -340,6 +349,12 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
  * dependency CLAUDE.md keeps out. Square caps and mitred joins because this
  * site has no radii; a round-capped chevron is the same regression as a
  * `rounded-*` class, just one check-guards.sh can't grep for.
+ *
+ * Leans 2px the way it points while its button is hovered — the same
+ * distance in the same direction the photo is about to travel. `motion-safe`
+ * rather than `motion-reduce:transition-none`: with the transition merely
+ * removed the chevron would still jump to the offset, and a reduced-motion
+ * preference is about the movement, not about how it is timed.
  */
 function Chevron({ dir }: { dir: 'left' | 'right' }) {
   return (
@@ -353,7 +368,12 @@ function Chevron({ dir }: { dir: 'left' | 'right' }) {
       strokeLinecap="square"
       strokeLinejoin="miter"
       aria-hidden="true"
-      className="pointer-events-none"
+      className={cn(
+        'pointer-events-none motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out',
+        dir === 'left'
+          ? 'motion-safe:group-hover:-translate-x-[2px]'
+          : 'motion-safe:group-hover:translate-x-[2px]'
+      )}
     >
       <path d={dir === 'left' ? 'M10 3 5 8l5 5' : 'M6 3l5 5-5 5'} />
     </svg>

@@ -16,7 +16,9 @@ export function Checkbox({ className, children, ...props }: CheckboxProps) {
     <AriaCheckbox
       className={(renderProps) =>
         cn(
-          'group flex items-start gap-3 text-sm leading-relaxed',
+          // Same reasoning as radio-group.tsx: the <label> is the control
+          // here, which no global selector can tell.
+          'group flex cursor-pointer items-start gap-3 text-sm leading-relaxed',
           typeof className === 'function' ? className(renderProps) : className
         )
       }
@@ -27,8 +29,13 @@ export function Checkbox({ className, children, ...props }: CheckboxProps) {
           <div
             aria-hidden="true"
             className={cn(
-              'mt-1 flex size-4 shrink-0 items-center justify-center border border-ink bg-paper text-paper',
+              'press mt-1 flex size-4 shrink-0 items-center justify-center border border-ink bg-paper text-paper',
               'group-data-[selected]:bg-ink',
+              // A 4mm box is a small thing to aim at, and the label text
+              // gives no hint that clicking it does anything. Tinting the
+              // indicator's edge from anywhere in the label says the whole
+              // row is the target.
+              'group-hover:border-accent-ink',
               'group-data-[focus-visible]:focus-block',
               'forced-colors:group-data-[selected]:bg-[Highlight] forced-colors:border-[ButtonBorder]'
             )}

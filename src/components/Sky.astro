@@ -35,10 +35,13 @@
       if (!toggle) return
       const key = paused ? 'resumeLabel' : 'pauseLabel'
       toggle.setAttribute('aria-label', toggle.dataset[key] ?? '')
-      // Wind lines promise what the click does, same as the label: shown
-      // while paused (click animates), hidden while already animating
-      // (click freezes it still).
-      toggle.querySelector('.sky-icon-wind')?.toggleAttribute('hidden', !paused)
+      // The wind lines follow the same promise as the label — shown while
+      // paused (click animates), hidden while already animating (click
+      // freezes it still) — but they are styled off this attribute rather
+      // than toggling `hidden` on them directly, so the change can be
+      // animated. `hidden` is display:none, which nothing transitions out
+      // of. See the <g> in Base.astro.
+      toggle.dataset.paused = String(paused)
     }
 
     function requestIdle(cb: () => void) {
