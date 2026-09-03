@@ -115,7 +115,13 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
         aria-label={d.productGalleryLabel}
         onKeyDown={onKeyDown}
       >
-        <div className="relative mx-auto aspect-[4/5] w-full max-w-[32rem] lg:max-w-none">
+        {/*
+          Capped at every breakpoint, not just below `lg` — letting the
+          frame grow to the full ~624px grid column on desktop made it
+          ~780px tall at this 4/5 ratio, pushing the pagination row and the
+          whole buy panel below the fold on ordinary laptop viewports.
+        */}
+        <div className="relative mx-auto aspect-[4/5] w-full max-w-[26rem]">
           {fits.map((f) =>
             f.gallery.map((image, i) => {
               const isActive = f.id === fit && i === index
@@ -141,23 +147,6 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
               )
             })
           )}
-
-          <button
-            type="button"
-            aria-label={d.productImagePrevious}
-            onClick={() => goTo(index - 1)}
-            className="absolute left-0 top-1/2 size-10 -translate-y-1/2 border border-ink bg-paper text-ink transition-colors hover:bg-ink hover:text-paper"
-          >
-            <ChevronIcon direction="left" />
-          </button>
-          <button
-            type="button"
-            aria-label={d.productImageNext}
-            onClick={() => goTo(index + 1)}
-            className="absolute right-0 top-1/2 size-10 -translate-y-1/2 border border-ink bg-paper text-ink transition-colors hover:bg-ink hover:text-paper"
-          >
-            <ChevronIcon direction="right" />
-          </button>
         </div>
 
         <div className="mt-3 flex items-center justify-center gap-1">
@@ -195,25 +184,5 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
         {announcement}
       </p>
     </div>
-  )
-}
-
-function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      aria-hidden="true"
-      stroke="currentColor"
-      fill="none"
-      strokeWidth={1.5}
-    >
-      <path
-        d={direction === 'left' ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }

@@ -148,34 +148,30 @@ test('carousel exposes exactly one image at a time, pages with the numbered pagi
   await expect(status).toHaveText('Classique — Image 3 de 4')
 })
 
-test('carousel arrows wrap and are keyboard-operable', async ({ page }) => {
+test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
   await page.goto(ROUTES.home['fr-CA'])
 
+  // No visible prev/next buttons — the numbered pagination is the only
+  // pointer affordance, and arrow keys work from focus anywhere in the
+  // group (see onKeyDown in ProductCarousel.tsx), pagination included.
   const carousel = page.getByRole('group', { name: 'Images du produit' })
-  const next = page.getByRole('button', { name: 'Image suivante' })
-  const prev = page.getByRole('button', { name: 'Image précédente' })
   const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
 
-  await next.click()
-  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
-
-  await prev.focus()
-  await page.keyboard.press('ArrowLeft')
-  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
-
-  // Wraps rather than disabling at the boundary, so focus never strands on
-  // a button that just became disabled.
-  await prev.focus()
-  await page.keyboard.press('ArrowLeft')
-  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
-  await expect(carousel.getByRole('img')).toHaveCount(1)
-
-  // An arrow key with focus on a pagination button moves focus along with it.
   await pageButtons.nth(0).click()
   await pageButtons.nth(0).focus()
   await page.keyboard.press('ArrowRight')
   await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
+  // An arrow key moves focus along with the current slide.
   await expect(pageButtons.nth(1)).toBeFocused()
+
+  await page.keyboard.press('ArrowLeft')
+  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
+
+  // Wraps rather than stopping at the boundary — there's no disabled state
+  // to strand focus on.
+  await page.keyboard.press('ArrowLeft')
+  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await expect(carousel.getByRole('img')).toHaveCount(1)
 })
 
 test('notify-me source tag records fit and size', async ({ page }) => {

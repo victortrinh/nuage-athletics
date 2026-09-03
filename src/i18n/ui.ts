@@ -58,8 +58,6 @@ export type Dict = {
   productBuy: string
   productSelectSizeError: string
   productFitLabel: string
-  productImagePrevious: string
-  productImageNext: string
   productImagePosition: string
   orderConfirmedTitle: string
   orderConfirmedBody: string
@@ -125,8 +123,6 @@ export const UI: Record<Locale, Dict> = {
     productBuy: 'Acheter',
     productSelectSizeError: 'Choisissez une taille.',
     productFitLabel: 'Coupe',
-    productImagePrevious: 'Image précédente',
-    productImageNext: 'Image suivante',
     productImagePosition: 'Image {n} de {total}',
     orderConfirmedTitle: 'Commande confirmée',
     orderConfirmedBody:
@@ -189,8 +185,6 @@ export const UI: Record<Locale, Dict> = {
     productBuy: 'Buy now',
     productSelectSizeError: 'Choose a size.',
     productFitLabel: 'Fit',
-    productImagePrevious: 'Previous image',
-    productImageNext: 'Next image',
     productImagePosition: 'Image {n} of {total}',
     orderConfirmedTitle: 'Order confirmed',
     orderConfirmedBody: 'Thanks for your order. A confirmation email is on its way.',
