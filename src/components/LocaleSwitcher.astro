@@ -20,13 +20,19 @@ if (!routeId && !href) {
 <!--
   Bill 96: the French version must be at least as easy to reach as any other.
   Keep this control visible in the header — not buried in a footer.
+
+  Its underline is permanent, unlike the footer's underline-sweep: this one
+  link has to read as a link before anyone hovers anything, so hover only
+  brightens and tints it. Same reason focus-visible undims it too — the
+  keyboard should not get less than the pointer on the one control the
+  Charter is about.
 -->
 <a
   href={href ?? route(routeId!, other)}
   hreflang={other}
   rel="alternate"
   aria-label={t(locale).switchTo}
-  class="text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100"
+  class="press text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:text-accent-ink hover:opacity-100 focus-visible:opacity-100"
 >
   {LOCALE_LABEL[other]}
 </a>

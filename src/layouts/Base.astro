@@ -8,6 +8,7 @@ import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
 import { buttonVariants } from '../components/ui/button-variants'
+import { cn } from '../components/ui/cn'
 
 interface Props {
   locale: Locale
@@ -42,14 +43,28 @@ const year = new Date().getFullYear()
     <header class="sticky top-0 z-40 border-b border-line bg-paper px-6 pt-safe pb-4 sm:px-10">
       <div class="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-6">
         <div aria-hidden="true"></div>
+        {/*
+          `group` is what lets the wordmark's dot react to hover/focus on the
+          whole link rather than only on the 3px of glyph under the pointer —
+          see .logo-dot in Logo.astro.
+        */}
         <a
           href={route('home', locale)}
           aria-label={d.brand}
-          class="justify-self-center text-xl hover:text-accent-ink"
+          class="group press justify-self-center text-xl hover:text-accent-ink"
         >
           <Logo variant="wordmark" />
         </a>
         <div class="flex items-center justify-end gap-6">
+          {/*
+            The icon is 24x16, which is under WCAG 2.2's 24x24 target
+            minimum on one axis; the flex box around it pads the target out
+            to 32x32 without changing how big the cloud is drawn.
+
+            data-paused (set by Sky.astro's script, which owns the state)
+            rather than the wind lines' old `hidden` attribute: `hidden` is
+            display:none, and nothing animates in or out of that.
+          */}
           <button
             type="button"
             id="sky-toggle"
@@ -57,10 +72,13 @@ const year = new Date().getFullYear()
             data-pause-label={d.skyPause}
             data-resume-label={d.skyResume}
             aria-label={d.skyPause}
-            class={buttonVariants({ variant: 'quiet' })}
+            class={cn(
+              buttonVariants({ variant: 'quiet' }),
+              'group flex size-8 items-center justify-center'
+            )}
           >
             <svg
-              class="h-4 w-6"
+              class="h-4 w-6 overflow-visible"
               viewBox="0 0 26 16"
               fill="none"
               stroke="currentColor"
@@ -72,7 +90,17 @@ const year = new Date().getFullYear()
               <path
                 d="M11 14.5a3.5 3.5 0 0 1-.4-6.98A4.5 4.5 0 0 1 19.4 6a3.6 3.6 0 0 1 .6 7.15V14.5H11Z"
               ></path>
-              <g class="sky-icon-wind" hidden>
+              {/*
+                Wind lines promise what the click does, same as the label:
+                shown while paused (click animates), hidden while already
+                animating (click freezes it still). They now blow in from
+                the left instead of appearing, which is the state change the
+                button is about — and under prefers-reduced-motion they
+                simply appear, in place, with no travel and no fade.
+              */}
+              <g
+                class="sky-icon-wind opacity-0 group-data-[paused=true]:opacity-100 motion-safe:-translate-x-1 motion-safe:transition-[opacity,translate] motion-safe:duration-300 motion-safe:ease-out motion-safe:group-data-[paused=true]:translate-x-0"
+              >
                 <line x1="1" y1="6" x2="4" y2="6"></line>
                 <line x1="0.5" y1="9.5" x2="5.5" y2="9.5"></line>
               </g>
@@ -89,10 +117,23 @@ const year = new Date().getFullYear()
 
     <footer class="mt-16 border-t border-line px-6 py-10 text-xs text-mute sm:px-10">
       <div class="mx-auto max-w-6xl">
+        {/*
+          underline-sweep, not `hover:underline`: these three are the only
+          links on the site with no underline of their own, and a rule that
+          draws itself in from the left is the same hairline the layout is
+          already built from. It answers :focus-visible too, so tabbing the
+          footer gets the affordance and not only the focus outline.
+        */}
         <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
-          <a href={route('privacy', locale)} class="hover:text-accent-ink">{d.privacy}</a>
-          <a href={route('terms', locale)} class="hover:text-accent-ink">{d.terms}</a>
-          <a href="mailto:hello@nuageathletics.com" class="hover:text-accent-ink">{d.contact}</a>
+          <a href={route('privacy', locale)} class="underline-sweep hover:text-accent-ink">
+            {d.privacy}
+          </a>
+          <a href={route('terms', locale)} class="underline-sweep hover:text-accent-ink">
+            {d.terms}
+          </a>
+          <a href="mailto:hello@nuageathletics.com" class="underline-sweep hover:text-accent-ink">
+            {d.contact}
+          </a>
         </nav>
         <p>© {year} {d.brand}. {d.rights}</p>
       </div>
