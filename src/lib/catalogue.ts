@@ -1,5 +1,5 @@
 import type { Locale } from '../i18n/config'
-import type { Product } from './commerce/types'
+import type { Product, ProductVariant } from './commerce/types'
 
 /**
  * The catalogue, deliberately free of any commerce backend.
@@ -28,14 +28,116 @@ const PLACEHOLDER_PRICE_CENTS = 6500
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL'] as const
 
-/** Size labels are the same in both locales, so they are generated, not translated. */
-function variants(productId: string, skuBase: string) {
-  return SIZES.map((label) => ({
-    id: `${productId}-${label.toLowerCase()}`,
-    sku: `${skuBase}-${label}`,
-    label,
-    inStock: true,
-  }))
+/** The two garment fits. Ids only — display names live in FIT_NAMES below. */
+export type FitId = 'classic' | 'crop'
+export const FIT_IDS = ['classic', 'crop'] as const satisfies readonly FitId[]
+export const DEFAULT_FIT: FitId = 'classic'
+
+const FIT_SKU: Record<FitId, string> = { classic: 'CLA', crop: 'CRP' }
+
+/**
+ * Fit display names. Kept here rather than in `ui.ts`'s `Dict`: a fit name is
+ * a product fact that changes with the garment, not interface chrome — the
+ * same reasoning `ProductEditorial`'s spec labels already follow below.
+ * `Record<Locale, …>` still makes a missing translation a type error.
+ */
+const FIT_NAMES: Record<Locale, Record<FitId, string>> = {
+  'fr-CA': { classic: 'Classique', crop: 'Crop' },
+  'en-CA': { classic: 'Classic', crop: 'Cropped' },
+}
+
+/**
+ * Fit × size = 12 variants, fit-major. `label` composes the fit and size name
+ * (e.g. "Crop · M") and is what ends up on the Stripe line item and receipt —
+ * see `stripe.ts`, which reads `variant.label` directly and needed no changes
+ * for this. `options` carries the same two facts as ids, for `ProductActions`
+ * to resolve a variant from a (fit, size) selection without re-deriving the
+ * id scheme in a second file.
+ */
+function variants(productId: string, skuBase: string, locale: Locale): ProductVariant[] {
+  return FIT_IDS.flatMap((fit) =>
+    SIZES.map((size) => ({
+      id: `${productId}-${fit}-${size.toLowerCase()}`,
+      sku: `${skuBase}-${FIT_SKU[fit]}-${size}`,
+      label: `${FIT_NAMES[locale][fit]} · ${size}`,
+      inStock: true,
+      options: { fit, size },
+    }))
+  )
+}
+
+/** View order within a fit's gallery, per the product page's spec: front, back, worn front, worn back. */
+type ViewId = 'front' | 'back' | 'front-worn' | 'back-worn'
+const VIEWS = ['front', 'back', 'front-worn', 'back-worn'] as const satisfies readonly ViewId[]
+
+interface ImageAsset {
+  src: string
+  width: number
+  height: number
+}
+
+/** Encoded from the source photography at build time; see the image pipeline notes in CLAUDE.md. */
+const IMAGES: Record<FitId, Record<ViewId, ImageAsset>> = {
+  classic: {
+    front: { src: '/img/ls-01-classic-front.webp', width: 1280, height: 615 },
+    back: { src: '/img/ls-01-classic-back.webp', width: 1280, height: 620 },
+    'front-worn': { src: '/img/ls-01-classic-front-worn.webp', width: 801, height: 1560 },
+    'back-worn': { src: '/img/ls-01-classic-back-worn.webp', width: 826, height: 1560 },
+  },
+  crop: {
+    front: { src: '/img/ls-01-crop-front.webp', width: 1280, height: 601 },
+    back: { src: '/img/ls-01-crop-back.webp', width: 1280, height: 492 },
+    'front-worn': { src: '/img/ls-01-crop-front-worn.webp', width: 844, height: 1560 },
+    'back-worn': { src: '/img/ls-01-crop-back-worn.webp', width: 849, height: 1560 },
+  },
+}
+
+/**
+ * Alt text per locale × fit × view. Not composed from parts — French word
+ * order differs from English, and a copywriter needs to be able to edit
+ * these directly. The `Record` nesting keeps a missing one a type error.
+ */
+const ALT: Record<Locale, Record<FitId, Record<ViewId, string>>> = {
+  'fr-CA': {
+    classic: {
+      front: 'Manches longues 01, coupe classique, vue de face, à plat',
+      back: 'Manches longues 01, coupe classique, vue de dos, à plat',
+      'front-worn': 'Manches longues 01, coupe classique, porté, vue de face',
+      'back-worn': 'Manches longues 01, coupe classique, porté, vue de dos',
+    },
+    crop: {
+      front: 'Manches longues 01, coupe crop, vue de face, à plat',
+      back: 'Manches longues 01, coupe crop, vue de dos, à plat',
+      'front-worn': 'Manches longues 01, coupe crop, porté, vue de face',
+      'back-worn': 'Manches longues 01, coupe crop, porté, vue de dos',
+    },
+  },
+  'en-CA': {
+    classic: {
+      front: 'Long Sleeve 01, classic fit, front, laid flat',
+      back: 'Long Sleeve 01, classic fit, back, laid flat',
+      'front-worn': 'Long Sleeve 01, classic fit, worn, front view',
+      'back-worn': 'Long Sleeve 01, classic fit, worn, back view',
+    },
+    crop: {
+      front: 'Long Sleeve 01, cropped fit, front, laid flat',
+      back: 'Long Sleeve 01, cropped fit, back, laid flat',
+      'front-worn': 'Long Sleeve 01, cropped fit, worn, front view',
+      'back-worn': 'Long Sleeve 01, cropped fit, worn, back view',
+    },
+  },
+}
+
+function galleryFor(locale: Locale, fit: FitId): GalleryImage[] {
+  return VIEWS.map((view) => ({ ...IMAGES[fit][view], alt: ALT[locale][fit][view] }))
+}
+
+function fitsFor(locale: Locale): ProductFit[] {
+  return FIT_IDS.map((id) => ({ id, label: FIT_NAMES[locale][id], gallery: galleryFor(locale, id) }))
+}
+
+function allImagePaths(): string[] {
+  return FIT_IDS.flatMap((fit) => VIEWS.map((view) => IMAGES[fit][view].src))
 }
 
 export const CATALOGUE: Record<Locale, Product[]> = {
@@ -48,8 +150,8 @@ export const CATALOGUE: Record<Locale, Product[]> = {
       description:
         'Un chandail à manches longues en laine mérinos et modal. Plus de détails à venir.',
       price: { amount: PLACEHOLDER_PRICE_CENTS, currency: 'CAD' },
-      images: [],
-      variants: variants('ls-01', 'NA-LS01'),
+      images: allImagePaths(),
+      variants: variants('ls-01', 'NA-LS01', 'fr-CA'),
     },
   ],
   'en-CA': [
@@ -61,26 +163,26 @@ export const CATALOGUE: Record<Locale, Product[]> = {
       description:
         'A long sleeve in merino wool and modal. More details to come.',
       price: { amount: PLACEHOLDER_PRICE_CENTS, currency: 'CAD' },
-      images: [],
-      variants: variants('ls-01', 'NA-LS01'),
+      images: allImagePaths(),
+      variants: variants('ls-01', 'NA-LS01', 'en-CA'),
     },
   ],
 }
 
-/**
- * A slot in the product gallery. There are no photographs yet, so every slot
- * ships with no `src` and renders as a placeholder block at the right aspect
- * ratio — the layout is already final, only the pixels are missing. Filling in
- * `src` is the entire swap when the shoot lands.
- */
-export interface GallerySlot {
-  src?: string
+/** One image in a fit's gallery, in display order. */
+export interface GalleryImage extends ImageAsset {
   alt: string
-  ratio: '4/5' | '1/1'
+}
+
+/** One fit's worth of product photography. */
+export interface ProductFit {
+  id: FitId
+  label: string
+  gallery: GalleryImage[]
 }
 
 /**
- * Editorial content — the spec sheet and the gallery.
+ * Editorial content — the spec sheet and the per-fit galleries.
  *
  * Kept out of `Product` on purpose: that interface is the commerce contract a
  * Lightspeed adapter would also have to satisfy, and none of this belongs in
@@ -89,22 +191,18 @@ export interface GallerySlot {
  * `Record<Locale, …>` shape still makes an untranslated one a type error.
  */
 export interface ProductEditorial {
-  gallery: GallerySlot[]
+  fits: ProductFit[]
   specs: { label: string; value: string }[]
 }
-
-const GALLERY_SHAPE: GallerySlot['ratio'][] = ['4/5', '4/5', '1/1', '4/5', '1/1', '4/5']
 
 export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
   'fr-CA': {
     'ls-01': {
-      gallery: GALLERY_SHAPE.map((ratio, i) => ({
-        ratio,
-        alt: `Manches longues 01 — vue ${i + 1}`,
-      })),
+      fits: fitsFor('fr-CA'),
+      // JSON-LD `material` in ProductView.astro reads specs[0] — keep Composition first.
       specs: [
         { label: 'Composition', value: '50 % laine mérinos, 50 % modal' },
-        { label: 'Coupe', value: 'Régulière' },
+        { label: 'Coupes', value: 'Classique ou crop' },
         { label: 'Tailles', value: 'XS – 2XL' },
         { label: 'Entretien', value: 'Lavage à froid, séchage à plat' },
         { label: 'Origine', value: 'Fabriqué au Canada' },
@@ -113,13 +211,11 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
   },
   'en-CA': {
     'ls-01': {
-      gallery: GALLERY_SHAPE.map((ratio, i) => ({
-        ratio,
-        alt: `Long Sleeve 01 — view ${i + 1}`,
-      })),
+      fits: fitsFor('en-CA'),
+      // JSON-LD `material` in ProductView.astro reads specs[0] — keep Composition first.
       specs: [
         { label: 'Composition', value: '50% merino wool, 50% modal' },
-        { label: 'Fit', value: 'Regular' },
+        { label: 'Fits', value: 'Classic or cropped' },
         { label: 'Sizes', value: 'XS – 2XL' },
         { label: 'Care', value: 'Cold wash, dry flat' },
         { label: 'Origin', value: 'Made in Canada' },

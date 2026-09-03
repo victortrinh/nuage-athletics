@@ -67,6 +67,17 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 - React islands only where interaction requires it. Default to zero JS.
 - Tailwind utility classes inline; no component CSS files.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
+- The product's **fit** (`FitId` in `src/lib/catalogue.ts`) is a purchasable
+  axis alongside size, not just a photo toggle — 12 variants, fit × size.
+  `ProductCarousel.tsx` (the image carousel) and `ProductActions.tsx` (the
+  buy panel) are separate islands in different grid columns, so they can't
+  share React state through props or context; they share the selected fit
+  through `src/lib/fit-store.ts`, a small module-level store keyed by
+  `productId`. It's a deliberate exception to "no hidden coupling between
+  components" — the alternative was one island covering the whole product
+  body, which would hydrate the heading, description and spec list for no
+  interactive reason, the exact thing the "default to zero JS" rule above
+  rules out.
 
 ## Component library
 

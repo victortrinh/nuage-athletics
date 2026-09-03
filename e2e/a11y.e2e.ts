@@ -14,12 +14,14 @@ const paths = LOCALES.flatMap((locale) =>
  * axe's color-contrast rule can't resolve a CSS gradient to a background
  * color, so any text painted over one comes back `incomplete` rather than
  * pass/fail — asserting only on `violations` would pass while contrast goes
- * silently unevaluated wherever a gradient sits behind text. Two spots do
- * this: Sky.astro's fixed full-page radial-gradient, and ProductGallery's
- * linear-gradient placeholder tiles. Rather than hardcode both selectors
- * (Tailwind's arbitrary-value gradient classes aren't valid CSS selectors
- * without heavy escaping anyway), flatten every element whose *computed*
- * background is a gradient to the real paper color, generically.
+ * silently unevaluated wherever a gradient sits behind text. Sky.astro's
+ * fixed full-page radial-gradient is the one spot left that does this
+ * (ProductGallery's placeholder tiles, the other original source, are gone
+ * now that real product photography replaced them). Kept generic rather
+ * than a hardcoded selector — Tailwind's arbitrary-value gradient classes
+ * aren't valid CSS selectors without heavy escaping anyway — by flattening
+ * every element whose *computed* background is a gradient to the real
+ * paper color.
  */
 async function neutralizeGradients(page: Page) {
   await page.evaluate(() => {
