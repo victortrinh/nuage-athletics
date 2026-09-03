@@ -129,38 +129,46 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
           Capped at every breakpoint, not just below `lg` — letting the
           frame grow to the full ~624px grid column on desktop made it
           ~780px tall at this 4/5 ratio, pushing the pagination row and the
-          whole buy panel below the fold on ordinary laptop viewports. The
-          aspect ratio itself now tracks the active image (frameAspect
-          above) so landscape flat-lay shots aren't squeezed into a
-          portrait box, but stays floored at 4/5 for the worn shots to
-          preserve that cap.
+          whole buy panel below the fold on ordinary laptop viewports.
+
+          This outer box stays fixed at 4/5 — the tallest case, since
+          frameAspect is floored at 4/5 — and just centers the actual
+          (variable-height) stage inside it. The stage's own height still
+          tracks the active image so landscape flat-lay shots aren't
+          squeezed into a portrait box, but that no longer resizes this
+          wrapper: on mobile, where the carousel is the first thing in the
+          document flow, letting the wrapper itself shrink for landscape
+          photos moved the pagination row, the fit label, and the buy
+          panel up and down the page on every navigation.
         */}
-        <div className="relative mx-auto w-full max-w-[26rem]" style={{ aspectRatio: frameAspect }}>
-          {fits.map((f) =>
-            f.gallery.map((image, i) => {
-              const isActive = f.id === fit && i === index
-              // The one image blocking first paint. Everything else starts
-              // lazy and is flipped to eager once `warm` (see effect above).
-              const isInitial = f.id === initialFit && i === 0
-              return (
-                <img
-                  key={`${f.id}-${i}`}
-                  src={image.src}
-                  width={image.width}
-                  height={image.height}
-                  alt={image.alt}
-                  aria-hidden={isActive ? undefined : true}
-                  loading={isInitial || warm ? 'eager' : 'lazy'}
-                  fetchPriority={isInitial ? 'high' : 'low'}
-                  decoding="async"
-                  className={cn(
-                    'absolute inset-0 h-full w-full object-contain transition-opacity duration-150 motion-reduce:transition-none',
-                    isActive ? 'opacity-100' : 'pointer-events-none opacity-0'
-                  )}
-                />
-              )
-            })
-          )}
+        <div className="relative mx-auto grid aspect-[4/5] w-full max-w-[26rem] place-items-center">
+          <div className="relative w-full" style={{ aspectRatio: frameAspect }}>
+            {fits.map((f) =>
+              f.gallery.map((image, i) => {
+                const isActive = f.id === fit && i === index
+                // The one image blocking first paint. Everything else starts
+                // lazy and is flipped to eager once `warm` (see effect above).
+                const isInitial = f.id === initialFit && i === 0
+                return (
+                  <img
+                    key={`${f.id}-${i}`}
+                    src={image.src}
+                    width={image.width}
+                    height={image.height}
+                    alt={image.alt}
+                    aria-hidden={isActive ? undefined : true}
+                    loading={isInitial || warm ? 'eager' : 'lazy'}
+                    fetchPriority={isInitial ? 'high' : 'low'}
+                    decoding="async"
+                    className={cn(
+                      'absolute inset-0 h-full w-full object-contain transition-opacity duration-150 motion-reduce:transition-none',
+                      isActive ? 'opacity-100' : 'pointer-events-none opacity-0'
+                    )}
+                  />
+                )
+              })
+            )}
+          </div>
         </div>
 
         <div className="mt-3 flex items-center justify-center gap-1">
