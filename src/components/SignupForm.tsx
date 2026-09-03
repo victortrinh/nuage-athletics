@@ -67,6 +67,14 @@ export default function SignupForm({
    * which breaks hydration and costs us the widget (and therefore the token).
    * An effect runs after hydration, so the DOM the server sent is never
    * touched before React is done with it.
+   *
+   * Two things have to be true before rendering: api.js has loaded, and the
+   * container actually has a layout box. The gate screen keeps this form
+   * inside a collapsed <details>, whose contents aren't rendered at all —
+   * Turnstile draws an iframe, and one rendered into nothing never finishes
+   * its challenge, so we'd hand the endpoint an empty token. Whichever of
+   * the two happens last triggers the mount; `mount` is idempotent, so
+   * being called from both paths is harmless.
    */
   useEffect(() => {
     if (!turnstileSiteKey) return
@@ -74,6 +82,9 @@ export default function SignupForm({
     function mount() {
       const el = widgetRef.current
       if (!el || !window.turnstile || widgetId.current !== null) return
+      // checkVisibility is Baseline-2023; treat its absence as visible,
+      // which is the pre-<details> behaviour.
+      if (el.checkVisibility && !el.checkVisibility()) return
       widgetId.current = window.turnstile.render(el, {
         sitekey: turnstileSiteKey,
         theme: 'light',
@@ -85,8 +96,13 @@ export default function SignupForm({
     if (window.turnstile) mount()
     else script?.addEventListener('load', mount, { once: true })
 
+    // No-op for every form that isn't inside a disclosure.
+    const disclosure = widgetRef.current?.closest('details')
+    disclosure?.addEventListener('toggle', mount)
+
     return () => {
       script?.removeEventListener('load', mount)
+      disclosure?.removeEventListener('toggle', mount)
       if (widgetId.current !== null) {
         window.turnstile?.remove(widgetId.current)
         widgetId.current = null

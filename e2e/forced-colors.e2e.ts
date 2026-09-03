@@ -16,6 +16,8 @@ test('consent checkbox stays visually distinct checked vs unchecked in forced-co
   page,
 }) => {
   await page.goto(ROUTES.gate['fr-CA'])
+  // The gate's SignupForm lives inside a <details> disclosure.
+  await page.locator('details > summary').click()
 
   const indicator = page.locator('div.size-4')
   const unchecked = await indicator.evaluate((el) => getComputedStyle(el).backgroundColor)

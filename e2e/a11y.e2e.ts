@@ -60,9 +60,23 @@ function isKnownSafeConsentLabelOverlap(node: {
   )
 }
 
+/**
+ * axe only sees rendered markup, so the gate's signup form — which sits
+ * inside a collapsed <details> (GateScreen.astro) — would drop out of the
+ * scan entirely. Expand every disclosure first so the scan covers what a
+ * visitor who opens it sees. Generic rather than gate-specific: any
+ * <details> added later is covered without touching this file.
+ */
+async function expandDisclosures(page: Page) {
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll('details')) el.open = true
+  })
+}
+
 for (const path of paths) {
   test(`a11y: ${path}`, async ({ page }) => {
     await page.goto(path)
+    await expandDisclosures(page)
     await neutralizeGradients(page)
 
     const results = await new AxeBuilder({ page })
