@@ -32,6 +32,16 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
 
   const activeFit = fits.find((f) => f.id === fit) ?? fits[0]
   const total = activeFit.gallery.length
+  const activeImage = activeFit.gallery[index]
+  // Front/back are flat-lay shots (~2:1, landscape); front-worn/back-worn are
+  // tall (~1:2, portrait). A single fixed aspect box shrinks whichever shape
+  // doesn't match it — 4/5 was picked for the worn shots (see the frame's own
+  // comment below on why *that* is capped), which let the flat-lay pair
+  // shrink to a thin horizontal strip. Following each image's own ratio fixes
+  // that; the 4/5 floor only kicks in for the worn shots, preserving the
+  // existing cap that keeps them from pushing the pagination row and buy
+  // panel below the fold.
+  const frameAspect = Math.max(activeImage.width / activeImage.height, 4 / 5)
 
   // Defers the other 7 images to idle — the same deferral pattern
   // Sky.astro uses for its WebGL engine. One ~50KB image blocks first
@@ -119,9 +129,13 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
           Capped at every breakpoint, not just below `lg` — letting the
           frame grow to the full ~624px grid column on desktop made it
           ~780px tall at this 4/5 ratio, pushing the pagination row and the
-          whole buy panel below the fold on ordinary laptop viewports.
+          whole buy panel below the fold on ordinary laptop viewports. The
+          aspect ratio itself now tracks the active image (frameAspect
+          above) so landscape flat-lay shots aren't squeezed into a
+          portrait box, but stays floored at 4/5 for the worn shots to
+          preserve that cap.
         */}
-        <div className="relative mx-auto aspect-[4/5] w-full max-w-[26rem]">
+        <div className="relative mx-auto w-full max-w-[26rem]" style={{ aspectRatio: frameAspect }}>
           {fits.map((f) =>
             f.gallery.map((image, i) => {
               const isActive = f.id === fit && i === index
