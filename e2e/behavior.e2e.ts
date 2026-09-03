@@ -164,9 +164,8 @@ test('carousel exposes exactly one image at a time, pages with the numbered pagi
 test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
   await page.goto(ROUTES.home['fr-CA'])
 
-  // No visible prev/next buttons — the numbered pagination is the only
-  // pointer affordance, and arrow keys work from focus anywhere in the
-  // group (see onKeyDown in ProductCarousel.tsx), pagination included.
+  // Arrow keys work from focus anywhere in the group (see onKeyDown in
+  // ProductCarousel.tsx), pagination and prev/next arrows included.
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
 
@@ -184,6 +183,77 @@ test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
   // to strand focus on.
   await page.keyboard.press('ArrowLeft')
   await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await expect(carousel.getByRole('img')).toHaveCount(1)
+})
+
+test('carousel prev/next arrows page and wrap', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const carousel = page.getByRole('group', { name: 'Images du produit' })
+  const prev = page.getByRole('button', { name: 'Image précédente' })
+  const next = page.getByRole('button', { name: 'Image suivante' })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+
+  await next.click()
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
+  await prev.click()
+  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
+
+  // Wraps in both directions, so neither arrow ever needs a disabled state
+  // that would strand focus on it.
+  await prev.click()
+  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await next.click()
+  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
+
+  // The arrows are chrome, not slides: still exactly one image exposed.
+  await expect(carousel.getByRole('img')).toHaveCount(1)
+})
+
+/**
+ * The drag path has no axe- or markup-visible surface at all — it lives
+ * entirely in pointer handlers — so this is the only thing standing between
+ * a swipe and a silent regression. Playwright's mouse emits real pointer
+ * events, which is what ProductCarousel listens for; the intermediate moves
+ * matter, because the handler ignores a gesture until it has travelled
+ * DRAG_INTENT_PX horizontally.
+ */
+async function swipe(page: import('@playwright/test').Page, dx: number) {
+  // The *exposed* image, not the first in the DOM: off-screen slides sit on a
+  // translated track, so their boxes are outside the frame and a drag started
+  // there would never reach the stage's handlers.
+  const stage = page.getByRole('group', { name: 'Images du produit' }).getByRole('img')
+  const box = (await stage.boundingBox())!
+  const y = box.y + box.height / 2
+  const from = box.x + box.width / 2
+  await page.mouse.move(from, y)
+  await page.mouse.down()
+  for (let step = 1; step <= 5; step++) await page.mouse.move(from + (dx * step) / 5, y)
+  await page.mouse.up()
+}
+
+test('carousel advances on a horizontal drag and clamps at the ends', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const carousel = page.getByRole('group', { name: 'Images du produit' })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const status = page.locator('[role="status"].sr-only').first()
+
+  // Dragging right at the first image has nowhere to go — unlike the arrows,
+  // a swipe deliberately doesn't wrap (see `resist` in ProductCarousel.tsx).
+  await swipe(page, 200)
+  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
+
+  await swipe(page, -200)
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
+  await expect(status).toHaveText('Classique — Image 2 de 4')
+
+  // Short of the threshold, the track springs back and nothing changes.
+  await swipe(page, -20)
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
+
+  await swipe(page, 200)
+  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
   await expect(carousel.getByRole('img')).toHaveCount(1)
 })
 

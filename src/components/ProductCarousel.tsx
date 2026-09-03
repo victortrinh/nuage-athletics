@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { FitId, ProductFit } from '../lib/catalogue'
 import { useFit } from '../lib/fit-store'
 import { fmt, type Dict } from '../i18n/ui'
@@ -11,6 +11,11 @@ interface Props {
   initialFit: FitId
 }
 
+/** Distance (px) a pointer must travel horizontally before the gesture counts
+ *  as a swipe rather than the start of a vertical page scroll or a stray
+ *  twitch on a tap. */
+const DRAG_INTENT_PX = 8
+
 /**
  * The product image carousel. Zero-JS was the default (see
  * ProductGallery.astro, which this replaces) but paging through photos and
@@ -18,16 +23,25 @@ interface Props {
  * need interaction, so this earns its hydration.
  *
  * All 8 photos (both fits × 4 views) are always in the DOM — only opacity
- * and aria-hidden change on navigation, never `display`, so a lazy image
+ * and aria-hidden change on a fit switch, never `display`, so a lazy image
  * stays fetchable and toggling fit never stalls on a fresh network request.
  * See the loading-priority effect below for how the other 7 get warmed up.
+ *
+ * Within a fit the 4 photos sit on a translated flex track rather than a
+ * crossfade stack, because a swipe has to show the next photo following the
+ * finger — a fade has nothing to drag. The two fits are still two stacked
+ * tracks that crossfade, so the DOM invariant above is unchanged.
  */
 export default function ProductCarousel({ d, productId, fits, initialFit }: Props) {
   const [fit, setFit] = useFit(productId, initialFit)
   const [index, setIndex] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const [warm, setWarm] = useState(false)
+  const [dragDx, setDragDx] = useState(0)
+  const [dragging, setDragging] = useState(false)
   const paginationRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const stageRef = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ id: number; x: number; y: number; active: boolean } | null>(null)
   const mounted = useRef(false)
 
   const activeFit = fits.find((f) => f.id === fit) ?? fits[0]
@@ -103,6 +117,63 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
     }
   }
 
+  // The arrows, the pagination and the arrow keys all wrap; a swipe doesn't.
+  // Wrapping a *drag* would mean the finger pulling the last photo left and
+  // the track then flying back across the other three to land on the first —
+  // the gesture and the animation would point opposite ways. Resistance at
+  // the two ends says "nothing further this way" in the gesture's own terms
+  // instead, which is also what every native photo viewer does.
+  function resist(dx: number) {
+    const pullingPastStart = index === 0 && dx > 0
+    const pullingPastEnd = index === total - 1 && dx < 0
+    return pullingPastStart || pullingPastEnd ? dx * 0.3 : dx
+  }
+
+  function onPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, active: false }
+  }
+
+  function onPointerMove(e: PointerEvent<HTMLDivElement>) {
+    const start = drag.current
+    if (!start || e.pointerId !== start.id) return
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+    if (!start.active) {
+      // Claim the gesture only once it is clearly horizontal. `touch-pan-y`
+      // on the stage already hands vertical panning to the browser (which
+      // then sends us pointercancel), but a mouse drag gets no such help.
+      if (Math.abs(dx) < DRAG_INTENT_PX || Math.abs(dx) <= Math.abs(dy)) return
+      start.active = true
+      // Capture so a drag that leaves the frame — or ends over the header —
+      // still reports its pointerup here rather than stranding the track
+      // mid-slide.
+      e.currentTarget.setPointerCapture(e.pointerId)
+      setDragging(true)
+    }
+    setDragDx(resist(dx))
+  }
+
+  function onPointerEnd(e: PointerEvent<HTMLDivElement>) {
+    const start = drag.current
+    if (!start || e.pointerId !== start.id) return
+    drag.current = null
+    if (!start.active) return
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    setDragging(false)
+    setDragDx(0)
+    if (e.type === 'pointercancel') return
+
+    // Threshold on the *undamped* travel, and proportional to the frame so
+    // the same flick reads the same on a phone and on a 26rem desktop frame.
+    const travelled = e.clientX - start.x
+    const width = stageRef.current?.clientWidth ?? 0
+    if (Math.abs(travelled) < Math.max(40, width * 0.15)) return
+    const next = index + (travelled < 0 ? 1 : -1)
+    if (next < 0 || next >= total) return
+    goTo(next)
+  }
+
   return (
     <div>
       {/*
@@ -142,36 +213,88 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
           panel up and down the page on every navigation.
         */}
         <div className="relative mx-auto grid aspect-[4/5] w-full max-w-[26rem] place-items-center">
-          <div className="relative w-full" style={{ aspectRatio: frameAspect }}>
-            {fits.map((f) =>
-              f.gallery.map((image, i) => {
-                const isActive = f.id === fit && i === index
-                // The one image blocking first paint. Everything else starts
-                // lazy and is flipped to eager once `warm` (see effect above).
-                const isInitial = f.id === initialFit && i === 0
-                return (
-                  <img
-                    key={`${f.id}-${i}`}
-                    src={image.src}
-                    width={image.width}
-                    height={image.height}
-                    alt={image.alt}
-                    aria-hidden={isActive ? undefined : true}
-                    loading={isInitial || warm ? 'eager' : 'lazy'}
-                    fetchPriority={isInitial ? 'high' : 'low'}
-                    decoding="async"
+          {/*
+            touch-pan-y, not touch-none: a vertical flick that happens to
+            start on the photo has to scroll the page — on mobile the
+            carousel is most of the first screen, so swallowing vertical
+            gestures here would strand the visitor. The aspect transition
+            matches the slide duration so the frame reshapes *with* the
+            incoming photo (portrait worn shot ⇄ landscape flat-lay)
+            instead of snapping under it halfway through.
+          */}
+          <div
+            ref={stageRef}
+            className="relative w-full touch-pan-y select-none overflow-hidden transition-[aspect-ratio] duration-300 ease-out motion-reduce:transition-none"
+            style={{ aspectRatio: frameAspect }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerEnd}
+            onPointerCancel={onPointerEnd}
+          >
+            {fits.map((f) => {
+              const isActiveFit = f.id === fit
+              return (
+                <div
+                  key={f.id}
+                  className={cn(
+                    'absolute inset-0 transition-opacity duration-150 motion-reduce:transition-none',
+                    isActiveFit ? 'opacity-100' : 'pointer-events-none opacity-0'
+                  )}
+                >
+                  <div
                     className={cn(
-                      'absolute inset-0 h-full w-full object-contain transition-opacity duration-150 motion-reduce:transition-none',
-                      isActive ? 'opacity-100' : 'pointer-events-none opacity-0'
+                      'flex h-full w-full',
+                      dragging ? 'transition-none' : 'transition-transform duration-300 ease-out motion-reduce:transition-none'
                     )}
-                  />
-                )
-              })
-            )}
+                    style={{
+                      transform: `translate3d(calc(${index * -100}% + ${isActiveFit ? dragDx : 0}px), 0, 0)`,
+                    }}
+                  >
+                    {f.gallery.map((image, i) => {
+                      const isActive = isActiveFit && i === index
+                      // The one image blocking first paint. Everything else
+                      // starts lazy and is flipped to eager once `warm` (see
+                      // effect above).
+                      const isInitial = f.id === initialFit && i === 0
+                      return (
+                        <img
+                          key={`${f.id}-${i}`}
+                          src={image.src}
+                          width={image.width}
+                          height={image.height}
+                          alt={image.alt}
+                          // Driven by the selection, never by what a drag
+                          // happens to have slid into view: exactly one of
+                          // the 8 is in the accessibility tree at any moment.
+                          aria-hidden={isActive ? undefined : true}
+                          loading={isInitial || warm ? 'eager' : 'lazy'}
+                          fetchPriority={isInitial ? 'high' : 'low'}
+                          decoding="async"
+                          // Without this a mouse drag on the photo starts a
+                          // native image drag and the swipe dies on the
+                          // first pixel.
+                          draggable={false}
+                          className="h-full w-full shrink-0 object-contain"
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
         <div className="mt-3 flex items-center justify-center gap-1">
+          <button
+            type="button"
+            aria-label={d.productImagePrev}
+            onClick={() => goTo(index - 1)}
+            className="mr-2 flex size-8 items-center justify-center border border-line text-mute transition-colors hover:border-ink hover:text-ink"
+          >
+            <Chevron dir="left" />
+          </button>
+
           {activeFit.gallery.map((_, i) => (
             <button
               key={i}
@@ -193,6 +316,15 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
               {i + 1}
             </button>
           ))}
+
+          <button
+            type="button"
+            aria-label={d.productImageNext}
+            onClick={() => goTo(index + 1)}
+            className="ml-2 flex size-8 items-center justify-center border border-line text-mute transition-colors hover:border-ink hover:text-ink"
+          >
+            <Chevron dir="right" />
+          </button>
         </div>
 
         <p className="mt-2 text-center text-[10px] uppercase tracking-label text-mute">{activeFit.label}</p>
@@ -206,5 +338,30 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
         {announcement}
       </p>
     </div>
+  )
+}
+
+/**
+ * Inline rather than lucide-react — one 20-byte path doesn't justify the
+ * dependency CLAUDE.md keeps out. Square caps and mitred joins because this
+ * site has no radii; a round-capped chevron is the same regression as a
+ * `rounded-*` class, just one check-guards.sh can't grep for.
+ */
+function Chevron({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="square"
+      strokeLinejoin="miter"
+      aria-hidden="true"
+      className="pointer-events-none"
+    >
+      <path d={dir === 'left' ? 'M10 3 5 8l5 5' : 'M6 3l5 5-5 5'} />
+    </svg>
   )
 }
