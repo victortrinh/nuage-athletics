@@ -46,16 +46,6 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
 
   const activeFit = fits.find((f) => f.id === fit) ?? fits[0]
   const total = activeFit.gallery.length
-  const activeImage = activeFit.gallery[index]
-  // Front/back are flat-lay shots (~2:1, landscape); front-worn/back-worn are
-  // tall (~1:2, portrait). A single fixed aspect box shrinks whichever shape
-  // doesn't match it — 4/5 was picked for the worn shots (see the frame's own
-  // comment below on why *that* is capped), which let the flat-lay pair
-  // shrink to a thin horizontal strip. Following each image's own ratio fixes
-  // that; the 4/5 floor only kicks in for the worn shots, preserving the
-  // existing cap that keeps them from pushing the pagination row and buy
-  // panel below the fold.
-  const frameAspect = Math.max(activeImage.width / activeImage.height, 4 / 5)
 
   // Defers the other 7 images to idle — the same deferral pattern
   // Sky.astro uses for its WebGL engine. One ~50KB image blocks first
@@ -165,7 +155,8 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
     if (e.type === 'pointercancel') return
 
     // Threshold on the *undamped* travel, and proportional to the frame so
-    // the same flick reads the same on a phone and on a 26rem desktop frame.
+    // the same flick reads the same on a phone and on a full-column desktop
+    // frame.
     const travelled = e.clientX - start.x
     const width = stageRef.current?.clientWidth ?? 0
     if (Math.abs(travelled) < Math.max(40, width * 0.15)) return
@@ -197,35 +188,38 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
         onKeyDown={onKeyDown}
       >
         {/*
-          Capped at every breakpoint, not just below `lg` — letting the
-          frame grow to the full ~624px grid column on desktop made it
-          ~780px tall at this 4/5 ratio, pushing the pagination row and the
-          whole buy panel below the fold on ordinary laptop viewports.
+          The frame is one fixed box, sized by nothing the visitor can
+          change: the spacer below reserves the height, the stage lies on
+          top of it at the column's full width, and every photo is fitted
+          inside with object-contain. Paging or switching fit therefore
+          never moves the pagination row, the fit label or the buy panel —
+          on mobile especially, where the carousel is the first thing in
+          the document flow and a reflow here shifts the whole page.
 
-          This outer box stays fixed at 4/5 — the tallest case, since
-          frameAspect is floored at 4/5 — and just centers the actual
-          (variable-height) stage inside it. The stage's own height still
-          tracks the active image so landscape flat-lay shots aren't
-          squeezed into a portrait box, but that no longer resizes this
-          wrapper: on mobile, where the carousel is the first thing in the
-          document flow, letting the wrapper itself shrink for landscape
-          photos moved the pagination row, the fit label, and the buy
-          panel up and down the page on every navigation.
+          The spacer keeps the old 4/5-at-26rem shape, which is the tallest
+          the gallery gets (the worn shots) at the largest height that
+          still leaves the pagination row and buy panel above the fold on
+          an ordinary laptop. Below 26rem the cap stops biting and it
+          tracks the viewport, as before.
+
+          The stage is deliberately wider than that cap: front and back are
+          flat-lay shots at roughly 2:1, so a 26rem-wide frame left them
+          barely 200px tall in a 520px box. Spanning the whole grid column
+          (~39rem) gives those two half again as much size, while the worn
+          shots — bounded by the reserved height, not the width — come out
+          exactly as they did before.
         */}
-        <div className="relative mx-auto grid aspect-[4/5] w-full max-w-[26rem] place-items-center">
+        <div className="relative w-full">
+          <div aria-hidden="true" className="mx-auto aspect-[4/5] w-full max-w-[26rem]" />
           {/*
             touch-pan-y, not touch-none: a vertical flick that happens to
             start on the photo has to scroll the page — on mobile the
             carousel is most of the first screen, so swallowing vertical
-            gestures here would strand the visitor. The aspect transition
-            matches the slide duration so the frame reshapes *with* the
-            incoming photo (portrait worn shot ⇄ landscape flat-lay)
-            instead of snapping under it halfway through.
+            gestures here would strand the visitor.
           */}
           <div
             ref={stageRef}
-            className="relative w-full touch-pan-y select-none overflow-hidden transition-[aspect-ratio] duration-300 ease-out motion-reduce:transition-none"
-            style={{ aspectRatio: frameAspect }}
+            className="absolute inset-0 touch-pan-y select-none overflow-hidden"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerEnd}
