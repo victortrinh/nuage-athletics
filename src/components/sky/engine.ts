@@ -249,10 +249,19 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
   const seedProgram = new Program(gl, { vertex: VERTEX, fragment: FLUID_SEED })
   const seedMesh = new Mesh(gl, { geometry, program: seedProgram })
 
+  // iOS Safari fires `resize` on every URL-bar collapse/expand: a
+  // height-only delta of roughly 60-90px with the width unchanged.
+  // Reallocating every fluid render target for that is what makes the sky
+  // stutter mid-scroll, so a height-only change under this threshold is
+  // absorbed into the existing CSS box instead of triggering a reallocation.
+  // An ~11% vertical stretch of an abstract cloud field is invisible; the
+  // reallocation isn't.
+  const TOOLBAR_RESIZE_SLOP = 120
+
   function resize() {
     const w = Math.round(window.innerWidth)
     const h = Math.round(window.innerHeight)
-    if (w === width && h === height) return
+    if (w === width && Math.abs(h - height) < TOOLBAR_RESIZE_SLOP) return
     width = w
     height = h
     renderer.setSize(width, height)

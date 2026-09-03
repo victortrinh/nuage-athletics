@@ -53,7 +53,9 @@ export default defineConfig({
       // the other two projects' spec files and runs them here too — under
       // this project's reducedMotion: 'reduce', which is exactly the
       // condition sky-motion.e2e.ts exists to assert is NOT the case.
-      testIgnore: ['**/sky-motion.e2e.ts', '**/forced-colors.e2e.ts'],
+      // mobile-layout.e2e.ts is excluded for the same reason: it needs the
+      // 'mobile' project's viewport, not this project's Desktop Chrome one.
+      testIgnore: ['**/sky-motion.e2e.ts', '**/forced-colors.e2e.ts', '**/mobile-layout.e2e.ts'],
       use: {
         ...devices['Desktop Chrome'],
         storageState: STORAGE_STATE,
@@ -79,6 +81,19 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: STORAGE_STATE,
         contextOptions: { forcedColors: 'active', reducedMotion: 'reduce' },
+      },
+    },
+    {
+      // Chromium can't emulate iOS safe-area insets, so this catches
+      // sticky/opacity/offset regressions in the header only — the
+      // env(safe-area-inset-*) padding itself still needs on-device
+      // verification (see mobile-layout.e2e.ts).
+      name: 'mobile',
+      testMatch: '**/mobile-layout.e2e.ts',
+      use: {
+        ...devices['Pixel 5'],
+        storageState: STORAGE_STATE,
+        contextOptions: { reducedMotion: 'reduce' },
       },
     },
   ],

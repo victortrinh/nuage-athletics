@@ -40,7 +40,13 @@ const org = {
 ---
 
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- viewport-fit=cover is what makes env(safe-area-inset-*) non-zero on iOS;
+     without it the header's pt-safe utility (global.css) is a no-op. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- Keeps the iOS status-bar tint the same as the sticky header's bg-paper
+     fill so there's no seam — must stay in sync with --color-paper in
+     global.css. -->
+<meta name="theme-color" content="#fafafa" />
 <title>{title}</title>
 <meta name="description" content={description} />
 <link rel="canonical" href={canonical} />

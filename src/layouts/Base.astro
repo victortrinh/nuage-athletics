@@ -31,7 +31,7 @@ const year = new Date().getFullYear()
     <Seo {locale} {routeId} {alternates} {title} {description} {noindex} />
     <slot name="head" />
   </head>
-  <body class="min-h-dvh flex flex-col font-sans antialiased">
+  <body class="min-h-svh flex flex-col font-sans antialiased">
     <a
       href="#content"
       class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:border focus:border-ink focus:bg-paper focus:px-4 focus:py-2 focus:text-sm"
@@ -39,7 +39,7 @@ const year = new Date().getFullYear()
       {d.skipToContent}
     </a>
     <Sky />
-    <header class="border-b border-line px-6 py-4 sm:px-10">
+    <header class="sticky top-0 z-40 border-b border-line bg-paper px-6 pt-safe pb-4 sm:px-10">
       <div class="mx-auto flex max-w-6xl items-center justify-between gap-6">
         <a
           href={route('home', locale)}
