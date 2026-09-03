@@ -4,6 +4,37 @@ import type { Locale } from './config.ts'
  * Every user-facing string lives here. Bill 96 requires the French version to be
  * complete — not a subset — so a missing key is a compliance bug, not a cosmetic
  * one. The Dict type makes an omission a type error.
+ *
+ * VOICE — the brand is a cloud, so the copy reads as weather. Two clipped
+ * fragments, periods, vouvoiement, no exclamation marks: "Ciel couvert. Le mot
+ * de passe dégage la vue." French is written first and English written beside
+ * it, not translated from it — a pun that only works in one language stays in
+ * that language ("First drop" is already both a release and a raindrop; the
+ * French says "éclaircie" instead of forcing it).
+ *
+ * The metaphor is for ambience only. These stay literal, deliberately, and a
+ * future pass should leave them alone:
+ *
+ *   - Anything that names a control or is read by a screen reader —
+ *     emailLabel, gatePasswordLabel, productSizeLabel, productFitLabel,
+ *     productGalleryLabel, productImagePosition, skipToContent, switchTo.
+ *     A weather word in an accessible name is a broken accessible name.
+ *   - Errors that tell you how to fix the thing — errorEmail, errorConsent,
+ *     productSelectSizeError, errorChallenge, errorEmailSend. Cute is hostile
+ *     when someone is stuck. Errors that are only "wait and retry"
+ *     (errorGeneric, errorRate) carry the voice instead.
+ *   - submitting, successTitle: progress and success are announced through a
+ *     live region, where being understood on the first hearing beats charm.
+ *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
+ *     mailUnsub, mailSubject/mailHeading/mailCta, orderCancelled*, privacy,
+ *     terms, rights, productOutOfStock, productBuy.
+ *   - consentLabel most of all: it is pinned to CONSENT_VERSION in
+ *     src/lib/consent.ts and every subscriber row records the version it was
+ *     captured under. Rewording it is a version bump plus two live wordings
+ *     forever, not a copy edit.
+ *   - dropLine: it renders only in the meta description, so it is read in
+ *     search results and nowhere else. Clarity sells there; the wink has no
+ *     audience.
  */
 export type Dict = {
   brand: string
@@ -81,16 +112,16 @@ export const UI: Record<Locale, Dict> = {
     submitting: 'Un instant…',
     successTitle: 'Vérifiez vos courriels',
     successBody:
-      'Nous vous avons envoyé un lien de confirmation. Cliquez dessus pour compléter votre inscription.',
-    errorGeneric: 'Une erreur est survenue. Réessayez dans un moment.',
+      'Un lien de confirmation vient de partir. Un clic et le ciel se dégage.',
+    errorGeneric: 'Turbulences. Réessayez dans un moment.',
     errorEmail: 'Entrez une adresse courriel valide.',
     errorConsent: 'Vous devez accepter de recevoir nos courriels.',
-    errorRate: 'Trop de tentatives. Réessayez dans quelques minutes.',
+    errorRate: 'Trop de tentatives. Laissez passer quelques minutes.',
     errorChallenge: 'La vérification a échoué. Réessayez.',
     errorEmailSend: "L'envoi du courriel a échoué. Réessayez dans un moment.",
-    alreadySubscribed: 'Cette adresse est déjà inscrite.',
+    alreadySubscribed: 'Cette adresse est déjà dans nos prévisions.',
     confirmTitle: 'Inscription confirmée',
-    confirmBody: 'Merci. Vous serez parmi les premiers avertis.',
+    confirmBody: 'Merci. On vous écrit à la première éclaircie.',
     unsubTitle: 'Désabonnement effectué',
     unsubBody: 'Vous ne recevrez plus de courriels de notre part.',
     privacy: 'Confidentialité',
@@ -102,22 +133,22 @@ export const UI: Record<Locale, Dict> = {
     mailSubject: 'Confirmez votre inscription',
     mailHeading: 'Confirmez votre inscription',
     mailBody:
-      "Confirmez que vous voulez recevoir nos courriels. C'est la seule étape qu'il reste.",
+      "Confirmez que vous voulez recevoir nos courriels. C'est la dernière étape avant l'éclaircie.",
     mailCta: 'Confirmer mon inscription',
     mailIgnore: "Si cette inscription ne vient pas de vous, ignorez ce courriel.",
     mailUnsub: 'Se désabonner',
-    gateTitle: 'Accès restreint',
-    gateLede: 'Ce site n’est pas encore ouvert. Entrez le mot de passe pour continuer.',
+    gateTitle: 'Ciel couvert',
+    gateLede: 'Ciel couvert. Le mot de passe dégage la vue.',
     gatePasswordLabel: 'Mot de passe',
     gateSubmit: 'Entrer',
-    gateErrorBad: 'Mot de passe incorrect.',
-    gateSignupLede: 'Pas de mot de passe? Soyez averti du lancement.',
+    gateErrorBad: 'Toujours couvert.',
+    gateSignupLede: "Pas de mot de passe? On vous écrit à l'éclaircie.",
     productDetails: 'Détails',
     productGalleryLabel: 'Images du produit',
-    productNotifyTitle: 'Soyez averti',
+    productNotifyTitle: "Avis d'éclaircie",
     productNotifyBody:
-      'Choisissez votre taille et laissez-nous votre courriel. Nous vous écrirons dès que la vente ouvre.',
-    productComingSoon: 'Bientôt',
+      'Choisissez votre taille, laissez votre courriel. On vous écrit dès que le ciel se dégage.',
+    productComingSoon: "À l'horizon",
     productSizeLabel: 'Taille',
     productOutOfStock: 'Épuisé',
     productBuy: 'Acheter',
@@ -126,7 +157,7 @@ export const UI: Record<Locale, Dict> = {
     productImagePosition: 'Image {n} de {total}',
     orderConfirmedTitle: 'Commande confirmée',
     orderConfirmedBody:
-      'Merci pour votre commande. Un courriel de confirmation vous a été envoyé.',
+      'Merci. Un courriel de confirmation est en route.',
     orderCancelledTitle: 'Commande annulée',
     orderCancelledBody: "Votre commande n'a pas été complétée. Aucun montant n'a été prélevé.",
     skyPause: 'Figer le ciel',
@@ -144,16 +175,16 @@ export const UI: Record<Locale, Dict> = {
     submitting: 'One moment…',
     successTitle: 'Check your email',
     successBody:
-      'We sent you a confirmation link. Click it to complete your signup.',
-    errorGeneric: 'Something went wrong. Try again in a moment.',
+      'A confirmation link just went out. One click and the sky clears.',
+    errorGeneric: 'Turbulence. Try again in a moment.',
     errorEmail: 'Enter a valid email address.',
     errorConsent: 'You need to agree to receive our emails.',
-    errorRate: 'Too many attempts. Try again in a few minutes.',
+    errorRate: 'Too many attempts. Let a few minutes pass.',
     errorChallenge: 'Verification failed. Try again.',
     errorEmailSend: 'Sending the email failed. Try again in a moment.',
-    alreadySubscribed: 'That address is already signed up.',
+    alreadySubscribed: 'That address is already in the forecast.',
     confirmTitle: 'Signup confirmed',
-    confirmBody: "Thanks. You'll be among the first to know.",
+    confirmBody: "Thanks. We'll write at the first clearing.",
     unsubTitle: 'Unsubscribed',
     unsubBody: 'You will no longer receive emails from us.',
     privacy: 'Privacy',
@@ -164,22 +195,22 @@ export const UI: Record<Locale, Dict> = {
     skipToContent: 'Skip to content',
     mailSubject: 'Confirm your signup',
     mailHeading: 'Confirm your signup',
-    mailBody: "Confirm that you want our emails. It's the only step left.",
+    mailBody: "Confirm you want our emails. That's the last step before it clears.",
     mailCta: 'Confirm my signup',
     mailIgnore: "If this signup wasn't you, ignore this email.",
     mailUnsub: 'Unsubscribe',
-    gateTitle: 'Restricted access',
-    gateLede: 'This site is not open yet. Enter the password to continue.',
+    gateTitle: 'Overcast',
+    gateLede: 'Overcast. The password clears the view.',
     gatePasswordLabel: 'Password',
     gateSubmit: 'Enter',
-    gateErrorBad: 'Incorrect password.',
-    gateSignupLede: 'No password? Get notified at launch.',
+    gateErrorBad: 'Still overcast.',
+    gateSignupLede: "No password? We'll write when it clears.",
     productDetails: 'Details',
     productGalleryLabel: 'Product images',
-    productNotifyTitle: 'Get notified',
+    productNotifyTitle: 'Clearing advisory',
     productNotifyBody:
-      'Pick your size and leave us your email. We will write the moment it goes on sale.',
-    productComingSoon: 'Soon',
+      'Pick your size, leave your email. We write the moment the sky clears.',
+    productComingSoon: 'On the horizon',
     productSizeLabel: 'Size',
     productOutOfStock: 'Out of stock',
     productBuy: 'Buy now',
@@ -187,7 +218,7 @@ export const UI: Record<Locale, Dict> = {
     productFitLabel: 'Fit',
     productImagePosition: 'Image {n} of {total}',
     orderConfirmedTitle: 'Order confirmed',
-    orderConfirmedBody: 'Thanks for your order. A confirmation email is on its way.',
+    orderConfirmedBody: 'Thanks. A confirmation email is on its way.',
     orderCancelledTitle: 'Order cancelled',
     orderCancelledBody: 'Your order was not completed. You have not been charged.',
     skyPause: 'Pause the sky',

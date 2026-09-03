@@ -1,6 +1,16 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { ROUTES } from '../src/i18n/utils'
 import { LOCALES } from '../src/i18n/config'
+
+/**
+ * The gate screen keeps its SignupForm inside a <details> disclosure, so
+ * the form is in the DOM but not rendered until the summary is clicked.
+ * Every gate test below needs it open first.
+ */
+async function openGateSignup(page: Page) {
+  await page.locator('details > summary').click()
+  await expect(page.getByRole('checkbox')).toBeVisible()
+}
 
 /**
  * The CASL consent checkbox must never be pre-checked or inferred
@@ -11,6 +21,7 @@ import { LOCALES } from '../src/i18n/config'
 for (const locale of LOCALES) {
   test(`consent checkbox is unchecked on load (${locale})`, async ({ page }) => {
     await page.goto(ROUTES.gate[locale])
+    await openGateSignup(page)
     const consent = page.getByRole('checkbox')
     await expect(consent).not.toBeChecked()
   })
@@ -28,6 +39,7 @@ test('consent checkbox toggles by keyboard, and a bad email wires aria-invalid',
   page,
 }) => {
   await page.goto(ROUTES.gate['fr-CA'])
+  await openGateSignup(page)
 
   const consent = page.getByRole('checkbox')
   await consent.focus()
@@ -54,6 +66,7 @@ test('focus moves into the success panel, and the live region announces it', asy
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
   )
 
+  await openGateSignup(page)
   await page.getByRole('checkbox').focus()
   await page.keyboard.press('Space')
   await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')

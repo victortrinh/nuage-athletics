@@ -1,6 +1,5 @@
 ---
 import { env } from 'cloudflare:workers'
-import Logo from './Logo.astro'
 import SignupForm from './SignupForm.tsx'
 import { t } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
@@ -26,15 +25,20 @@ const error = Astro.url.searchParams.get('e')
 const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateErrorBad : null
 ---
 
-<section class="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center py-16">
-  <Logo variant="mark" class="text-5xl" />
+{/*
+  The gate is the one page whose only job is the password. The brand mark
+  and the "Accès restreint" heading both used to sit above the field, and
+  both duplicate what the header already says a few pixels higher — so the
+  heading stays for screen readers (a page still needs an h1) and the lede
+  stays visible, because a visitor who lands here cold otherwise gets a
+  password box with no explanation of what it belongs to.
+*/}
+<section class="mx-auto flex min-h-[60vh] w-full max-w-sm flex-col justify-center py-16">
+  <h1 class="sr-only">{d.gateTitle}</h1>
 
-  <h1 class="mt-10 text-[11px] uppercase tracking-label">
-    {d.gateTitle}
-  </h1>
-  <p class="mt-3 text-lg leading-snug">{d.gateLede}</p>
+  <p class="text-sm text-mute">{d.gateLede}</p>
 
-  <form method="POST" action="/api/gate" class="mt-10">
+  <form method="POST" action="/api/gate" class="mt-6">
     <input type="hidden" name="to" value={to} />
     <label for="gate-password" class={labelVariants()}>
       {d.gatePasswordLabel}
@@ -59,25 +63,40 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
       )
     }
 
-    <button type="submit" class={cn(buttonVariants(), 'mt-8')}>
+    <button type="submit" class={cn(buttonVariants(), 'mt-6')}>
       {d.gateSubmit}
     </button>
   </form>
 
-  <hr class="mt-14 border-line" />
-
-  <p class="mt-8 text-[11px] uppercase tracking-label text-mute">
-    {d.gateSignupLede}
-  </p>
-  <div class="mt-5">
-    <SignupForm
-      client:load
-      {locale}
-      {d}
-      {turnstileSiteKey}
-      source="gate"
-    />
-  </div>
+  {/*
+    Signup is secondary here — most visitors who reach the gate have the
+    password. A native <details> keeps it to one line until someone wants
+    it, and needs no JS of its own. The island still hydrates on load: the
+    form inside is small, and deferring it would leave a form that looks
+    ready but isn't for whoever opens the disclosure immediately. Turnstile
+    is the one part that can't render into a collapsed <details> — see the
+    mount effect in SignupForm.tsx.
+  */}
+  <details class="mt-12 border-t border-line pt-6">
+    <summary
+      class={cn(
+        'cursor-pointer list-none text-[11px] uppercase tracking-label text-mute hover:text-accent-ink',
+        // list-none kills the marker in every engine but WebKit, which
+        // needs its own pseudo-element hidden.
+        '[&::-webkit-details-marker]:hidden',
+        // Without a marker of its own, a muted uppercase line reads as a
+        // caption rather than a control. The +/– is the whole affordance,
+        // so it's decorative to a screen reader — the summary already
+        // announces as an expandable button with its own state.
+        "before:mr-2 before:content-['+'] [[open]>&]:before:content-['–']"
+      )}
+    >
+      {d.gateSignupLede}
+    </summary>
+    <div class="mt-6">
+      <SignupForm client:load {locale} {d} {turnstileSiteKey} source="gate" />
+    </div>
+  </details>
 </section>
 
 {
