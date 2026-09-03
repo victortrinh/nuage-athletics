@@ -68,13 +68,13 @@ test('size selector is a real radiogroup with roving-tabindex arrow navigation',
 }) => {
   await page.goto(ROUTES.home['fr-CA'])
 
-  const group = page.getByRole('radiogroup')
+  // Scoped to "Taille" — the fit selector (ProductActions.tsx) is a second
+  // radiogroup on this page since the fit/carousel work, so a bare
+  // getByRole('radiogroup') is a Playwright strict-mode violation now.
+  const group = page.getByRole('radiogroup', { name: 'Taille' })
   await expect(group).toBeVisible()
-  // Named via aria-labelledby at the visible "Taille" label, not a
-  // redundant separate aria-label — see ProductActions.tsx.
-  await expect(group).toHaveAccessibleName('Taille')
 
-  const radios = page.getByRole('radio')
+  const radios = group.getByRole('radio')
   const count = await radios.count()
   expect(count).toBeGreaterThan(1)
 
@@ -85,4 +85,119 @@ test('size selector is a real radiogroup with roving-tabindex arrow navigation',
   await expect(radios.nth(1)).toBeChecked()
   await expect(radios.nth(1)).toBeFocused()
   await expect(radios.first()).not.toBeChecked()
+})
+
+test('fit selector is a radiogroup, defaults to Classique, and switching fit updates the carousel', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const fitGroup = page.getByRole('radiogroup', { name: 'Coupe' })
+  await expect(fitGroup).toBeVisible()
+  await expect(fitGroup.getByRole('radio')).toHaveCount(2)
+  await expect(fitGroup.getByRole('radio', { name: 'Classique' })).toBeChecked()
+
+  const carousel = page.getByRole('group', { name: 'Images du produit' })
+  await expect(carousel.getByRole('img')).toHaveAttribute('alt', /coupe classique/)
+
+  // RadioGroup renders each radio as a visually-hidden <input> inside a
+  // styled <label> (see radio-group.tsx / checkbox.tsx) — the input's own
+  // hit-test box is a 1px clip-rect, so clicking the accessible "radio"
+  // element directly fights Playwright's actionability check forever. Click
+  // the label, same as a real pointer user would.
+  await fitGroup.locator('label').filter({ hasText: 'Crop' }).click()
+  await expect(fitGroup.getByRole('radio', { name: 'Crop' })).toBeChecked()
+  await expect(carousel.getByRole('img')).toHaveAttribute('alt', /coupe crop/)
+
+  // Switching size after fit keeps the size selected — the value={size}
+  // binding (not value={variantId}) is what makes this survive a fit change.
+  const sizeGroup = page.getByRole('radiogroup', { name: 'Taille' })
+  await sizeGroup.locator('label').nth(2).click()
+  const thirdSize = sizeGroup.getByRole('radio').nth(2)
+  await expect(thirdSize).toBeChecked()
+  await fitGroup.locator('label').filter({ hasText: 'Classique' }).click()
+  await expect(thirdSize).toBeChecked()
+})
+
+test('carousel exposes exactly one image at a time, pages with the numbered pagination, and announces the change', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const carousel = page.getByRole('group', { name: 'Images du produit' })
+  await expect(carousel).toHaveAttribute('aria-roledescription', 'carousel')
+  // axe can't make this assertion — it has no notion of "only one of 8
+  // images should be in the accessibility tree at a time". This is the one
+  // check that catches a broken aria-hidden toggle.
+  await expect(carousel.getByRole('img')).toHaveCount(1)
+
+  // Two sr-only status regions exist on this page while commerce is off —
+  // this one (the carousel's) and SignupForm's inside ProductActions. The
+  // carousel column is first in document order.
+  const status = page.locator('[role="status"].sr-only').first()
+  await expect(status).toHaveText('')
+
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  await expect(pageButtons).toHaveCount(4)
+  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
+
+  await pageButtons.nth(2).click()
+  await expect(pageButtons.nth(2)).toHaveAttribute('aria-current', 'true')
+  await expect(pageButtons.nth(0)).not.toHaveAttribute('aria-current', 'true')
+  await expect(carousel.getByRole('img')).toHaveCount(1)
+  await expect(status).toHaveText('Classique — Image 3 de 4')
+})
+
+test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  // No visible prev/next buttons — the numbered pagination is the only
+  // pointer affordance, and arrow keys work from focus anywhere in the
+  // group (see onKeyDown in ProductCarousel.tsx), pagination included.
+  const carousel = page.getByRole('group', { name: 'Images du produit' })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+
+  await pageButtons.nth(0).click()
+  await pageButtons.nth(0).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
+  // An arrow key moves focus along with the current slide.
+  await expect(pageButtons.nth(1)).toBeFocused()
+
+  await page.keyboard.press('ArrowLeft')
+  await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
+
+  // Wraps rather than stopping at the boundary — there's no disabled state
+  // to strand focus on.
+  await page.keyboard.press('ArrowLeft')
+  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await expect(carousel.getByRole('img')).toHaveCount(1)
+})
+
+test('notify-me source tag records fit and size', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  let posted: { source?: string } = {}
+  await page.route('**/api/subscribe', async (route) => {
+    posted = route.request().postDataJSON()
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+  })
+
+  // Click the label, not the (visually-hidden) input the "radio" role
+  // resolves to — see the comment on the fit-selector test above.
+  await page
+    .getByRole('radiogroup', { name: 'Coupe' })
+    .locator('label')
+    .filter({ hasText: 'Crop' })
+    .click()
+  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').nth(2).click()
+
+  await page.getByRole('checkbox').focus()
+  await page.keyboard.press('Space')
+  await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
+  // ProductActions doesn't override SignupForm's submitLabel, so the button
+  // reads "M'inscrire" here too, same as the gate screen.
+  await page.getByRole('button', { name: /m.inscrire/i }).click({ force: true })
+
+  await expect.poll(() => posted.source).toBe('product:ls-01:crop:M')
 })

@@ -36,6 +36,13 @@ export function Radio({ className, ...props }: RadioProps) {
           'cursor-pointer bg-paper px-3 py-3 text-xs uppercase tracking-label transition-colors',
           'hover:bg-ink hover:text-paper',
           'data-[selected]:bg-ink data-[selected]:text-paper',
+          // In forced-colors mode bg-ink/text-paper are both flattened to
+          // system colors and selected/unselected become indistinguishable —
+          // same failure mode CLAUDE.md documents for checkbox.tsx. Highlight
+          // the selected state explicitly rather than relying on the
+          // (removed) background contrast.
+          'forced-colors:border forced-colors:border-[ButtonBorder]',
+          'forced-colors:data-[selected]:bg-[Highlight] forced-colors:data-[selected]:text-[HighlightText]',
           'data-[focus-visible]:focus-block',
           'data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:text-mute data-[disabled]:line-through',
           typeof className === 'function' ? className(renderProps) : className

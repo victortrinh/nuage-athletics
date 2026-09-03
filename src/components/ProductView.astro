@@ -1,11 +1,11 @@
 ---
 import { env } from 'cloudflare:workers'
-import ProductGallery from './ProductGallery.astro'
+import ProductCarousel from './ProductCarousel.tsx'
 import ProductActions from './ProductActions.tsx'
 import CpaDisclosure from './CpaDisclosure.astro'
 import { t } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
-import { editorialFor, featuredProduct } from '../lib/catalogue'
+import { editorialFor, featuredProduct, DEFAULT_FIT } from '../lib/catalogue'
 
 interface Props {
   locale: Locale
@@ -33,6 +33,7 @@ const jsonLd = {
   '@type': 'Product',
   name: product.name,
   description: product.description,
+  image: product.images.map((src) => new URL(src, Astro.site).href),
   brand: { '@type': 'Brand', name: d.brand },
   material: editorial.specs[0]?.value,
   ...(commerceEnabled
@@ -51,7 +52,36 @@ const jsonLd = {
 <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
 <article class="grid gap-10 py-8 lg:grid-cols-[1fr_24rem] lg:gap-16 lg:py-12">
-  <ProductGallery slots={editorial.gallery} label={d.productGalleryLabel} />
+  <div>
+    <ProductCarousel
+      client:load
+      {d}
+      productId={product.id}
+      fits={editorial.fits}
+      initialFit={DEFAULT_FIT}
+    />
+    {/* Images are content, not chrome — the carousel needs JS to page
+        through them, but every photo still has to reach a no-JS visitor. */}
+    <noscript>
+      <div class="mt-3 grid grid-cols-2 gap-3">
+        {
+          editorial.fits.flatMap((fit) =>
+            fit.gallery.map((image) => (
+              <img
+                src={image.src}
+                width={image.width}
+                height={image.height}
+                alt={image.alt}
+                loading="lazy"
+                decoding="async"
+                class="w-full object-contain"
+              />
+            ))
+          )
+        }
+      </div>
+    </noscript>
+  </div>
 
   <div class="lg:sticky lg:top-8 lg:self-start">
     <h1 class="wordmark text-3xl leading-none sm:text-4xl">{product.name}</h1>
@@ -73,6 +103,8 @@ const jsonLd = {
         {d}
         productId={product.id}
         variants={product.variants}
+        fits={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
+        initialFit={DEFAULT_FIT}
         {commerceEnabled}
         turnstileSiteKey={siteKey}
       />

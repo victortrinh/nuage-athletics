@@ -17,8 +17,16 @@ export interface Money {
 export interface ProductVariant {
   id: string
   sku: string
-  label: string // e.g. "M"
+  label: string // e.g. "Classique · M"
   inStock: boolean
+  /**
+   * The option axes this variant sits on, as ids never display strings
+   * (e.g. { fit: 'crop', size: 'M' }). Generic on purpose: this interface is
+   * the contract a Lightspeed adapter must also satisfy, and "fit" is a fact
+   * about this garment, not something the commerce contract should hardcode.
+   * Optional so a single-axis product needs none.
+   */
+  options?: Record<string, string>
 }
 
 export interface Product {

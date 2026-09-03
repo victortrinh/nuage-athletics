@@ -57,6 +57,8 @@ export type Dict = {
   productOutOfStock: string
   productBuy: string
   productSelectSizeError: string
+  productFitLabel: string
+  productImagePosition: string
   orderConfirmedTitle: string
   orderConfirmedBody: string
   orderCancelledTitle: string
@@ -120,6 +122,8 @@ export const UI: Record<Locale, Dict> = {
     productOutOfStock: 'Épuisé',
     productBuy: 'Acheter',
     productSelectSizeError: 'Choisissez une taille.',
+    productFitLabel: 'Coupe',
+    productImagePosition: 'Image {n} de {total}',
     orderConfirmedTitle: 'Commande confirmée',
     orderConfirmedBody:
       'Merci pour votre commande. Un courriel de confirmation vous a été envoyé.',
@@ -180,6 +184,8 @@ export const UI: Record<Locale, Dict> = {
     productOutOfStock: 'Out of stock',
     productBuy: 'Buy now',
     productSelectSizeError: 'Choose a size.',
+    productFitLabel: 'Fit',
+    productImagePosition: 'Image {n} of {total}',
     orderConfirmedTitle: 'Order confirmed',
     orderConfirmedBody: 'Thanks for your order. A confirmation email is on its way.',
     orderCancelledTitle: 'Order cancelled',
@@ -191,4 +197,16 @@ export const UI: Record<Locale, Dict> = {
 
 export function t(locale: Locale): Dict {
   return UI[locale]
+}
+
+/**
+ * Minimal `{token}` interpolation for the handful of Dict strings that need
+ * a value (e.g. "Image {n} de {total}"). French word order differs from
+ * English, so a positional or concatenated string wouldn't be translatable —
+ * this keeps the whole sentence in ui.ts, editable as one piece.
+ */
+export function fmt(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in vars ? String(vars[key]) : match
+  )
 }
