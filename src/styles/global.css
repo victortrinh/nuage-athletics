@@ -84,7 +84,7 @@ button, input, textarea, select, img, video { border-radius: 0; }
    indicator rather than their visually-hidden real <input>. */
 @utility focus-block {
   outline: 2px solid var(--color-accent-ink);
-  outline-offset: 2px;
+  outline-offset: 4px;
 }
 
 :focus-visible {

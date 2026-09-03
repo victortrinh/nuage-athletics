@@ -6,9 +6,17 @@ import { cva } from 'class-variance-authority'
  * password field is set in a wide-tracked monospace to read like a PIN
  * entry. Also imported directly by .astro (GateScreen.astro) — keep this
  * file free of React/RAC imports.
+ *
+ * No focus-visible:border-accent-ink and no focus:outline-none: the global
+ * :focus-visible rule in global.css is unlayered CSS, which wins over any
+ * Tailwind utility layer regardless — so focus:outline-none never actually
+ * suppressed anything, and the accent-colored border fired at the same time
+ * as the outline box. On an input whose only visible edge is this one
+ * bottom line, that doubled signal read as one dense rectangle sitting
+ * right on the text rather than two separate cues.
  */
 export const inputVariants = cva(
-  'w-full border-0 border-b border-ink bg-transparent px-0 py-2 transition-colors focus:outline-none focus-visible:border-accent-ink',
+  'w-full border-0 border-b border-ink bg-transparent px-0 py-2 transition-colors',
   {
     variants: {
       variant: {
