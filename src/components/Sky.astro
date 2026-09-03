@@ -34,7 +34,11 @@
     function applyLabel() {
       if (!toggle) return
       const key = paused ? 'resumeLabel' : 'pauseLabel'
-      toggle.textContent = toggle.dataset[key] ?? ''
+      toggle.setAttribute('aria-label', toggle.dataset[key] ?? '')
+      // Wind lines promise what the click does, same as the label: shown
+      // while paused (click animates), hidden while already animating
+      // (click freezes it still).
+      toggle.querySelector('.sky-icon-wind')?.toggleAttribute('hidden', !paused)
     }
 
     function requestIdle(cb: () => void) {

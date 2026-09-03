@@ -1,5 +1,5 @@
 ---
-import { LOCALES, type Locale } from '../i18n/config'
+import { LOCALES, LOCALE_LABEL, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
 
@@ -25,7 +25,8 @@ if (!routeId && !href) {
   href={href ?? route(routeId!, other)}
   hreflang={other}
   rel="alternate"
+  aria-label={t(locale).switchTo}
   class="text-xs tracking-widest uppercase underline underline-offset-4 opacity-70 hover:opacity-100"
 >
-  {t(locale).switchTo}
+  {LOCALE_LABEL[other]}
 </a>

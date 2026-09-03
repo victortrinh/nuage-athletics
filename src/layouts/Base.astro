@@ -40,24 +40,43 @@ const year = new Date().getFullYear()
     </a>
     <Sky />
     <header class="sticky top-0 z-40 border-b border-line bg-paper px-6 pt-safe pb-4 sm:px-10">
-      <div class="mx-auto flex max-w-6xl items-center justify-between gap-6">
+      <div class="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-6">
+        <div aria-hidden="true"></div>
         <a
           href={route('home', locale)}
           aria-label={d.brand}
-          class="text-xl hover:text-accent-ink"
+          class="justify-self-center text-xl hover:text-accent-ink"
         >
           <Logo variant="wordmark" />
         </a>
-        <div class="flex items-center gap-6">
+        <div class="flex items-center justify-end gap-6">
           <button
             type="button"
             id="sky-toggle"
             hidden
             data-pause-label={d.skyPause}
             data-resume-label={d.skyResume}
+            aria-label={d.skyPause}
             class={buttonVariants({ variant: 'quiet' })}
           >
-            {d.skyPause}
+            <svg
+              class="h-4 w-6"
+              viewBox="0 0 26 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M11 14.5a3.5 3.5 0 0 1-.4-6.98A4.5 4.5 0 0 1 19.4 6a3.6 3.6 0 0 1 .6 7.15V14.5H11Z"
+              ></path>
+              <g class="sky-icon-wind" hidden>
+                <line x1="1" y1="6" x2="4" y2="6"></line>
+                <line x1="0.5" y1="9.5" x2="5.5" y2="9.5"></line>
+              </g>
+            </svg>
           </button>
           <LocaleSwitcher {locale} {routeId} href={localeHref} />
         </div>
