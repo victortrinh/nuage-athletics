@@ -108,3 +108,98 @@ test('the nav trigger’s strokes drift on hover', async ({ page }) => {
   await page.getByRole('button', { name: 'Menu' }).hover()
   await expect(stroke).not.toHaveCSS('translate', 'none')
 })
+
+/**
+ * Regression test for the engine reading a backgrounded tab as a stalled
+ * renderer and giving up on it (src/components/sky/engine.ts, the
+ * SLOW_MS_HARD_CEILING path fed by an unresynced `lastTime`).
+ *
+ * Real OS-level tab backgrounding isn't reliably reproducible from a
+ * headless Playwright run — switching pages with bringToFront() doesn't
+ * dependably flip document.visibilityState under headless Chromium, since
+ * there's no real window compositor deciding what's "in front". The engine's
+ * only contract with the browser is `document.visibilityState` plus the
+ * `visibilitychange` event, so this drives that interface directly rather
+ * than chasing OS-level backgrounding semantics a headless run can't give it.
+ */
+test('the sky survives being backgrounded for longer than the old degrade ceiling', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const canvas = page.locator('.sky-canvas')
+  await expect(canvas).toHaveCSS('opacity', '1', { timeout: 15_000 })
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+
+  // Comfortably past SLOW_MS_HARD_CEILING (3000ms) in engine.ts — the rAF
+  // loop is genuinely suspended for this whole span since onVisibility
+  // stops rescheduling once `hidden` is true.
+  await page.waitForTimeout(4_000)
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+
+  await expect(canvas).toHaveCSS('opacity', '1')
+  const gaveUp = await page.evaluate(() => sessionStorage.getItem('na-sky-gaveup'))
+  expect(gaveUp).toBeNull()
+})
+
+/**
+ * Regression test for the shader clock running on absolute wall-clock time
+ * (`(now - mountTime) / 1000` in the old engine.ts): pausing didn't stop the
+ * clock, so resuming after a few seconds snapped the cloud field forward
+ * instead of resuming from where it froze. preserveDrawingBuffer: true
+ * (engine.ts) exists specifically so a test can read the canvas back like
+ * this.
+ */
+test('pausing and resuming the sky does not jump the cloud field', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const toggle = page.locator('#sky-toggle')
+  await expect(toggle).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('.sky-canvas')).toHaveCSS('opacity', '1')
+
+  const sampleCanvas = () =>
+    page.evaluate(() => {
+      const canvas = document.querySelector('canvas.sky-canvas') as HTMLCanvasElement
+      const off = document.createElement('canvas')
+      off.width = 32
+      off.height = 32
+      const ctx = off.getContext('2d')!
+      ctx.drawImage(canvas, 0, 0, 32, 32)
+      return Array.from(ctx.getImageData(0, 0, 32, 32).data)
+    })
+
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('data-paused', 'true')
+
+  const before = await sampleCanvas()
+  await page.waitForTimeout(3_000)
+
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('data-paused', 'false')
+  // Let the resumed loop paint a frame.
+  await page.waitForTimeout(200)
+
+  const after = await sampleCanvas()
+
+  let totalDiff = 0
+  for (let i = 0; i < before.length; i++) totalDiff += Math.abs(before[i] - after[i])
+  const meanDiff = totalDiff / before.length
+
+  // A frozen-then-resumed field differs only by render noise; a field that
+  // jumped 3s of drift differs by a lot more across a 32x32 sample.
+  expect(meanDiff).toBeLessThan(2)
+})
