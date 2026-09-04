@@ -63,6 +63,13 @@ These look like arbitrary choices and are not. Do not "simplify" them.
   once for `button`/`summary`/`[role=button]`; a `<label>` that *is* the control
   (checkbox.tsx, radio-group.tsx) still has to say `cursor-pointer` itself,
   because no selector can tell those apart from an ordinary label.
+- **The Cloudflare Workers Builds GitHub integration comments on every push**
+  (`cloudflare-workers-and-pages[bot]`, posted as `issue_comment.created` then
+  edited to `issue_comment.edited` once the build finishes). This is pure
+  status noise — the same result is already the `Workers Builds:
+  nuage-athletics` check run. When watching a PR, don't investigate or reply
+  to this bot's comments; just note the deploy status from the check run and
+  move on.
 
 ## Conventions
 

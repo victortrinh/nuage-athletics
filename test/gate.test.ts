@@ -47,7 +47,10 @@ describe('token', () => {
 
   it('rejects a tampered signature', async () => {
     const token = await issueToken(PASSWORD)
-    expect(await tokenIsValid(PASSWORD, `${token.slice(0, -1)}0`)).toBe(false)
+    // The signature is hex, so flipping the last character to a fixed digit
+    // is a no-op ~1/16 of the time; pick a digit guaranteed to differ.
+    const tamperedDigit = token.endsWith('0') ? '1' : '0'
+    expect(await tokenIsValid(PASSWORD, `${token.slice(0, -1)}${tamperedDigit}`)).toBe(false)
   })
 
   it('rejects an expiry moved into the future without a matching signature', async () => {
