@@ -264,13 +264,35 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 }
 
 /*
- * The nav drawer (NavMenu.tsx) slides in on keyframes rather than a
- * transition — react-aria-components detects the *end* of a CSS animation to
- * know when it's safe to unmount an exiting Modal, and that detection only
- * hooks animationend, not transitionend. motion-safe: gates the keyframes at
- * their call site in NavMenu.tsx, not here, matching how `press` gates its
- * own transform.
+ * The nav drawer (#nav-drawer, Base.astro) slides in on keyframes rather
+ * than a transition: a transition never starts on an element whose display
+ * just flipped from none to flex in the same tick, which is exactly what
+ * <dialog>.showModal() does, while a keyframe animation doesn't care what
+ * the "before" state was. Base.astro's script sets data-state to drive
+ * these and listens for 'animationend' to know when the exit has finished
+ * and it's safe to call .close().
+ *
+ * Gated at prefers-reduced-motion here rather than per rule, since every
+ * caller needs the same gate: under `reduce`, animation-name never
+ * resolves to anything, so 'animationend' never fires — the script checks
+ * the same media query before ever setting data-state to 'exiting', so it
+ * closes immediately instead of waiting for an event that isn't coming.
  */
+@media (prefers-reduced-motion: no-preference) {
+  #nav-drawer[data-state='entering'] {
+    animation: veil-in 200ms ease-out;
+  }
+  #nav-drawer[data-state='exiting'] {
+    animation: veil-out 150ms ease-in;
+  }
+  #nav-drawer[data-state='entering'] #nav-drawer-panel {
+    animation: drawer-in 300ms ease-out;
+  }
+  #nav-drawer[data-state='exiting'] #nav-drawer-panel {
+    animation: drawer-out 200ms ease-in;
+  }
+}
+
 @keyframes drawer-in { from { translate: -100% 0; } to { translate: 0 0; } }
 @keyframes drawer-out { from { translate: 0 0; } to { translate: -100% 0; } }
 @keyframes veil-in { from { opacity: 0; } to { opacity: 1; } }

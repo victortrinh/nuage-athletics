@@ -1,0 +1,67 @@
+---
+/**
+ * The nav drawer's trigger and close icons — the same three unequal-length
+ * rounded strokes the sky toggle's wind lines use (Base.astro), read as
+ * cloud strata rather than a generic hamburger. Plain .astro, not a React
+ * island: it's static markup with a CSS-only hover animation, so it ships
+ * no JS at all, same as everything else on the site apart from the drawer's
+ * own open/close script.
+ *
+ * `bars` drifts each stroke a different distance on hover, staggered, so
+ * the set reads as wind rather than a rigid block. `close` is a static X at
+ * the same geometry, used inside the open panel — there is no morph
+ * animation from one to the other: the close button sits at the trigger's
+ * own position once the panel is open, and that position continuity is
+ * what reads as the transformation, the same way GateScreen's disclosure
+ * doesn't animate its own marker.
+ */
+interface Props {
+  variant: 'bars' | 'close'
+}
+
+const { variant } = Astro.props
+---
+
+<svg
+  class="h-4 w-6 overflow-visible"
+  viewBox="0 0 26 16"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.4"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  {
+    variant === 'bars' ? (
+      <>
+        <line
+          x1="3"
+          y1="4"
+          x2="23"
+          y2="4"
+          class="motion-safe:transition-[translate] motion-safe:duration-300 motion-safe:ease-out motion-safe:group-hover:translate-x-[2px]"
+        />
+        <line
+          x1="3"
+          y1="8"
+          x2="17"
+          y2="8"
+          class="motion-safe:transition-[translate] motion-safe:duration-300 motion-safe:delay-75 motion-safe:ease-out motion-safe:group-hover:translate-x-[3px]"
+        />
+        <line
+          x1="3"
+          y1="12"
+          x2="20"
+          y2="12"
+          class="motion-safe:transition-[translate] motion-safe:duration-300 motion-safe:delay-150 motion-safe:ease-out motion-safe:group-hover:translate-x-[1px]"
+        />
+      </>
+    ) : (
+      <>
+        <line x1="6" y1="3" x2="20" y2="13" />
+        <line x1="20" y1="3" x2="6" y2="13" />
+      </>
+    )
+  }
+</svg>

@@ -353,10 +353,13 @@ test('the wordmark dot stays put on hover under prefers-reduced-motion', async (
 })
 
 /**
- * The nav drawer (NavMenu.tsx) is the site's one modal — worth its own
- * coverage beyond axe, which only ever scans the closed page (a11y.e2e.ts
- * force-opens <details> disclosures before scanning, but has no equivalent
- * for a dialog that only exists once triggered).
+ * The nav drawer (#nav-drawer, Base.astro) is the site's one modal — worth
+ * its own coverage beyond axe, which only ever scans the closed page
+ * (a11y.e2e.ts force-opens <details> disclosures before scanning, but has
+ * no equivalent for a dialog that only exists once triggered). It's a
+ * native <dialog> shown with showModal(), so the focus trap, the inert
+ * background and the Escape handling are the browser's, not hand-rolled —
+ * this is what proves Chromium is actually holding up its end.
  */
 test('nav drawer opens from its trigger, traps focus, and Escape returns focus to the trigger', async ({
   page,
@@ -369,15 +372,15 @@ test('nav drawer opens from its trigger, traps focus, and Escape returns focus t
   const dialog = page.getByRole('dialog', { name: 'Navigation du site' })
   await expect(dialog).toBeVisible()
 
-  // RAC auto-focuses the dialog on open (it has no auto-focusable field to
-  // prefer, same as the gate's own success panel — see the tabindex="-1"
-  // pattern above) rather than the close button specifically; what matters
+  // showModal()'s own focusing steps land on the first focusable descendant
+  // or the dialog itself, not necessarily the close button — what matters
   // is that focus lands inside the dialog, not outside it.
   const focusIsInsideDialog = await dialog.evaluate((el) => el.contains(document.activeElement))
   expect(focusIsInsideDialog).toBe(true)
 
-  // Tab cycles between the dialog's own controls only — RAC's focus trap —
-  // never escaping to the (aria-hidden) rest of the page.
+  // Tab cycles between the dialog's own controls only — the browser's
+  // native modal focus trap — never escaping to the (now-inert) rest of
+  // the page.
   await page.keyboard.press('Tab')
   const stillInsideDialog = await dialog.evaluate((el) => el.contains(document.activeElement))
   expect(stillInsideDialog).toBe(true)
@@ -420,13 +423,15 @@ test('nav drawer has no axe violations while open', async ({ page }) => {
 /**
  * The reduced-motion mirror of sky-motion.e2e.ts's positive assertion: this
  * project runs under reducedMotion: 'reduce' (playwright.config.ts), so the
- * drawer panel must land in place with no slide, same as the sky toggle's
- * wind lines and the wordmark dot above.
+ * drawer's visible panel (#nav-drawer-panel — the child div that actually
+ * slides; #nav-drawer itself is the full-viewport scrim) must land in place
+ * with no slide, same as the sky toggle's wind lines and the wordmark dot
+ * above.
  */
 test('nav drawer panel does not slide under prefers-reduced-motion', async ({ page }) => {
   await page.goto(ROUTES.home['fr-CA'])
   await page.getByRole('button', { name: 'Menu' }).click()
 
-  const panel = page.getByRole('dialog', { name: 'Navigation du site' })
+  const panel = page.locator('#nav-drawer-panel')
   await expect(panel).toHaveCSS('translate', 'none')
 })

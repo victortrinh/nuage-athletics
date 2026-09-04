@@ -76,8 +76,8 @@ test('the wordmark dot floats on hover and on keyboard focus', async ({ page }) 
   // Tabbed to, not .focus()'d: :focus-visible is decided by how the element
   // was reached, and a scripted focus after a mouse interaction doesn't
   // match it in Chromium. Three stops — the skip link is first (see
-  // behavior.e2e.ts), the nav drawer trigger second (NavMenu.tsx, first
-  // thing in the header's grid), the home link third.
+  // behavior.e2e.ts), the nav drawer trigger second (#nav-trigger,
+  // Base.astro, first thing in the header's grid), the home link third.
   await page.keyboard.press('Tab')
   await page.keyboard.press('Tab')
   await page.keyboard.press('Tab')
@@ -93,11 +93,11 @@ test('the wordmark dot floats on hover and on keyboard focus', async ({ page }) 
 })
 
 /**
- * The nav drawer trigger's three strokes (NavMenu.tsx's NavIcon) are the
- * hamburger equivalent of the sky toggle's wind lines above — they drift on
- * hover instead of appearing, and only under real motion preferences.
- * behavior.e2e.ts holds the mirror assertion that they stay put under
- * prefers-reduced-motion.
+ * The nav drawer trigger's three strokes (#nav-trigger, Base.astro, drawn by
+ * NavIcon.astro) are the hamburger equivalent of the sky toggle's wind lines
+ * above — they drift on hover instead of appearing, and only under real
+ * motion preferences. behavior.e2e.ts holds the mirror assertion that they
+ * stay put under prefers-reduced-motion.
  */
 test('the nav trigger’s strokes drift on hover', async ({ page }) => {
   await page.goto(ROUTES.home['fr-CA'])
