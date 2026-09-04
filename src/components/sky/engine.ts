@@ -20,6 +20,14 @@ export interface SkyOptions {
    * permanently unavailable rather than offering another attempt.
    */
   onUnavailable?: () => void
+  /**
+   * Called when the GPU context was reclaimed by the browser (not a
+   * performance give-up) and has since been restored. Every GL object from
+   * the old context is invalid at this point, so recovery means mounting a
+   * fresh instance on the same canvas rather than patching resources back —
+   * the caller is expected to call mountSky again from here.
+   */
+  onContextRestored?: () => void
 }
 
 /** Desktop frame-time budget. Loosened on coarse pointers below, where the
@@ -304,17 +312,43 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
   let hidden = document.visibilityState === 'hidden'
   function onVisibility() {
     hidden = document.visibilityState === 'hidden'
-    if (!hidden && !paused) scheduleFrame()
+    if (!hidden && !paused) {
+      resync()
+      scheduleFrame()
+    }
   }
   document.addEventListener('visibilitychange', onVisibility)
 
-  const mountTime = performance.now()
+  let clock = 0
   let rafId: number | null = null
   let lastTime = performance.now()
   let simAccumulator = 0
   let emaFrameMs = 16
   let slowMs = 0
   let degradeTier = 0
+  /** A gap this long is a stalled rAF (backgrounded tab, sleeping laptop,
+   * blocked main thread), not a slow renderer — feeding it to the degrade
+   * ladder below reads as catastrophic slowness and gives the whole sky up
+   * on the first frame back. */
+  const STALL_MS = 500
+
+  // Shared by the visibility resume path and the stall guard in frame():
+  // the pointer listener keeps updating latestX/Y while nothing is
+  // stepping, so the first sim step after a gap would otherwise splat a
+  // streak from the stale prevFrameX/Y to wherever the cursor is now — the
+  // same failure mode the first-sample guard in onPointerMove exists to
+  // avoid, just triggered by a gap instead of a fresh mount.
+  function resyncPointer() {
+    prevFrameX = latestX
+    prevFrameY = latestY
+    movedSinceLastFrame = false
+  }
+
+  function resync() {
+    lastTime = performance.now()
+    simAccumulator = 0
+    resyncPointer()
+  }
 
   function degrade(hardCeiling: boolean) {
     degradeTier += 1
@@ -360,6 +394,16 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
 
     const rawDt = (now - lastTime) / 1000
     lastTime = now
+
+    if (rawDt * 1000 > STALL_MS) {
+      // Treat this exactly like a fresh resume: don't judge the gap as slow
+      // frames, and don't let a stale pointer position draw a wake streak.
+      simAccumulator = 0
+      resyncPointer()
+      scheduleFrame()
+      return
+    }
+
     const dt = Math.min(rawDt, 1 / 15)
 
     emaFrameMs = emaFrameMs * 0.9 + rawDt * 1000 * 0.1
@@ -379,7 +423,8 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
       if (simAccumulator > simDt * 4) simAccumulator = 0
     }
 
-    renderCloud((now - mountTime) / 1000)
+    clock += dt
+    renderCloud(clock)
     scheduleFrame()
   }
 
@@ -449,27 +494,51 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
 
   // Fade the canvas in once the first real frame has painted.
   requestAnimationFrame(() => {
-    renderCloud((performance.now() - mountTime) / 1000)
+    renderCloud(clock)
     canvas.style.opacity = '1'
     lastTime = performance.now()
     scheduleFrame()
   })
+
+  function onContextLost(e: Event) {
+    // Without preventDefault() the browser never attempts to restore the
+    // context — this is the one call in this whole file that has to run
+    // synchronously inside the event handler.
+    e.preventDefault()
+    stop()
+    canvas.style.opacity = '0'
+  }
+  function onContextRestoredEvent() {
+    // Every GL object built against the old context is invalid now; patching
+    // them back individually isn't worth it when the caller can just mount a
+    // fresh instance on the same canvas.
+    destroy()
+    options.onContextRestored?.()
+  }
+  canvas.addEventListener('webglcontextlost', onContextLost)
+  canvas.addEventListener('webglcontextrestored', onContextRestoredEvent)
+
+  function destroy() {
+    stop()
+    window.removeEventListener('resize', onResize)
+    window.removeEventListener('pointermove', onPointerMove)
+    document.removeEventListener('visibilitychange', onVisibility)
+    canvas.removeEventListener('webglcontextlost', onContextLost)
+    canvas.removeEventListener('webglcontextrestored', onContextRestoredEvent)
+    if (resizeTimer) clearTimeout(resizeTimer)
+  }
 
   return {
     setPaused(next: boolean) {
       paused = next
       if (paused) stop()
       else {
-        lastTime = performance.now()
+        resync()
         scheduleFrame()
       }
     },
     destroy() {
-      stop()
-      window.removeEventListener('resize', onResize)
-      window.removeEventListener('pointermove', onPointerMove)
-      document.removeEventListener('visibilitychange', onVisibility)
-      if (resizeTimer) clearTimeout(resizeTimer)
+      destroy()
       try {
         const ext = gl.getExtension('WEBGL_lose_context') as { loseContext(): void } | null
         ext?.loseContext()
