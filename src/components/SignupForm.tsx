@@ -26,6 +26,23 @@ interface Props {
    * whoever adds a second one. Falls back to a fixed id when omitted.
    */
   idPrefix?: string
+  /**
+   * The page this form lives on, e.g. `/acces/` or the current product path
+   * — carried as a hidden field so /api/subscribe knows where to bounce a
+   * no-JS submit back to. Omitted only means a caller forgot; the endpoint
+   * falls back to '/' rather than failing.
+   */
+  redirectTo?: string
+  /**
+   * A no-JS submit can't stay on the page to render its own result — the
+   * endpoint redirects back here with the outcome folded into the URL
+   * ('se=<code>' or 'sent=1') instead, and the caller reads that back out of
+   * `Astro.url.searchParams` and passes it straight through as one of these
+   * two. Server render and first client render then agree on `state` from
+   * the same props, so there's nothing for hydration to reconcile.
+   */
+  initialErrorCode?: string
+  initialSuccess?: boolean
 }
 
 type State =
@@ -33,6 +50,18 @@ type State =
   | { kind: 'submitting' }
   | { kind: 'success' }
   | { kind: 'error'; code: string; message: string }
+
+function errorMessage(d: Dict, code: string): string {
+  const map: Record<string, string> = {
+    invalid_email: d.errorEmail,
+    consent_required: d.errorConsent,
+    rate_limited: d.errorRate,
+    already_subscribed: d.alreadySubscribed,
+    challenge_failed: d.errorChallenge,
+    email_failed: d.errorEmailSend,
+  }
+  return map[code] ?? d.errorGeneric
+}
 
 declare global {
   interface Window {
@@ -53,8 +82,17 @@ export default function SignupForm({
   source,
   submitLabel,
   idPrefix = 'signup',
+  redirectTo,
+  initialErrorCode,
+  initialSuccess,
 }: Props) {
-  const [state, setState] = useState<State>({ kind: 'idle' })
+  const [state, setState] = useState<State>(() => {
+    if (initialSuccess) return { kind: 'success' }
+    if (initialErrorCode) {
+      return { kind: 'error', code: initialErrorCode, message: errorMessage(d, initialErrorCode) }
+    }
+    return { kind: 'idle' }
+  })
   const [email, setEmail] = useState('')
   const [consent, setConsent] = useState(false)
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -159,19 +197,11 @@ export default function SignupForm({
         return
       }
 
-      const map: Record<string, string> = {
-        invalid_email: d.errorEmail,
-        consent_required: d.errorConsent,
-        rate_limited: d.errorRate,
-        already_subscribed: d.alreadySubscribed,
-        challenge_failed: d.errorChallenge,
-        email_failed: d.errorEmailSend,
-      }
       const code = data.code ?? ''
       // Turnstile tokens are single use. Without a reset, retrying after an
       // error submits the spent token and fails the challenge every time.
       resetTurnstile()
-      setState({ kind: 'error', code, message: map[code] ?? d.errorGeneric })
+      setState({ kind: 'error', code, message: errorMessage(d, code) })
     } catch {
       resetTurnstile()
       setState({ kind: 'error', code: 'network', message: d.errorGeneric })
@@ -207,7 +237,13 @@ export default function SignupForm({
           <p className="mt-2 text-sm text-mute">{d.successBody}</p>
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="max-w-md w-full" noValidate>
+        <form
+          method="POST"
+          action="/api/subscribe"
+          onSubmit={onSubmit}
+          className="max-w-md w-full"
+          noValidate
+        >
           {/* honeypot — real users never fill this */}
           <input
             type="text"
@@ -217,6 +253,18 @@ export default function SignupForm({
             aria-hidden="true"
             className="absolute -left-[9999px] h-0 w-0 opacity-0"
           />
+
+          {/*
+            Carries what the fetch body in onSubmit sends explicitly, for the
+            native POST a no-JS (or not-yet-hydrated) submit falls back to.
+            onSubmit's own fetch call ignores these — it reads `email`/
+            `locale`/`source`/`consent` from component state and props, not
+            from FormData — so there's nothing here for the hydrated path to
+            get out of sync with.
+          */}
+          <input type="hidden" name="locale" value={locale} />
+          {source && <input type="hidden" name="source" value={source} />}
+          {redirectTo && <input type="hidden" name="redirect" value={redirectTo} />}
 
           <TextField
             id={`${idPrefix}-email`}

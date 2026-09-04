@@ -115,10 +115,18 @@ export function isGatePath(pathname: string): boolean {
  * Only same-origin paths may be redirected to after a successful unlock.
  * An absolute URL or a protocol-relative `//evil.example` would turn the gate
  * into an open redirect.
+ *
+ * `excludeGatePath` defaults to true for the password gate's own `to` field,
+ * which must not loop back to the gate screen itself once unlocked. The
+ * signup form's redirect-back target (src/pages/api/subscribe.ts) is the
+ * gate screen by design — that's where the form lives — so it opts out.
  */
-export function safeRedirect(target: string | null): string {
+export function safeRedirect(
+  target: string | null,
+  { excludeGatePath = true }: { excludeGatePath?: boolean } = {}
+): string {
   if (!target) return '/'
   if (!target.startsWith('/') || target.startsWith('//')) return '/'
-  if (isGatePath(target.split('?')[0])) return '/'
+  if (excludeGatePath && isGatePath(target.split('?')[0])) return '/'
   return target
 }

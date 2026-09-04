@@ -89,7 +89,14 @@ These look like arbitrary choices and are not. Do not "simplify" them.
   components" — the alternative was one island covering the whole product
   body, which would hydrate the heading, description and spec list for no
   interactive reason, the exact thing the "default to zero JS" rule above
-  rules out.
+  rules out. Because of that coupling, `ProductCarousel` and `ProductActions`
+  must carry the *same* `client:*` directive. `fit-store.ts`'s
+  `useSyncExternalStore` gives each island `initialFit` as its server
+  snapshot — if one hydrated later than the other, picking a fit in the
+  already-hydrated island before the late one attaches would make that late
+  island mount showing the old fit and then visibly snap to the real
+  selection. Both stay `client:load` today for exactly this reason; if that
+  ever changes, it changes for both at once.
 
 ## Component library
 
@@ -99,6 +106,50 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 developed in so far; check whether that still holds before assuming `npx shadcn
 add <component>` will work, and if it does, treat the CLI's raw output as a diff
 to reconcile against these files' existing conventions, not a replacement for them.
+
+**react-aria-components stays.** It was flagged once as a possible violation of
+"default to zero JS" (above) and of SEO. Neither holds: Astro server-renders
+every island to full HTML before any hydration runs, so the crawlable content —
+headings, descriptions, the spec list, `Seo.astro`'s JSON-LD, `ProductView.astro`'s
+`<noscript>` image grid — is in the first response regardless of what hydrates
+afterward, and React only appears on two of sixteen routes in the first place
+(`SignupForm`, `ProductActions`, `ProductCarousel`). What RAC buys — roving-
+tabindex radiogroups, forced-colors indicators, live-region announcements, focus
+restoration — is pinned by ~30 assertions in `e2e/`; hand-rolling the same
+behaviour in vanilla JS to save the bundle weight would trade a tested layer for
+an untested one. `scripts/check-bundle.sh` (run in CI after `npm run build`, not
+part of `npm run check`) puts a number on that weight instead — it gzips every
+`dist/client/_astro/*.js` file and fails past a budget, so a regression here is
+a build failure, not a hunch.
+
+The real gap the migration left was narrower: **an island that wraps a `<form>`
+must degrade to a working native POST**, method/action and all, with hidden
+fields for whatever its hydrated `fetch()` call sends explicitly. `SignupForm.tsx`
+is the reference: `/api/subscribe` branches on `Content-Type` and answers a
+form-encoded POST with a 303 back to the referring page (`redirect` field,
+validated by `safeRedirect()` in `src/lib/gate.ts`) with the outcome folded into
+that page's query string (`sent=1` / `se=<code>`) rather than JSON, since a
+no-JS submit can't stay on the page to render one. The page reads that back out
+of `Astro.url.searchParams` and passes it into the form as `initialSuccess` /
+`initialErrorCode`, so the server render and the first client render agree and
+there's nothing for hydration to reconcile. Turnstile is the one input a no-JS
+POST can never carry — the widget needs JS to render at all — so `subscribe.ts`
+skips the challenge only on that path, leaning instead on the honeypot, the
+per-IP rate limit, and double opt-in; standing anti-abuse for that skip is a
+same-origin check (`isSameOrigin` in `subscribe.ts`), on top of Astro 7's own
+`checkOrigin` middleware, which already rejects a cross-origin form POST before
+any route handler runs.
+
+An island wrapped in a `<details>` that switches from `client:load` to
+`client:visible` gets its hydration deferred until the disclosure actually
+opens, not before — real savings on a page most visitors never expand (the
+gate screen: `GateScreen.astro`). But `client:visible` starting hydration only
+*then*, instead of well before any interaction (as `client:load` does), opens a
+real if narrow window where a fast click on the now-visible control lands before
+React's own handlers attach — `e2e/behavior.e2e.ts`'s `openGateSignup()` waits
+for the island to drop its `ssr` attribute (Astro's own hydration-complete
+signal) before interacting, for exactly this reason. `ProductCarousel` and
+`ProductActions` don't get this treatment — see the `fit-store.ts` note above.
 
 - **Variant tables (`*-variants.ts`) are plain `.ts`, zero React/RAC imports.**
   `.astro` files (`GateScreen.astro`, `Base.astro`) import `buttonVariants`,

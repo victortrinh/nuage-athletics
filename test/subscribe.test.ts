@@ -38,6 +38,43 @@ async function readJson(res: Response) {
   return (await res.json()) as { ok: boolean; code?: string }
 }
 
+function makeFormContext(
+  fields: Record<string, string | undefined>,
+  opts: { ip?: string; origin?: string; omitOriginHeaders?: boolean } = {}
+) {
+  const body = new URLSearchParams()
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) body.set(key, value)
+  }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    ...(opts.ip ? { 'CF-Connecting-IP': opts.ip } : {}),
+  }
+  if (!opts.omitOriginHeaders) {
+    headers.Origin = opts.origin ?? 'https://nuageathletics.com'
+  }
+  const request = new Request('https://nuageathletics.com/api/subscribe', {
+    method: 'POST',
+    headers,
+    body: body.toString(),
+  })
+  return {
+    request,
+    url: new URL(request.url),
+    clientAddress: opts.ip ?? '203.0.113.1',
+  } as Parameters<typeof POST>[0]
+}
+
+function validFormFields(overrides: Record<string, string | undefined> = {}) {
+  return {
+    email: uniqueEmail(),
+    locale: 'fr-CA',
+    consent: 'on',
+    redirect: '/acces/',
+    ...overrides,
+  }
+}
+
 describe('POST /api/subscribe', () => {
   it('accepts a valid signup and stores a pending subscriber', async () => {
     const body = validBody()
@@ -198,5 +235,104 @@ describe('POST /api/subscribe', () => {
     expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200])
     expect(statuses[5]).toBe(429)
     expect(await readJson(results[5])).toEqual({ ok: false, code: 'rate_limited' })
+  })
+
+  it('still rejects a missing Turnstile token when a secret is configured', async () => {
+    // vitest.config.ts binds no TURNSTILE_SECRET_KEY, so every other test in
+    // this file exercises the "no secret configured, don't block" branch.
+    // This is the one that proves the JSON path stays strictly enforced —
+    // unlike the form-encoded path below, which is allowed to skip it.
+    env.TURNSTILE_SECRET_KEY = 'test-secret'
+    try {
+      const body = validBody()
+      const res = await POST(makeContext(body, { ip: '203.0.113.40' }))
+      expect(res.status).toBe(400)
+      expect(await readJson(res)).toEqual({ ok: false, code: 'challenge_failed' })
+    } finally {
+      delete env.TURNSTILE_SECRET_KEY
+    }
+  })
+})
+
+describe('POST /api/subscribe (form-encoded — the no-JS <form> fallback)', () => {
+  it('accepts a valid signup and redirects back to the referring page with sent=1', async () => {
+    const fields = validFormFields()
+    const res = await POST(makeFormContext(fields, { ip: '203.0.113.60' }))
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/acces/?sent=1')
+
+    const row = await env.DB.prepare('SELECT status FROM subscribers WHERE email = ?')
+      .bind(fields.email)
+      .first<{ status: string }>()
+    expect(row?.status).toBe('pending')
+  })
+
+  it('honours the locale hidden field and the English gate path', async () => {
+    const fields = validFormFields({ locale: 'en-CA', redirect: '/en/access/' })
+    const res = await POST(makeFormContext(fields, { ip: '203.0.113.61' }))
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/en/access/?sent=1')
+
+    const row = await env.DB.prepare('SELECT locale FROM subscribers WHERE email = ?')
+      .bind(fields.email)
+      .first<{ locale: string }>()
+    expect(row?.locale).toBe('en-CA')
+  })
+
+  it('bounces back with se=consent_required when the box was left unchecked, and writes no row', async () => {
+    const fields = validFormFields({ consent: undefined })
+    const res = await POST(makeFormContext(fields, { ip: '203.0.113.62' }))
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/acces/?se=consent_required')
+
+    const row = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
+      .bind(fields.email)
+      .first()
+    expect(row).toBeNull()
+  })
+
+  it('overwrites a stale outcome param on the redirect target instead of accumulating it', async () => {
+    const fields = validFormFields({ redirect: '/acces/?se=rate_limited' })
+    const res = await POST(makeFormContext(fields, { ip: '203.0.113.63' }))
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/acces/?sent=1')
+  })
+
+  it('accepts a missing Turnstile token even with a secret configured', async () => {
+    env.TURNSTILE_SECRET_KEY = 'test-secret'
+    try {
+      const fields = validFormFields()
+      const res = await POST(makeFormContext(fields, { ip: '203.0.113.64' }))
+      expect(res.status).toBe(303)
+      expect(res.headers.get('Location')).toBe('/acces/?sent=1')
+    } finally {
+      delete env.TURNSTILE_SECRET_KEY
+    }
+  })
+
+  it('rejects a cross-origin form POST and writes no row', async () => {
+    const fields = validFormFields()
+    const res = await POST(
+      makeFormContext(fields, { ip: '203.0.113.65', origin: 'https://evil.example' })
+    )
+    expect(res.status).toBe(400)
+
+    const row = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
+      .bind(fields.email)
+      .first()
+    expect(row).toBeNull()
+  })
+
+  it('rejects a form POST carrying neither Origin nor Sec-Fetch-Site', async () => {
+    const fields = validFormFields()
+    const res = await POST(makeFormContext(fields, { ip: '203.0.113.66', omitOriginHeaders: true }))
+    expect(res.status).toBe(400)
+  })
+
+  it('falls back to / when the redirect field is missing', async () => {
+    const fields = validFormFields({ redirect: undefined })
+    const res = await POST(makeFormContext(fields, { ip: '203.0.113.67' }))
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/?sent=1')
   })
 })
