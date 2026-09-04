@@ -41,7 +41,7 @@ const year = new Date().getFullYear()
     </a>
     <Sky />
     <header class="sticky top-0 z-40 border-b border-line bg-paper px-6 pt-safe pb-4 sm:px-10">
-      <div class="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-6">
+      <div class="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-6">
         <div aria-hidden="true"></div>
         {/*
           `group` is what lets the wordmark's dot react to hover/focus on the
@@ -111,12 +111,12 @@ const year = new Date().getFullYear()
       </div>
     </header>
 
-    <main id="content" class="mx-auto w-full max-w-6xl flex-1 px-6 sm:px-10">
+    <main id="content" class="mx-auto w-full max-w-7xl flex-1 px-6 sm:px-10">
       <slot />
     </main>
 
     <footer class="mt-16 border-t border-line px-6 py-10 text-xs text-mute sm:px-10">
-      <div class="mx-auto max-w-6xl">
+      <div class="mx-auto max-w-7xl">
         {/*
           underline-sweep, not `hover:underline`: these three are the only
           links on the site with no underline of their own, and a rule that
