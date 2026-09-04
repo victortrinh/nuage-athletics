@@ -241,3 +241,20 @@ links (`fr-CA`, `en-CA`, `x-default`).
 `subscribe.ts` start verifying challenges the tests never send, and the suite
 fails with 400s that look like a code bug. Leave it commented out unless you are
 deliberately exercising Turnstile.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues (`victortrinh/nuage-athletics`), via the `gh` CLI. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See
+`docs/agents/domain.md`.
