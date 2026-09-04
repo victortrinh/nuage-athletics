@@ -43,7 +43,16 @@ jobs:
 
       # playwright.config.ts's webServer builds, migrates a throwaway local
       # D1, and starts `wrangler dev` itself — nothing to start here.
-      - run: npm run test:a11y
+      #
+      # One retry of the whole suite, not just Playwright's own per-test
+      # retries: those rerun a test against the same `wrangler dev`
+      # instance, which doesn't help when the instance itself dies mid-run
+      # (seen once as `wrangler dev` exiting with an esbuild-style error
+      # partway through a run, every later test then failing
+      # ERR_CONNECTION_REFUSED — ci.yml run 33812732925). A full rerun
+      # rebuilds and starts a fresh server instead of retrying into a dead
+      # one.
+      - run: npm run test:a11y || npm run test:a11y
 
       - uses: actions/upload-artifact@v4
         if: failure()
