@@ -35,6 +35,10 @@ interface Props {
    */
   commerceEnabled: boolean
   turnstileSiteKey?: string
+  /** Passed straight through to the notify-me SignupForm — see its own props. */
+  redirectTo?: string
+  initialErrorCode?: string
+  initialSuccess?: boolean
 }
 
 export default function ProductActions({
@@ -46,6 +50,9 @@ export default function ProductActions({
   initialFit,
   commerceEnabled,
   turnstileSiteKey,
+  redirectTo,
+  initialErrorCode,
+  initialSuccess,
 }: Props) {
   const [fit, setFit] = useFit(productId, initialFit)
   // Bound to the size string, not the variant id — with fit added as a
@@ -175,6 +182,9 @@ export default function ProductActions({
                 turnstileSiteKey={turnstileSiteKey}
                 source={`product:${productId}:${fit}:${size ?? 'unspecified'}`}
                 idPrefix={`signup-${productId}`}
+                redirectTo={redirectTo}
+                initialErrorCode={initialErrorCode}
+                initialSuccess={initialSuccess}
               />
             </div>
           </div>

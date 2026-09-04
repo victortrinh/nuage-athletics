@@ -23,6 +23,15 @@ const turnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY
 const to = Astro.url.searchParams.get('to') ?? '/'
 const error = Astro.url.searchParams.get('e')
 const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateErrorBad : null
+
+// /api/subscribe redirects a no-JS signup submit back to this same page with
+// its outcome folded into these two params (see SignupForm.tsx's props and
+// the matching comment in subscribe.ts). A signup outcome must force the
+// disclosure open — otherwise the confirmation or error renders correctly
+// but sits inside a <details> that a fresh page load always starts closed.
+const signupSent = Astro.url.searchParams.get('sent') === '1'
+const signupErrorCode = Astro.url.searchParams.get('se')
+const redirectTo = Astro.url.pathname + Astro.url.search
 ---
 
 {/*
@@ -71,13 +80,18 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
   {/*
     Signup is secondary here — most visitors who reach the gate have the
     password. A native <details> keeps it to one line until someone wants
-    it, and needs no JS of its own. The island still hydrates on load: the
-    form inside is small, and deferring it would leave a form that looks
-    ready but isn't for whoever opens the disclosure immediately. Turnstile
-    is the one part that can't render into a collapsed <details> — see the
-    mount effect in SignupForm.tsx.
+    it, and needs no JS of its own. Forced open when a no-JS submit just
+    bounced back here with an outcome (signupSent / signupErrorCode) — a
+    closed <details> would hide the very message the redirect exists to show.
+
+    The island hydrates on client:visible rather than client:load: the form
+    itself is a working native POST before any JS runs (SignupForm.tsx), so
+    there's no "looks ready but isn't" window to worry about, and a closed
+    disclosure has no layout box for the observer to fire on — most visitors
+    never pay for this island at all. Turnstile still can't render into a
+    collapsed <details>, hence its own toggle listener in SignupForm.tsx.
   */}
-  <details class="mt-12 border-t border-line pt-6">
+  <details class="mt-12 border-t border-line pt-6" open={signupSent || signupErrorCode ? true : undefined}>
     <summary
       class={cn(
         // cursor-pointer is global now (global.css) — <summary> is a
@@ -97,7 +111,16 @@ const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateEr
       {d.gateSignupLede}
     </summary>
     <div class="mt-6">
-      <SignupForm client:load {locale} {d} {turnstileSiteKey} source="gate" />
+      <SignupForm
+        client:visible
+        {locale}
+        {d}
+        {turnstileSiteKey}
+        source="gate"
+        {redirectTo}
+        initialErrorCode={signupErrorCode ?? undefined}
+        initialSuccess={signupSent}
+      />
     </div>
   </details>
 </section>

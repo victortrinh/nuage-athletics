@@ -7,10 +7,20 @@ import { LOCALES } from '../src/i18n/config'
  * The gate screen keeps its SignupForm inside a <details> disclosure, so
  * the form is in the DOM but not rendered until the summary is clicked.
  * Every gate test below needs it open first.
+ *
+ * SignupForm hydrates on client:visible here, which only starts once the
+ * disclosure becomes visible — i.e. right after the click below. Unlike the
+ * old client:load (which had a head start before any test or user could
+ * reach the form), there's now a real window where the checkbox's native
+ * <input> accepts a click before React's onChange is listening — the click
+ * lands, but the (still-unhydrated) `consent` state never sees it. Astro
+ * drops the island's `ssr` attribute the moment hydration finishes, so
+ * waiting for that closes the window before any test interacts.
  */
 async function openGateSignup(page: Page) {
   await page.locator('details > summary').click()
   await expect(page.getByRole('checkbox')).toBeVisible()
+  await page.locator('astro-island:not([ssr])').waitFor({ state: 'attached' })
 }
 
 /**
@@ -75,6 +85,80 @@ test('focus moves into the success panel, and the live region announces it', asy
 
   await expect(page.locator('p[tabindex="-1"]')).toBeFocused()
   await expect(page.locator('[role="status"].sr-only')).toHaveText('Vérifiez vos courriels')
+})
+
+/**
+ * The hydrated path above resolves in place — the URL never changes, and a
+ * success panel replaces the form via React state. A submit that lands
+ * before hydration can't do that: it's a genuine <form action="/api/subscribe">
+ * POST, which follows /api/subscribe's 303 into a full-page navigation (see
+ * the no-JS describe block below). This test pins the hydrated case as
+ * staying put, so the two paths can't quietly collapse into one without a
+ * test noticing.
+ */
+test('a hydrated submit resolves in place, without navigating', async ({ page }) => {
+  await page.goto(ROUTES.gate['fr-CA'])
+
+  await page.route('**/api/subscribe', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+  )
+
+  await openGateSignup(page)
+  await page.getByRole('checkbox').focus()
+  await page.keyboard.press('Space')
+  await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
+  await page.getByRole('button', { name: /m.inscrire/i }).click({ force: true })
+
+  await expect(page.locator('p[tabindex="-1"]')).toHaveText('Vérifiez vos courriels')
+  await expect(page).toHaveURL(new RegExp(`${ROUTES.gate['fr-CA']}$`))
+})
+
+/**
+ * The whole point of SignupForm.tsx's <form method="POST" action="...">:
+ * without this, a no-JS visitor's "notify me" silently does nothing, which
+ * is the bug this branch exists to fix. The gate's disclosure is a native
+ * <details>, so opening it and submitting need no JS of their own — only
+ * the request/response cycle differs from the hydrated tests above.
+ */
+test.describe('signup form works before hydration (no JS)', () => {
+  test.use({ javaScriptEnabled: false })
+
+  test('a native form POST redirects to the confirmation state on success', async ({ page }) => {
+    // The real endpoint always returns email_failed without RESEND_API_KEY
+    // configured (see README) — stub the redirect it would issue on success,
+    // the same shape /api/subscribe itself produces for a form-encoded POST.
+    await page.route('**/api/subscribe', (route) =>
+      route.fulfill({ status: 303, headers: { Location: `${ROUTES.gate['fr-CA']}?sent=1` } })
+    )
+
+    await page.goto(ROUTES.gate['fr-CA'])
+    await page.locator('details > summary').click()
+    await expect(page.getByRole('checkbox')).toBeVisible()
+
+    await page.getByRole('checkbox').focus()
+    await page.keyboard.press('Space')
+    await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
+    await page.getByRole('button', { name: /m.inscrire/i }).click()
+
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.gate['fr-CA']}\\?sent=1$`))
+    // No hydration ever ran, so there's no live region here — just the
+    // static success markup the server rendered from initialSuccess.
+    await expect(page.locator('p[tabindex="-1"]')).toHaveText('Vérifiez vos courriels')
+  })
+
+  test('submitting with consent unchecked bounces back with the French error, disclosure forced open', async ({
+    page,
+  }) => {
+    await page.goto(ROUTES.gate['fr-CA'])
+    await page.locator('details > summary').click()
+    await expect(page.getByRole('checkbox')).toBeVisible()
+
+    await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
+    await page.getByRole('button', { name: /m.inscrire/i }).click()
+
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.gate['fr-CA']}\\?se=consent_required$`))
+    await expect(page.getByRole('alert')).toHaveText('Vous devez accepter de recevoir nos courriels.')
+  })
 })
 
 test('size selector is a real radiogroup with roving-tabindex arrow navigation', async ({

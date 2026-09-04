@@ -28,6 +28,10 @@ jobs:
 
       - run: npm run build
 
+      # Not part of `npm run check` — that's tsc + guards and doesn't build.
+      # See scripts/check-bundle.sh for what this measures and why.
+      - run: bash scripts/check-bundle.sh
+
   a11y:
     runs-on: ubuntu-latest
     steps:
