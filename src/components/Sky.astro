@@ -23,13 +23,21 @@
     setStoredPause,
     clearGaveUp,
   } from './sky/prefs'
-  import type { SkyHandle } from './sky/engine'
+  import type { SkyHandle, mountSky as MountSky } from './sky/engine'
 
   const canvas = document.querySelector<HTMLCanvasElement>('.sky-canvas')
   const toggle = document.getElementById('sky-toggle')
   if (canvas) {
     let handle: SkyHandle | null = null
+    // Set once the dynamic import below resolves, and reused by
+    // onContextRestored to remount without re-importing.
+    let mountSky: typeof MountSky | null = null
     let paused = getStoredPause()
+    // A context that keeps getting reclaimed will keep getting reclaimed —
+    // past this many recoveries in one page life, leave the gradient
+    // fallback showing instead of retrying forever.
+    let remounts = 0
+    const MAX_REMOUNTS = 2
 
     function applyLabel() {
       if (!toggle) return
@@ -54,6 +62,29 @@
       }
     }
 
+    function mount() {
+      if (!mountSky) return
+      handle = mountSky(canvas, {
+        onGiveUp: () => {
+          handle = null
+        },
+        onUnavailable: () => {
+          handle = null
+          // Retrying can't help — the same canvas would fail to build a
+          // context the same way — so don't leave a control that looks
+          // functional but silently does nothing.
+          if (toggle) toggle.hidden = true
+        },
+        onContextRestored: () => {
+          handle = null
+          // paused: the visitor asked for it off, so don't turn it back on
+          // underneath them. Past the cap: it's not recovering, stop trying.
+          if (paused || remounts++ >= MAX_REMOUNTS) return
+          mount()
+        },
+      })
+    }
+
     // userInitiated distinguishes an explicit resume click, which may
     // override the soft blockers (data saver, a past give-up), from
     // auto-start on load, which must not.
@@ -61,20 +92,10 @@
       if (handle || paused) return
       if (userInitiated ? skyBlockedByOs() : skyDisabledByPrefs()) return
       requestIdle(() => {
-        import('./sky/engine').then(({ mountSky }) => {
+        import('./sky/engine').then((mod) => {
+          mountSky = mod.mountSky
           if (paused || handle) return
-          handle = mountSky(canvas, {
-            onGiveUp: () => {
-              handle = null
-            },
-            onUnavailable: () => {
-              handle = null
-              // Retrying can't help — the same canvas would fail to build a
-              // context the same way — so don't leave a control that looks
-              // functional but silently does nothing.
-              if (toggle) toggle.hidden = true
-            },
-          })
+          mount()
         })
       })
     }
