@@ -71,3 +71,19 @@ test('current pagination button stays visually distinct from the others in force
   const other = await pageButtons.nth(1).evaluate((el) => getComputedStyle(el).backgroundColor)
   expect(current).not.toBe(other)
 })
+
+/**
+ * The drawer panel (NavMenu.tsx) relies on bg-paper to stay a legible
+ * ground for its text over the WebGL sky — in forced-colors mode that
+ * background is stripped, so the explicit border (forced-colors:border-
+ * [CanvasText] in NavMenu.tsx) is what keeps the panel visually distinct
+ * from the page behind it.
+ */
+test('nav drawer panel keeps a visible edge in forced-colors', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+  await page.getByRole('button', { name: 'Menu' }).click()
+
+  const panel = page.getByRole('dialog', { name: 'Navigation du site' })
+  const borderStyle = await panel.evaluate((el) => getComputedStyle(el).borderRightStyle)
+  expect(borderStyle).not.toBe('none')
+})

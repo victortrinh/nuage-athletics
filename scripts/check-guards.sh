@@ -20,7 +20,7 @@ fi
 # modules only (src/components/ui/*-variants.ts), never from the .tsx
 # primitives — importing the .tsx would pull react-aria-components into the
 # Astro server graph. See the header comment in button.tsx.
-if grep -rnE "from ['\"]\.\./?.*components/ui/(button|checkbox|radio-group|text-field)(\.tsx)?['\"]" src/ --include=*.astro; then
+if grep -rnE "from ['\"]\.\./?.*components/ui/(button|checkbox|radio-group|text-field|modal)(\.tsx)?['\"]" src/ --include=*.astro; then
   echo "✘ an .astro file imports a react-aria-components .tsx primitive directly" >&2
   fail=1
 fi

@@ -4,6 +4,7 @@ import Seo from '../components/Seo.astro'
 import Sky from '../components/Sky.astro'
 import Logo from '../components/Logo.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
+import { NavMenu } from '../components/NavMenu'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
@@ -40,9 +41,25 @@ const year = new Date().getFullYear()
       {d.skipToContent}
     </a>
     <Sky />
-    <header class="sticky top-0 z-40 border-b border-line bg-paper px-6 pt-safe pb-4 sm:px-10">
+    <header class="sticky top-0 z-40 header-veil px-6 pt-safe pb-4 sm:px-10">
       <div class="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-6">
-        <div aria-hidden="true"></div>
+        <NavMenu
+          client:load
+          links={[
+            { label: d.navHome, href: route('home', locale) },
+            { label: d.privacy, href: route('privacy', locale) },
+            { label: d.terms, href: route('terms', locale) },
+            { label: d.contact, href: 'mailto:hello@nuageathletics.com' },
+            {
+              label: d.instagram,
+              href: 'https://instagram.com/nuageathletics',
+              external: true,
+            },
+          ]}
+          openLabel={d.navMenu}
+          closeLabel={d.navMenuClose}
+          navLabel={d.navLabel}
+        />
         {/*
           `group` is what lets the wordmark's dot react to hover/focus on the
           whole link rather than only on the 3px of glyph under the pointer —
@@ -115,7 +132,7 @@ const year = new Date().getFullYear()
       <slot />
     </main>
 
-    <footer class="mt-16 border-t border-line px-6 py-10 text-xs text-mute sm:px-10">
+    <footer class="mt-24 px-6 py-10 text-xs text-mute sm:px-10">
       <div class="mx-auto max-w-6xl">
         {/*
           underline-sweep, not `hover:underline`: these three are the only
@@ -124,7 +141,7 @@ const year = new Date().getFullYear()
           already built from. It answers :focus-visible too, so tabbing the
           footer gets the affordance and not only the focus outline.
         */}
-        <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
+        <nav aria-label={d.navFooterLabel} class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
           <a href={route('privacy', locale)} class="underline-sweep hover:text-accent-ink">
             {d.privacy}
           </a>
