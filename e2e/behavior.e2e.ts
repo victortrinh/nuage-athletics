@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 import { ROUTES } from '../src/i18n/utils'
 import { LOCALES } from '../src/i18n/config'
 
@@ -349,4 +350,88 @@ test('the wordmark dot stays put on hover under prefers-reduced-motion', async (
   const dot = page.locator('header .logo-dot')
   await page.getByRole('link', { name: 'Nuage Athletics' }).hover()
   await expect(dot).toHaveCSS('translate', 'none')
+})
+
+/**
+ * The nav drawer (#nav-drawer, Base.astro) is the site's one modal — worth
+ * its own coverage beyond axe, which only ever scans the closed page
+ * (a11y.e2e.ts force-opens <details> disclosures before scanning, but has
+ * no equivalent for a dialog that only exists once triggered). It's a
+ * native <dialog> shown with showModal(), so the focus trap, the inert
+ * background and the Escape handling are the browser's, not hand-rolled —
+ * this is what proves Chromium is actually holding up its end.
+ */
+test('nav drawer opens from its trigger, traps focus, and Escape returns focus to the trigger', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const trigger = page.getByRole('button', { name: 'Menu' })
+  await trigger.click()
+
+  const dialog = page.getByRole('dialog', { name: 'Navigation du site' })
+  await expect(dialog).toBeVisible()
+
+  // showModal()'s own focusing steps land on the first focusable descendant
+  // or the dialog itself, not necessarily the close button — what matters
+  // is that focus lands inside the dialog, not outside it.
+  const focusIsInsideDialog = await dialog.evaluate((el) => el.contains(document.activeElement))
+  expect(focusIsInsideDialog).toBe(true)
+
+  // Tab cycles between the dialog's own controls only — the browser's
+  // native modal focus trap — never escaping to the (now-inert) rest of
+  // the page.
+  await page.keyboard.press('Tab')
+  const stillInsideDialog = await dialog.evaluate((el) => el.contains(document.activeElement))
+  expect(stillInsideDialog).toBe(true)
+
+  const links = dialog.getByRole('link')
+  await expect(links).toHaveCount(5)
+  await expect(links.nth(0)).toHaveText('Accueil')
+  await expect(links.nth(1)).toHaveText('Confidentialité')
+  await expect(links.nth(2)).toHaveText('Conditions')
+  await expect(links.nth(3)).toHaveText('Contact')
+  await expect(links.nth(4)).toHaveText('Instagram')
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(trigger).toBeFocused()
+})
+
+test('nav drawer closes when a link is activated', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  await page.getByRole('button', { name: 'Menu' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Navigation du site' })
+  await dialog.getByRole('link', { name: 'Confidentialité' }).click()
+
+  await expect(page).toHaveURL(/\/confidentialite\/?$/)
+})
+
+test('nav drawer has no axe violations while open', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+  await page.getByRole('button', { name: 'Menu' }).click()
+  await expect(page.getByRole('dialog', { name: 'Navigation du site' })).toBeVisible()
+
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .exclude('iframe[src*="challenges.cloudflare.com"]')
+    .analyze()
+  expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
+})
+
+/**
+ * The reduced-motion mirror of sky-motion.e2e.ts's positive assertion: this
+ * project runs under reducedMotion: 'reduce' (playwright.config.ts), so the
+ * drawer's visible panel (#nav-drawer-panel — the child div that actually
+ * slides; #nav-drawer itself is the full-viewport scrim) must land in place
+ * with no slide, same as the sky toggle's wind lines and the wordmark dot
+ * above.
+ */
+test('nav drawer panel does not slide under prefers-reduced-motion', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+  await page.getByRole('button', { name: 'Menu' }).click()
+
+  const panel = page.locator('#nav-drawer-panel')
+  await expect(panel).toHaveCSS('translate', 'none')
 })

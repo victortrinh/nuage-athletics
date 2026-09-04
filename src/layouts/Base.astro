@@ -4,6 +4,7 @@ import Seo from '../components/Seo.astro'
 import Sky from '../components/Sky.astro'
 import Logo from '../components/Logo.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
+import NavIcon from '../components/NavIcon.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
@@ -24,6 +25,17 @@ interface Props {
 const { locale, routeId, alternates, localeHref, title, description, noindex } = Astro.props
 const d = t(locale)
 const year = new Date().getFullYear()
+
+// Resolved here rather than in the drawer's markup so route() and ROUTES
+// stay server-side. Product routes are deliberately absent — they're
+// reached from the page itself, not from chrome.
+const navLinks = [
+  { href: route('home', locale), label: d.navHome },
+  { href: route('privacy', locale), label: d.privacy },
+  { href: route('terms', locale), label: d.terms },
+  { href: 'mailto:hello@nuageathletics.com', label: d.contact },
+  { href: 'https://instagram.com/nuageathletics', label: d.instagram, external: true },
+]
 ---
 
 <!doctype html>
@@ -40,9 +52,73 @@ const year = new Date().getFullYear()
       {d.skipToContent}
     </a>
     <Sky />
-    <header class="sticky top-0 z-40 border-b border-line bg-paper px-6 pt-safe pb-4 sm:px-10">
+    <header class="sticky top-0 z-40 header-veil px-6 pt-safe pb-4 sm:px-10">
       <div class="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-6">
-        <div aria-hidden="true"></div>
+        <div class="flex items-center justify-self-start">
+          {/*
+            The nav drawer, wired by the inline script below — same pattern
+            as #sky-toggle: plain markup plus a small script, no framework.
+            <dialog> is what earns this its accessibility for free: showModal()
+            makes everything outside it inert and puts it in the top layer
+            (above the header's z-40 with no z-index of our own needed),
+            Escape fires a cancel event, and close() restores focus to
+            whatever was focused before — here, the trigger.
+
+            The dialog itself is sized to the full viewport and is the scrim
+            (bg-ink/15); the visible drawer is the child div inside it. That
+            split is what makes click-outside-to-close simple: a click whose
+            target is the dialog element itself (not a descendant) landed on
+            the scrim, not the panel — see the script's click listener.
+          */}
+          <button
+            type="button"
+            id="nav-trigger"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            aria-label={d.navMenu}
+            class={cn(
+              buttonVariants({ variant: 'quiet' }),
+              'group flex size-8 items-center justify-center'
+            )}
+          >
+            <NavIcon variant="bars" />
+          </button>
+          <dialog
+            id="nav-drawer"
+            aria-label={d.navLabel}
+            class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none border-0 bg-ink/15 p-0 [&[open]]:flex"
+          >
+            <div
+              id="nav-drawer-panel"
+              class="flex h-full w-[min(20rem,85vw)] flex-col border-r border-line bg-paper forced-colors:border-[CanvasText] pt-safe pr-6 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pl-[calc(1.5rem+env(safe-area-inset-left,0px))]"
+            >
+              <button
+                type="button"
+                id="nav-drawer-close"
+                aria-label={d.navMenuClose}
+                class={cn(
+                  buttonVariants({ variant: 'quiet' }),
+                  'flex size-8 items-center justify-center self-start'
+                )}
+              >
+                <NavIcon variant="close" />
+              </button>
+              <nav aria-label={d.navLabel} class="mt-10 flex flex-col items-start gap-5 text-base">
+                {
+                  navLinks.map((link) => (
+                    <a
+                      href={link.href}
+                      {...(link.external ? { rel: 'noopener' } : {})}
+                      class="underline-sweep hover:text-accent-ink"
+                    >
+                      {link.label}
+                    </a>
+                  ))
+                }
+              </nav>
+            </div>
+          </dialog>
+        </div>
         {/*
           `group` is what lets the wordmark's dot react to hover/focus on the
           whole link rather than only on the 3px of glyph under the pointer —
@@ -111,11 +187,84 @@ const year = new Date().getFullYear()
       </div>
     </header>
 
+    <script>
+      // Wires the nav drawer declared above. The open/close animations are
+      // CSS @keyframes on #nav-drawer and #nav-drawer-panel (global.css),
+      // triggered by a data-state attribute this script sets — keyframes,
+      // not transitions, because a transition never starts on an element
+      // whose display just flipped from none to flex in the same tick,
+      // which is exactly what showModal() does.
+      const trigger = document.getElementById('nav-trigger')
+      const dialog = document.getElementById('nav-drawer')
+      const closeButton = document.getElementById('nav-drawer-close')
+
+      if (
+        trigger instanceof HTMLButtonElement &&
+        dialog instanceof HTMLDialogElement &&
+        closeButton instanceof HTMLButtonElement
+      ) {
+        function prefersReducedMotion() {
+          return matchMedia('(prefers-reduced-motion: reduce)').matches
+        }
+
+        function open() {
+          dialog.showModal()
+          trigger.setAttribute('aria-expanded', 'true')
+          dialog.dataset.state = 'entering'
+        }
+
+        // Reduced-motion visitors get no animation-name at all (the
+        // keyframes are gated motion-safe in global.css), so 'animationend'
+        // would never fire and the dialog would never close — close it
+        // immediately instead of waiting for an event that isn't coming.
+        function requestClose() {
+          trigger.setAttribute('aria-expanded', 'false')
+          if (prefersReducedMotion()) {
+            dialog.close()
+            return
+          }
+          dialog.dataset.state = 'exiting'
+        }
+
+        dialog.addEventListener('animationend', (event) => {
+          if (event.target !== dialog) return
+          if (dialog.dataset.state === 'exiting') dialog.close()
+          dialog.dataset.state = ''
+        })
+
+        trigger.addEventListener('click', open)
+        closeButton.addEventListener('click', requestClose)
+
+        // Escape's default action closes <dialog> instantly, with no exit
+        // animation — cancel fires first and is cancelable, so intercept it
+        // and drive our own animated close instead.
+        dialog.addEventListener('cancel', (event) => {
+          event.preventDefault()
+          requestClose()
+        })
+
+        // The dialog element itself is the scrim (bg-ink/15, full viewport);
+        // the visible panel is the child div. A click landing on the dialog
+        // and not on a descendant is a click on the scrim.
+        dialog.addEventListener('click', (event) => {
+          if (event.target === dialog) requestClose()
+        })
+
+        // Closed with no animation, not requestClose(): every link here is
+        // a real navigation (including mailto: and the external one), so
+        // the page is already on its way out — nothing would see the exit
+        // play.
+        for (const link of dialog.querySelectorAll('a')) {
+          link.addEventListener('click', () => dialog.close())
+        }
+      }
+    </script>
+
     <main id="content" class="mx-auto w-full max-w-7xl flex-1 px-6 sm:px-10">
       <slot />
     </main>
 
-    <footer class="mt-16 border-t border-line px-6 py-10 text-xs text-mute sm:px-10">
+    <footer class="mt-24 px-6 py-10 text-xs text-mute sm:px-10">
       <div class="mx-auto max-w-7xl">
         {/*
           underline-sweep, not `hover:underline`: these three are the only
@@ -124,7 +273,7 @@ const year = new Date().getFullYear()
           already built from. It answers :focus-visible too, so tabbing the
           footer gets the affordance and not only the focus outline.
         */}
-        <nav class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
+        <nav aria-label={d.navFooterLabel} class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
           <a href={route('privacy', locale)} class="underline-sweep hover:text-accent-ink">
             {d.privacy}
           </a>

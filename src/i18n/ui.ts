@@ -18,7 +18,8 @@ import type { Locale } from './config.ts'
  *   - Anything that names a control or is read by a screen reader —
  *     emailLabel, gatePasswordLabel, productSizeLabel, productFitLabel,
  *     productGalleryLabel, productImagePosition, productImagePrev,
- *     productImageNext, skipToContent, switchTo.
+ *     productImageNext, skipToContent, switchTo, navMenu, navMenuClose,
+ *     navLabel, navFooterLabel.
  *     A weather word in an accessible name is a broken accessible name.
  *   - Errors that tell you how to fix the thing — errorEmail, errorConsent,
  *     productSelectSizeError, errorChallenge, errorEmailSend. Cute is hostile
@@ -65,6 +66,13 @@ export type Dict = {
   rights: string
   switchTo: string
   skipToContent: string
+  // nav drawer
+  navMenu: string
+  navMenuClose: string
+  navLabel: string
+  navFooterLabel: string
+  navHome: string
+  instagram: string
   // transactional email
   mailSubject: string
   mailHeading: string
@@ -133,6 +141,12 @@ export const UI: Record<Locale, Dict> = {
     rights: 'Tous droits réservés.',
     switchTo: 'English',
     skipToContent: 'Passer au contenu',
+    navMenu: 'Menu',
+    navMenuClose: 'Fermer le menu',
+    navLabel: 'Navigation du site',
+    navFooterLabel: 'Liens du pied de page',
+    navHome: 'Accueil',
+    instagram: 'Instagram',
     mailSubject: 'Confirmez votre inscription',
     mailHeading: 'Confirmez votre inscription',
     mailBody:
@@ -198,6 +212,12 @@ export const UI: Record<Locale, Dict> = {
     rights: 'All rights reserved.',
     switchTo: 'Français',
     skipToContent: 'Skip to content',
+    navMenu: 'Menu',
+    navMenuClose: 'Close menu',
+    navLabel: 'Site navigation',
+    navFooterLabel: 'Footer links',
+    navHome: 'Home',
+    instagram: 'Instagram',
     mailSubject: 'Confirm your signup',
     mailHeading: 'Confirm your signup',
     mailBody: "Confirm you want our emails. That's the last step before it clears.",

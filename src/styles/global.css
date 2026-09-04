@@ -82,11 +82,13 @@ body {
 }
 
 :root {
-  /* The sticky header's total height, excluding the safe-area inset: 2x the
-     header's py-4 plus the wordmark's line box. Read by #content's
-     scroll-margin and the product buy panel's sticky offset so all three
-     move together if the header's padding ever changes. */
-  --header-h: 3.75rem;
+  /* The sticky header's total height, excluding the safe-area inset. Set by
+     the size-8 (32px) row the sky toggle and nav trigger sit in plus the
+     header's pt-safe/pb-4 padding — not by the wordmark's line box, which is
+     shorter. Read by #content's scroll-margin and the product buy panel's
+     sticky offset so all three move together if the header's padding ever
+     changes. */
+  --header-h: 4rem;
 }
 
 /* Anchor jumps — the skip link, any in-page hash — would otherwise land
@@ -100,6 +102,25 @@ body {
    harmless no-op. */
 @utility pt-safe {
   padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+/* The header is see-through so the sky reads unbroken from the top of the
+   viewport down — but the band under an iPhone's status bar cannot be, or
+   scrolled content renders behind the clock and battery (the collision
+   6b7c736 fixed by making the whole header opaque). Two stacked layers: a
+   solid cap sized to the safe-area inset, and a veil that fades to nothing
+   beneath it. The +1px closes the subpixel seam where the two meet; it's
+   invisible wherever the inset is 0 (every non-notched device, every
+   desktop browser) because the veil is already full-paper at y:0 there. */
+@utility header-veil {
+  background-image:
+    linear-gradient(var(--color-paper), var(--color-paper)),
+    linear-gradient(to bottom, var(--color-paper), transparent);
+  background-repeat: no-repeat;
+  background-size:
+    100% calc(env(safe-area-inset-top, 0px) + 1px),
+    100% 100%;
+  background-position: top, top;
 }
 
 /* Nothing on this site is rounded. Stated once here rather than fighting it
@@ -241,3 +262,38 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
     animation: none !important;
   }
 }
+
+/*
+ * The nav drawer (#nav-drawer, Base.astro) slides in on keyframes rather
+ * than a transition: a transition never starts on an element whose display
+ * just flipped from none to flex in the same tick, which is exactly what
+ * <dialog>.showModal() does, while a keyframe animation doesn't care what
+ * the "before" state was. Base.astro's script sets data-state to drive
+ * these and listens for 'animationend' to know when the exit has finished
+ * and it's safe to call .close().
+ *
+ * Gated at prefers-reduced-motion here rather than per rule, since every
+ * caller needs the same gate: under `reduce`, animation-name never
+ * resolves to anything, so 'animationend' never fires — the script checks
+ * the same media query before ever setting data-state to 'exiting', so it
+ * closes immediately instead of waiting for an event that isn't coming.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  #nav-drawer[data-state='entering'] {
+    animation: veil-in 200ms ease-out;
+  }
+  #nav-drawer[data-state='exiting'] {
+    animation: veil-out 150ms ease-in;
+  }
+  #nav-drawer[data-state='entering'] #nav-drawer-panel {
+    animation: drawer-in 300ms ease-out;
+  }
+  #nav-drawer[data-state='exiting'] #nav-drawer-panel {
+    animation: drawer-out 200ms ease-in;
+  }
+}
+
+@keyframes drawer-in { from { translate: -100% 0; } to { translate: 0 0; } }
+@keyframes drawer-out { from { translate: 0 0; } to { translate: -100% 0; } }
+@keyframes veil-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes veil-out { from { opacity: 1; } to { opacity: 0; } }
