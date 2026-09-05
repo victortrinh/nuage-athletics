@@ -203,3 +203,67 @@ test('pausing and resuming the sky does not jump the cloud field', async ({ page
   // jumped 3s of drift differs by a lot more across a 32x32 sample.
   expect(meanDiff).toBeLessThan(2)
 })
+
+/**
+ * The give-up flag (`na-sky-gaveup`, src/components/sky/prefs.ts) used to be
+ * a plain '1' with no expiry, so a single runtime give-up — which the degrade
+ * ladder could reach off two sub-500ms hitches on hardware that was never
+ * slow — left the static fallback showing on every page the visitor opened
+ * for the rest of the browser session. It now records *when* it happened and
+ * stops suppressing the engine after GAVE_UP_TTL_MS.
+ */
+test('a give-up from earlier in the session stops suppressing the sky', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+  await expect(page.locator('.sky-canvas')).toHaveCSS('opacity', '1', { timeout: 15_000 })
+
+  await page.evaluate(() =>
+    sessionStorage.setItem('na-sky-gaveup', String(Date.now() - 60 * 60 * 1000))
+  )
+  await page.reload()
+
+  await expect(page.locator('.sky-canvas')).toHaveCSS('opacity', '1', { timeout: 15_000 })
+})
+
+/**
+ * The mirror of the above: a give-up recorded *just now* does still suppress
+ * the engine — that part is deliberate, so a device that genuinely can't
+ * render the sim isn't made to re-run the whole ladder on every navigation.
+ * What must not happen is the state going unannounced: the toggle owns the
+ * only route back, so it has to be offering the sky (data-paused=true, wind
+ * lines in) rather than offering to pause a sky that isn't running, and one
+ * click has to be enough.
+ */
+test('a suppressed sky leaves a button that offers it back in one click', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+  const toggle = page.locator('#sky-toggle')
+  await expect(toggle).toBeVisible({ timeout: 15_000 })
+
+  await page.evaluate(() => sessionStorage.setItem('na-sky-gaveup', String(Date.now())))
+  await page.reload()
+
+  await expect(toggle).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('.sky-canvas')).toHaveCSS('opacity', '0')
+  await expect(toggle).toHaveAttribute('data-paused', 'true')
+
+  await toggle.click()
+  await expect(page.locator('.sky-canvas')).toHaveCSS('opacity', '1', { timeout: 15_000 })
+  expect(await page.evaluate(() => sessionStorage.getItem('na-sky-gaveup'))).toBeNull()
+})
+
+/**
+ * Whatever the reason the canvas isn't showing — reduced motion, no WebGL2,
+ * a give-up, a lost context — the layer underneath it is the entire visual.
+ * It is allowed to be quiet; it is not allowed to be a blank white page.
+ */
+test('the sky fallback is a drawn sky, not a flat white field', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const fallback = page.locator('.sky-fallback')
+  await expect(fallback).toHaveCount(1)
+
+  const image = await fallback.evaluate((el) => getComputedStyle(el).backgroundImage)
+  // Several stacked gradients, not one wash. Counting them rather than
+  // asserting the exact stops keeps this from breaking every time the sky is
+  // retouched, while still failing if it collapses back to a single ellipse.
+  expect(image.match(/gradient\(/g)?.length ?? 0).toBeGreaterThanOrEqual(4)
+})

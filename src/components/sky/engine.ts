@@ -30,13 +30,37 @@ export interface SkyOptions {
   onContextRestored?: () => void
 }
 
-/** Desktop frame-time budget. Loosened on coarse pointers below, where the
- * sim already runs at a lower target rate by design. */
+/** Floor of the desktop frame-time budget — the budget itself floats above
+ * this with the display's own refresh cadence (see BUDGET_CEILING_MS).
+ * Loosened on coarse pointers below, where the sim already runs at a lower
+ * target rate by design. */
 const SLOW_FRAME_MS = 22
-/** Accumulated slow time before stepping down a degrade tier. */
+/**
+ * Hard upper bound on the adaptive budget below. A display that refreshes at
+ * 30Hz hands us 33ms frames no matter how little work we do, so a fixed 22ms
+ * budget reads a perfectly healthy panel as a permanently slow renderer —
+ * hence the budget floats up with the observed refresh cadence. This caps how
+ * far it may float, so a device that is genuinely rendering at 20fps can't
+ * hide behind its own slowness: past 40ms per frame it is always over budget.
+ */
+const BUDGET_CEILING_MS = 40
+/**
+ * Most a single frame may charge against the budget below.
+ *
+ * A GC pause, a video decode starting, dragging the window between displays —
+ * all produce one frame of a few hundred milliseconds on hardware that is
+ * otherwise comfortably fast. Charging such a frame its full duration let two
+ * of them inside a second spend the entire allowance and step the ladder down,
+ * which is what retired the sky on machines that were never slow. Sustained
+ * slowness doesn't need the headroom: a renderer genuinely stuck at 50ms per
+ * frame is only ~27ms over budget each time, well under this cap, so it still
+ * accumulates at full rate and still degrades.
+ */
+const MAX_FRAME_DEBIT_MS = 50
+/** Accumulated over-budget time before stepping down a degrade tier. */
 const SLOW_MS_TO_DEGRADE = 1000
-/** Accumulated slow time, still above budget, before skipping straight to
- * giving up rather than walking the remaining tiers. */
+/** Accumulated over-budget time, still above budget, before skipping straight
+ * to giving up rather than walking the remaining tiers. */
 const SLOW_MS_HARD_CEILING = 3000
 
 /** Grayscale range the cloud pass writes within. */
@@ -323,7 +347,15 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
   let rafId: number | null = null
   let lastTime = performance.now()
   let simAccumulator = 0
-  let emaFrameMs = 16
+  /**
+   * Shortest frame seen since mount — a read of how often the display
+   * actually refreshes, since a frame can never come in under one vsync
+   * period however cheap it is. Only ever lowered, so it can't drift upward
+   * on a device that starts fast and then bogs down; a device that is slow
+   * from the first frame keeps a high reading, which is exactly what
+   * BUDGET_CEILING_MS is there to stop from excusing it.
+   */
+  let fastestFrameMs = Number.POSITIVE_INFINITY
   let slowMs = 0
   let degradeTier = 0
   /** A gap this long is a stalled rAF (backgrounded tab, sleeping laptop,
@@ -406,13 +438,25 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
 
     const dt = Math.min(rawDt, 1 / 15)
 
-    emaFrameMs = emaFrameMs * 0.9 + rawDt * 1000 * 0.1
-    if (emaFrameMs > slowFrameMs) {
-      slowMs += rawDt * 1000
+    // A leaky bucket over how far each frame runs *past* budget, rather than
+    // an average of raw frame times. The distinction is the whole point: an
+    // average is dragged upward by one outlier for the dozen-odd frames it
+    // takes to decay back, so a single hitch used to charge the ladder its
+    // own duration and then keep charging it while healthy frames rebuilt the
+    // average. Here a fast frame credits the bucket the moment it lands, and
+    // only time genuinely spent over budget ever accumulates.
+    const frameMs = rawDt * 1000
+    if (frameMs < fastestFrameMs) fastestFrameMs = frameMs
+    const budgetMs = Number.isFinite(fastestFrameMs)
+      ? Math.min(BUDGET_CEILING_MS, Math.max(slowFrameMs, fastestFrameMs * 1.4))
+      : slowFrameMs
+    const overBudgetMs = frameMs - budgetMs
+    if (overBudgetMs > 0) {
+      slowMs += Math.min(overBudgetMs, MAX_FRAME_DEBIT_MS)
       if (slowMs > SLOW_MS_HARD_CEILING) degrade(true)
       else if (slowMs > SLOW_MS_TO_DEGRADE) degrade(false)
     } else {
-      slowMs = Math.max(0, slowMs - rawDt * 1000)
+      slowMs = Math.max(0, slowMs + overBudgetMs)
     }
 
     simAccumulator += dt
