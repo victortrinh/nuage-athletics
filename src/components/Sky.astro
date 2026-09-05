@@ -3,14 +3,19 @@
 // never intercepts pointer events — the pointer-tracking listeners the
 // engine attaches live on `window`, not the canvas, so the wake still
 // carves even though clicks pass straight through to the page underneath.
-// The gradient div is both the pre-JS paint and the permanent fallback for
-// prefers-reduced-motion / low-power devices: the canvas only ever fades in
-// on top of it, so there's never a blank frame or a layout shift.
+// The `sky-fallback` div is both the pre-JS paint and the permanent fallback
+// for prefers-reduced-motion / low-power devices: the canvas only ever fades
+// in on top of it, so there's never a blank frame or a layout shift.
+//
+// That fallback carries a drawn overcast sky (global.css) rather than the
+// near-flat wash it used to, because it is not only the pre-JS frame — it is
+// what a visitor is left looking at whenever the engine gives up, whenever a
+// GPU context can't be recovered, and always under prefers-reduced-motion.
+// A single ellipse reads as a blank white page in all three.
 ---
 
 <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden="true">
-  <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_15%,#ffffff_0%,#f1f1f1_45%,#e2e2e2_100%)]">
-  </div>
+  <div class="sky-fallback absolute inset-0"></div>
   <canvas class="sky-canvas absolute inset-0 h-full w-full opacity-0 transition-opacity duration-[600ms] ease-in-out">
   </canvas>
 </div>
@@ -67,6 +72,15 @@
       handle = mountSky(canvas, {
         onGiveUp: () => {
           handle = null
+          // The loop is stopped and the GL context deliberately dropped, so
+          // the button has to stop claiming it can pause something. Only the
+          // in-memory flag moves — never setStoredPause(): the visitor didn't
+          // ask for this, and writing it to localStorage would carry a
+          // runtime verdict into every future session as if they had. With
+          // the label honest, getting the sky back is one click (resume) and
+          // not two (pause a stopped sky, then resume it).
+          paused = true
+          applyLabel()
         },
         onUnavailable: () => {
           handle = null
@@ -100,7 +114,16 @@
       })
     }
 
-    if (!skyDisabledByPrefs()) start()
+    if (skyDisabledByPrefs()) {
+      // Nothing is going to animate: data saver, a stored pause, or a
+      // give-up recorded recently enough to still be suppressing the engine
+      // (prefs.ts). The reasons differ; what the button should offer doesn't
+      // — the sky, rather than the chance to stop something that isn't
+      // running. In-memory only, for the same reason as onGiveUp above.
+      paused = true
+    } else {
+      start()
+    }
 
     if (toggle) {
       // The toggle only overrides the soft, JS-level preferences (data

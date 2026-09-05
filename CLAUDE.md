@@ -97,6 +97,22 @@ These look like arbitrary choices and are not. Do not "simplify" them.
   island mount showing the old fit and then visibly snap to the real
   selection. Both stay `client:load` today for exactly this reason; if that
   ever changes, it changes for both at once.
+- **The sky is allowed to stop; it is never allowed to leave a white page.**
+  `sky/engine.ts` walks a degrade ladder and eventually gives up (hiding the
+  canvas, dropping the GL context, recording `na-sky-gaveup`), and three rules
+  keep that from reading as a broken site. The `sky-fallback` layer under the
+  canvas (`global.css`) is a drawn overcast deck, not a wash — it is the whole
+  background for reduced-motion, forced-colors and no-WebGL2 visitors, and its
+  densest tone deliberately tracks the shader's own `CLOUD_MIN` so the two
+  read as the same weather; `prefers-contrast: more` flattens it to paper
+  instead. The give-up flag carries a timestamp and expires, so one bad minute
+  can't retire the sky for a whole browsing session. And `Sky.astro` mirrors
+  any non-running state into `#sky-toggle`'s label — *in memory only*, never
+  through `setStoredPause()`, which would persist a runtime verdict as if the
+  visitor had chosen it. The degrade ladder itself charges a leaky bucket the
+  time each frame runs *past* budget, capped per frame: an average of raw
+  frame times let one GC pause spend most of the allowance and cost the sky a
+  tier on hardware that was never slow.
 
 ## Component library
 

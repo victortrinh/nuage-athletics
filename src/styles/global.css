@@ -123,6 +123,59 @@ body {
   background-position: top, top;
 }
 
+/* The static sky behind the WebGL canvas (Sky.astro).
+ *
+ * This is not just the frame before the engine mounts. It is the whole sky
+ * for anyone on prefers-reduced-motion, prefers-contrast, forced-colors or a
+ * device with no WebGL2 — and it is what a visitor is left with when the
+ * engine's degrade ladder gives up mid-session or a lost GPU context can't be
+ * recovered (sky/engine.ts). One near-white ellipse read as a blank page in
+ * every one of those, which is a strange thing for a site named after a
+ * cloud.
+ *
+ * Overlapping soft masses over a vertical wash, all of it static — the
+ * reduced-motion audience is the largest single group that ever sees this and
+ * nothing here may move. Greyscale, and *grey masses on a white ground*
+ * rather than the reverse, because that is what the shader it stands in for
+ * does: CLOUD writes mix(uCloudMax, uCloudMin, density), so density reads
+ * darker and clear sky is the near-white. Depth is matched to the same
+ * source: the densest overlap here measures #d3d3d3 against uCloudMin's
+ * #d1d1d1, so the fallback and the live deck put text on the same tone rather
+ * than the fallback quietly being a lighter, blanker page. (That tone is
+ * 3.7:1 under --color-mute, which the live sky is too — mute-on-sky is a
+ * pre-existing site-wide question, not one this layer introduces.)
+ *
+ * Stated here rather than as an inline arbitrary value for the same reason
+ * header-veil is: nine stacked gradients don't survive Tailwind's bracket
+ * syntax legibly. */
+@utility sky-fallback {
+  background-color: #fcfcfc;
+  background-image:
+    /* upper left, thinned by the sun side */
+    radial-gradient(38% 30% at 18% 24%, rgba(158, 158, 158, 0.24) 0%, rgba(158, 158, 158, 0.21) 42%, rgba(158, 158, 158, 0) 100%),
+    radial-gradient(30% 22% at 34% 16%, rgba(158, 158, 158, 0.21) 0%, rgba(158, 158, 158, 0.18) 40%, rgba(158, 158, 158, 0) 100%),
+    radial-gradient(44% 26% at 62% 32%, rgba(158, 158, 158, 0.22) 0%, rgba(158, 158, 158, 0.19) 45%, rgba(158, 158, 158, 0) 100%),
+    radial-gradient(26% 20% at 82% 22%, rgba(158, 158, 158, 0.19) 0%, rgba(158, 158, 158, 0.16) 40%, rgba(158, 158, 158, 0) 100%),
+    radial-gradient(50% 30% at 12% 62%, rgba(158, 158, 158, 0.24) 0%, rgba(158, 158, 158, 0.20) 45%, rgba(158, 158, 158, 0) 100%),
+    radial-gradient(42% 28% at 48% 74%, rgba(158, 158, 158, 0.26) 0%, rgba(158, 158, 158, 0.22) 45%, rgba(158, 158, 158, 0) 100%),
+    radial-gradient(38% 26% at 86% 66%, rgba(158, 158, 158, 0.22) 0%, rgba(158, 158, 158, 0.19) 42%, rgba(158, 158, 158, 0) 100%),
+    /* the deck's base, wide and mostly below the fold */
+    radial-gradient(70% 34% at 58% 100%, rgba(158, 158, 158, 0.27) 0%, rgba(158, 158, 158, 0.22) 40%, rgba(158, 158, 158, 0) 100%),
+    linear-gradient(to bottom, #ffffff 0%, #fbfbfb 40%, #f6f6f6 100%);
+}
+
+/* Anyone on prefers-contrast: more is already, by osPrefersNoMotion() in
+   sky/prefs.ts, someone who never sees the WebGL deck at all — this layer is
+   their entire background, permanently. They asked for contrast, so they get
+   the plain ground and none of the modelling above. Not a nicety: the masses
+   are what put a 3.7:1 tone under text that is otherwise read on paper. */
+@media (prefers-contrast: more) {
+  .sky-fallback {
+    background-color: var(--color-paper);
+    background-image: none;
+  }
+}
+
 /* Nothing on this site is rounded. Stated once here rather than fighting it
    with rounded-none on every control. */
 button, input, textarea, select, img, video { border-radius: 0; }
