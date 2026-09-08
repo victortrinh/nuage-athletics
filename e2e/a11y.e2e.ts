@@ -87,8 +87,6 @@ for (const path of paths) {
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
-      // Third-party markup, not ours to fix.
-      .exclude('iframe[src*="challenges.cloudflare.com"]')
       .analyze()
 
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])

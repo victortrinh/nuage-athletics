@@ -472,7 +472,6 @@ test('nav drawer has no axe violations while open', async ({ page }) => {
 
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa'])
-    .exclude('iframe[src*="challenges.cloudflare.com"]')
     .analyze()
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
 })

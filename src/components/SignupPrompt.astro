@@ -9,7 +9,6 @@ import type { Dict } from '../i18n/ui'
 interface Props {
   locale: Locale
   d: Dict
-  turnstileSiteKey?: string
   /** The current page, so a no-JS submit's 303 lands back here. */
   redirectTo: string
   /**
@@ -23,8 +22,7 @@ interface Props {
   initialErrorCode?: string
 }
 
-const { locale, d, turnstileSiteKey, redirectTo, initialOpen, initialSuccess, initialErrorCode } =
-  Astro.props
+const { locale, d, redirectTo, initialOpen, initialSuccess, initialErrorCode } = Astro.props
 ---
 
 {/*
@@ -33,12 +31,13 @@ const { locale, d, turnstileSiteKey, redirectTo, initialOpen, initialSuccess, in
   focus would promise modal behaviour it doesn't deliver.
 
   hidden (not display:none via a class) is what the script below flips, the
-  same signal Astro's client:visible directive already watches for on
-  SignupForm below: an island wrapped in something that starts hidden defers
-  its own hydration until that ancestor gets a layout box — see the note in
-  SignupForm.tsx's Turnstile mount effect. That's what lets Turnstile mount
-  correctly with no extra plumbing: hydration itself never starts until the
-  container is genuinely visible.
+  same signal Astro's client:visible directive watches for on SignupForm
+  below: an island wrapped in something that starts hidden defers its own
+  hydration until that ancestor gets a layout box. Most visitors never see
+  this band at all inside the ~6s reveal window (they navigate away, or
+  dismiss it once and it stays suppressed) — client:visible means they never
+  pay SignupForm's hydration cost either, the same reasoning GateScreen.astro
+  uses for its own collapsed <details>.
 
   The reveal itself needs JS (the timer below), so a no-JS visitor would
   otherwise never see this at all — the one JS-dependent thing standing
@@ -78,7 +77,6 @@ const { locale, d, turnstileSiteKey, redirectTo, initialOpen, initialSuccess, in
           client:visible
           {locale}
           {d}
-          {turnstileSiteKey}
           source="popup"
           idPrefix="signup-prompt"
           {redirectTo}

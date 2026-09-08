@@ -1,5 +1,4 @@
 ---
-import { env } from 'cloudflare:workers'
 import '../styles/global.css'
 import Seo from '../components/Seo.astro'
 import Sky from '../components/Sky.astro'
@@ -43,10 +42,6 @@ const navLinks = [
 // Defaults to shown for a page with no routeId — same convention Seo.astro
 // uses for `noindex` when it has no INDEXABLE entry to read.
 const showPrompt = routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true
-// A Worker runtime binding ([vars] in wrangler.toml), not a Vite build-time
-// value — see the matching comment in ProductView.astro.
-const promptTurnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY
-const showTurnstileScript = showPrompt && Boolean(promptTurnstileSiteKey)
 
 // The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
 // submit back to `redirect` with the outcome folded into 'sent'/'se' (see
@@ -316,21 +311,10 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
         <SignupPrompt
           {locale}
           {d}
-          turnstileSiteKey={promptTurnstileSiteKey}
           redirectTo={promptRedirectTo}
           initialOpen={promptInitialOpen}
           initialSuccess={promptSent}
           initialErrorCode={promptErrorCode ?? undefined}
-        />
-      )
-    }
-    {
-      showTurnstileScript && (
-        <script
-          is:inline
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-          async
-          defer
         />
       )
     }

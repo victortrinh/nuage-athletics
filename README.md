@@ -4,7 +4,7 @@ Landing page + email capture for the fall 2026 drop. Commerce is stubbed behind 
 adapter interface and not wired to any page yet.
 
 **Stack:** Astro 7 (static + SSR endpoints) · React islands · Tailwind 4 ·
-Cloudflare Workers · D1 · Resend · Turnstile · Stripe (phase 2)
+Cloudflare Workers · D1 · Resend · Stripe (phase 2)
 
 ---
 
@@ -45,15 +45,11 @@ Without `RESEND_API_KEY` the confirmation email is logged to the console with th
 confirm URL, and the signup endpoint returns `email_failed` — the row is still
 written, so paste the logged URL to finish the double opt-in locally.
 
-Turnstile: `wrangler.toml` ships Cloudflare's always-passes test site key.
-Replace both the site key and `TURNSTILE_SECRET_KEY` before production.
-
 ## Deploy
 
 ```bash
 wrangler kv namespace create SESSION   # adapter expects a SESSION binding
 wrangler secret put RESEND_API_KEY
-wrangler secret put TURNSTILE_SECRET_KEY
 npm run db:migrate:remote
 npm run deploy
 ```
@@ -86,7 +82,6 @@ src/
 │   ├── consent.ts CASL consent version + sender identity
 │   ├── db.ts      D1 queries
 │   ├── email.ts   Resend double opt-in
-│   ├── turnstile.ts
 │   └── commerce/  adapter interface + Stripe impl (phase 2)
 └── pages/
     ├── *.astro    French routes at root
@@ -100,7 +95,6 @@ src/
 
 - [ ] Real mailing address in `src/lib/consent.ts` — CASL requires it in every email
 - [ ] Privacy policy and terms written and legally reviewed (both locales)
-- [ ] Real Turnstile keys
 - [ ] Brand wordmark + typeface
 - [ ] `wrangler d1 create` and real `database_id`
 

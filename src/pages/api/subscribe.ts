@@ -3,7 +3,6 @@ import { env } from 'cloudflare:workers'
 import { z } from 'zod'
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config'
 import { CONSENT_VERSION, consentText } from '../../lib/consent'
-import { verifyTurnstile } from '../../lib/turnstile'
 import { sendConfirmationEmail } from '../../lib/email'
 import { safeRedirect } from '../../lib/gate'
 import {
@@ -22,7 +21,6 @@ const Body = z.object({
   // Must be literally true. A missing or false value is a hard failure —
   // CASL requires express consent, so we never infer it.
   consent: z.literal(true),
-  turnstileToken: z.string().optional(),
   source: z.string().max(500).nullable().optional(),
   company: z.string().optional(), // honeypot
 })
@@ -86,14 +84,15 @@ function emailFailed(error: string | undefined, respond: Responder) {
 }
 
 /**
- * A native form POST can't attach a Turnstile token — the widget needs JS to
- * render at all, so a no-JS visitor never sees a challenge to solve. Standing
- * anti-abuse for that path is the honeypot below, the per-IP rate limit, and
- * double opt-in (nobody joins the list without clicking a link in their
- * inbox). What has to hold instead is that the POST actually came from this
- * site: same-origin only, checked via whichever of Origin / Sec-Fetch-Site
- * the browser sent. Neither present fails closed — every real browser sends
- * at least one on a same-origin POST.
+ * A native form POST is the one path a third-party site could trigger
+ * without JS of its own (a hidden auto-submitting form is the classic CSRF
+ * vector) — this checks the POST actually came from this site: same-origin
+ * only, via whichever of Origin / Sec-Fetch-Site the browser sent. Neither
+ * present fails closed — every real browser sends at least one on a
+ * same-origin POST. The JSON (fetch) path doesn't need this of its own: this
+ * endpoint sends no Access-Control-Allow-Origin header, so a fetch() from
+ * another origin never even reaches here — the browser's own CORS check
+ * blocks it first.
  */
 function isSameOrigin(request: Request, origin: string): boolean {
   const requestOrigin = request.headers.get('Origin')
@@ -128,7 +127,6 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
       // form data entirely when not — never a boolean. Anything else stays
       // falsy, so z.literal(true) below still rejects it.
       consent: consentValue === 'on' || consentValue === 'true',
-      turnstileToken: form.get('turnstileToken') ?? form.get('cf-turnstile-response') ?? undefined,
       source: form.get('source'),
       company: form.get('company') ?? undefined,
     }
@@ -155,17 +153,6 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
   if (ip && (await isRateLimited(env.DB, ip))) {
     return respond.fail('rate_limited', 429)
   }
-
-  // Skip the challenge only on the form-encoded path — see isSameOrigin's
-  // comment for why that's safe. verifyTurnstile treats a missing secret as
-  // "don't block", which is exactly the behaviour wanted here; the JSON path
-  // keeps passing the real secret and stays strictly enforced.
-  const human = await verifyTurnstile(
-    input.turnstileToken,
-    isForm ? undefined : env.TURNSTILE_SECRET_KEY,
-    ip
-  )
-  if (!human) return respond.fail('challenge_failed', 400)
 
   if (ip) await recordAttempt(env.DB, ip)
 

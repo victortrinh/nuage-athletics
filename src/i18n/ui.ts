@@ -22,8 +22,8 @@ import type { Locale } from './config.ts'
  *     navLabel, navFooterLabel, promptClose.
  *     A weather word in an accessible name is a broken accessible name.
  *   - Errors that tell you how to fix the thing — errorEmail, errorConsent,
- *     productSelectSizeError, errorChallenge, errorEmailSend. Cute is hostile
- *     when someone is stuck. Errors that are only "wait and retry"
+ *     productSelectSizeError, errorEmailSend. Cute is hostile when someone
+ *     is stuck. Errors that are only "wait and retry"
  *     (errorGeneric, errorRate) carry the voice instead.
  *   - submitting, successTitle: progress and success are announced through a
  *     live region, where being understood on the first hearing beats charm.
@@ -64,7 +64,6 @@ export type Dict = {
   errorEmail: string
   errorConsent: string
   errorRate: string
-  errorChallenge: string
   errorEmailSend: string
   alreadySubscribed: string
   confirmTitle: string
@@ -141,7 +140,6 @@ export const UI: Record<Locale, Dict> = {
     errorEmail: 'Entrez une adresse courriel valide.',
     errorConsent: 'Vous devez accepter de recevoir nos courriels.',
     errorRate: 'Trop de tentatives. Laissez passer quelques minutes.',
-    errorChallenge: 'La vérification a échoué. Réessayez.',
     errorEmailSend: "L'envoi du courriel a échoué. Réessayez dans un moment.",
     alreadySubscribed: 'Cette adresse est déjà dans nos prévisions.',
     confirmTitle: 'Inscription confirmée',
@@ -212,7 +210,6 @@ export const UI: Record<Locale, Dict> = {
     errorEmail: 'Enter a valid email address.',
     errorConsent: 'You need to agree to receive our emails.',
     errorRate: 'Too many attempts. Let a few minutes pass.',
-    errorChallenge: 'Verification failed. Try again.',
     errorEmailSend: 'Sending the email failed. Try again in a moment.',
     alreadySubscribed: 'That address is already in the forecast.',
     confirmTitle: 'Signup confirmed',
