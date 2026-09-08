@@ -148,7 +148,7 @@ export const CATALOGUE: Record<Locale, Product[]> = {
       slugs: SLUGS['ls-01'],
       name: 'Manches longues 01',
       description:
-        'Un chandail à manches longues en laine mérinos et modal. Plus de détails à venir.',
+        'Un chandail à manches longues en laine mérinos et modal, conçu au Québec et fabriqué en Chine.',
       price: { amount: PLACEHOLDER_PRICE_CENTS, currency: 'CAD' },
       images: allImagePaths(),
       variants: variants('ls-01', 'NA-LS01', 'fr-CA'),
@@ -161,7 +161,7 @@ export const CATALOGUE: Record<Locale, Product[]> = {
       slugs: SLUGS['ls-01'],
       name: 'Long Sleeve 01',
       description:
-        'A long sleeve in merino wool and modal. More details to come.',
+        'A long sleeve in merino wool and modal, designed in Quebec and made in China.',
       price: { amount: PLACEHOLDER_PRICE_CENTS, currency: 'CAD' },
       images: allImagePaths(),
       variants: variants('ls-01', 'NA-LS01', 'en-CA'),
@@ -205,7 +205,13 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
         { label: 'Coupes', value: 'Classique ou crop' },
         { label: 'Tailles', value: 'XS – 2XL' },
         { label: 'Entretien', value: 'Lavage à froid, séchage à plat' },
-        { label: 'Origine', value: 'Fabriqué au Canada' },
+        // Two facts, two rows, on purpose: this brand is designed in Quebec
+        // and manufactured in China, and folding that into one "Origine" row
+        // (as an earlier version of this file did, saying "Fabriqué au
+        // Canada") is exactly the false country-of-manufacture claim the
+        // note on `tagline` in src/i18n/ui.ts warns about. Keep them apart.
+        { label: 'Conception', value: 'Québec, Canada' },
+        { label: 'Fabrication', value: 'Chine' },
       ],
     },
   },
@@ -218,7 +224,8 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
         { label: 'Fits', value: 'Classic or cropped' },
         { label: 'Sizes', value: 'XS – 2XL' },
         { label: 'Care', value: 'Cold wash, dry flat' },
-        { label: 'Origin', value: 'Made in Canada' },
+        { label: 'Design', value: 'Quebec, Canada' },
+        { label: 'Made in', value: 'China' },
       ],
     },
   },

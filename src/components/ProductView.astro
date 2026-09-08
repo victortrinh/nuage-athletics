@@ -57,11 +57,16 @@ const jsonLd = {
   brand: { '@id': organizationId(site) },
   material: editorial.specs[0]?.value,
   /**
-   * "Fabriqué au Canada" is already in the spec list as prose. Saying it in
-   * a field as well is what lets it be read as a fact about the garment
-   * rather than a sentence that happens to mention Canada.
+   * schema.org's countryOfOrigin means country of manufacture, same as a
+   * garment tag — it is not the brand's home country or where it was
+   * designed. This garment is made in China; catalogue.ts's spec list says
+   * so too, split from the separate "Conception"/"Design" row for Quebec so
+   * neither fact is stated in a way that could be misread as the other. A
+   * shopping engine or answer engine reading `countryOfOrigin: 'Canada'`
+   * here — which an earlier version of this field said — would be reading a
+   * false Made-in-Canada claim, not a stylistic choice.
    */
-  countryOfOrigin: { '@type': 'Country', name: 'Canada' },
+  countryOfOrigin: { '@type': 'Country', name: 'China' },
   inLanguage: HTML_LANG[locale],
   ...(commerceEnabled
     ? {
