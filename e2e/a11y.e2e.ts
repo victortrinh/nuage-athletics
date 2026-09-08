@@ -60,6 +60,34 @@ function isKnownSafeConsentLabelOverlap(node: {
   )
 }
 
+// Sky.astro's `sky-fallback` and `sky-canvas` are both `absolute inset-0`
+// inside a `fixed inset-0 -z-10` wrapper — pinned to the viewport, not the
+// document, and `sky-canvas` sits at `opacity-0` until its script fades it
+// in. Two stacked, partly-transparent full-viewport layers at the same
+// query point is what axe can't cleanly resolve into a single background
+// color ("elmPartiallyObscured" — the reverse of the consent label's case
+// above, where the *foreground* text was flagged as obscuring; here it's the
+// flagged text's own background that's ambiguous). It doesn't matter which
+// layer axe would pick: `body` (global.css) paints `--color-paper` under all
+// of it regardless, and this paragraph has no color override, so it
+// inherits `body`'s `--color-ink` — ~19.5:1, nowhere near the 4.5:1 line.
+//
+// This only started firing on ProductActions' notify-me copy because that
+// paragraph's line-wrap shifts with its text length, moving its box within
+// the first viewport height where the fixed sky sits behind it — a layout
+// accident, not a property of the copy, so match on the node's own html
+// (stable here — this paragraph has one fixed class list in both locales)
+// rather than on which words happen to be in it.
+function isKnownSafeSkyBackgroundOverlap(node: {
+  html: string
+  any: { data?: { messageKey?: string } | null }[]
+}) {
+  return (
+    node.html.startsWith('<p class="mt-3 text-sm leading-relaxed">') &&
+    node.any.some((a) => a.data?.messageKey === 'elmPartiallyObscured')
+  )
+}
+
 /**
  * axe only sees rendered markup, so the gate's signup form — which sits
  * inside a collapsed <details> (GateScreen.astro) — would drop out of the
@@ -90,7 +118,7 @@ for (const path of paths) {
     const unresolvedContrast = results.incomplete
       .filter((r) => r.id === 'color-contrast')
       .flatMap((r) => r.nodes)
-      .filter((n) => !isKnownSafeConsentLabelOverlap(n))
+      .filter((n) => !isKnownSafeConsentLabelOverlap(n) && !isKnownSafeSkyBackgroundOverlap(n))
 
     expect(unresolvedContrast, JSON.stringify(unresolvedContrast, null, 2)).toEqual([])
   })

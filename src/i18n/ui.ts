@@ -34,14 +34,25 @@ import type { Locale } from './config.ts'
  *     src/lib/consent.ts and every subscriber row records the version it was
  *     captured under. Rewording it is a version bump plus two live wordings
  *     forever, not a copy edit.
- *   - dropLine: it renders only in the meta description, so it is read in
- *     search results and nowhere else. Clarity sells there; the wink has no
- *     audience.
+ *   - tagline, dropLine: tagline renders in <title> and og:title, dropLine
+ *     only in the meta description — both are read in search results before
+ *     anyone reaches the page, so clarity sells there and the wink has no
+ *     audience. tagline doubles as the one country-of-manufacture claim this
+ *     brand makes in its most visible copy: it must never say or imply
+ *     "Made in Canada" or name a manufacturing country at all unless that is
+ *     literally true that day. The garment is designed in Quebec and made in
+ *     China (see catalogue.ts's `specs`, which does name both, and
+ *     ProductView.astro's `countryOfOrigin`) — a "Made in Canada" claim here
+ *     is a Competition Bureau matter, not a style choice.
+ *   - ogImageAlt: alt text for the link-preview card, read aloud by the
+ *     clients that surface it. Same rule as the gallery alt text in
+ *     catalogue.ts — describe the photograph, don't perform.
  */
 export type Dict = {
   brand: string
   tagline: string
   dropLine: string
+  ogImageAlt: string
   emailLabel: string
   emailPlaceholder: string
   consentLabel: string
@@ -113,8 +124,10 @@ export type Dict = {
 export const UI: Record<Locale, Dict> = {
   'fr-CA': {
     brand: 'Nuage Athletics',
-    tagline: 'Vêtements techniques. Fabriqués au Canada.',
+    tagline: 'Vêtements de sport, sans le plastique.',
     dropLine: 'Première sortie. Automne 2026.',
+    ogImageAlt:
+      'Le chandail à manches longues 01 de Nuage Athletics, coupe classique, à plat sur fond clair.',
     emailLabel: 'Courriel',
     emailPlaceholder: 'vous@exemple.com',
     consentLabel:
@@ -184,8 +197,10 @@ export const UI: Record<Locale, Dict> = {
   },
   'en-CA': {
     brand: 'Nuage Athletics',
-    tagline: 'Technical apparel. Made in Canada.',
+    tagline: 'Athletic wear, without the plastic.',
     dropLine: 'First drop. Fall 2026.',
+    ogImageAlt:
+      'Nuage Athletics Long Sleeve 01, classic fit, laid flat on a light background.',
     emailLabel: 'Email',
     emailPlaceholder: 'you@example.com',
     consentLabel:

@@ -34,6 +34,45 @@ export function alternates(id: RouteId): { locale: Locale; path: string }[] {
 }
 
 /**
+ * Which routes may be indexed.
+ *
+ * One table, because two things have to agree and previously didn't: the
+ * `noindex` meta `Seo.astro` renders, and the URLs `@astrojs/sitemap`
+ * publishes. Each page used to pass `noindex` itself while the sitemap
+ * published every route it could find, so the sitemap advertised fourteen
+ * noindex pages — two of them `/acces/` and `/en/access/`, which
+ * `src/middleware.ts` answers with a hard 404 the moment the pre-launch gate
+ * comes off. Now `Seo.astro` reads this and so does the sitemap's `filter`
+ * (astro.config.mjs), and flipping a page's indexability is one edit here.
+ *
+ * `Record<RouteId, boolean>` is exhaustive by construction, so a route added
+ * to ROUTES is a type error until someone decides — the same reasoning
+ * `Dict` in src/i18n/ui.ts follows.
+ */
+export const INDEXABLE: Record<RouteId, boolean> = {
+  home: true,
+  // 401 while the site is locked, 404 once it isn't. Never a page anyone
+  // should reach from a search result, in either state.
+  gate: false,
+  // Drafts pending legal review — see the notice at the top of each. Flip
+  // these when the reviewed text ships and the sitemap follows on its own.
+  privacy: false,
+  terms: false,
+  // Dead ends reached from an email link or a checkout return. Nothing on
+  // them is worth ranking, and confirmed/unsubscribed leak an intent we have
+  // no business publishing.
+  confirmed: false,
+  unsubscribed: false,
+  orderConfirmed: false,
+  orderCancelled: false,
+}
+
+/** Every indexable route's path, in every locale — the sitemap's allowlist. */
+export const INDEXABLE_PATHS: readonly string[] = (Object.keys(ROUTES) as RouteId[])
+  .filter((id) => INDEXABLE[id])
+  .flatMap((id) => LOCALES.map((l) => ROUTES[id][l]))
+
+/**
  * Product pages aren't in ROUTES: the slug differs per locale (it's part of
  * the catalogue, not a fixed page id), so canonical/hreflang for these is
  * built from the product's own per-locale slugs — see productAlternates.

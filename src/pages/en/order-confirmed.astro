@@ -10,7 +10,7 @@ const locale = 'en-CA' as const
 const d = t(locale)
 ---
 
-<Base {locale} routeId="orderConfirmed" title={d.orderConfirmedTitle} description={d.orderConfirmedBody} noindex>
+<Base {locale} routeId="orderConfirmed" title={d.orderConfirmedTitle} description={d.orderConfirmedBody}>
   <section class="max-w-xl py-24">
     <h1 class="text-3xl font-semibold tracking-tight">{d.orderConfirmedTitle}</h1>
     <p class="mt-4 opacity-70">{d.orderConfirmedBody}</p>
