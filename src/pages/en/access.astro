@@ -11,6 +11,6 @@ const locale = 'en-CA' as const
 const d = t(locale)
 ---
 
-<Base {locale} routeId="gate" noindex title={`${d.gateTitle} - ${d.brand}`} description={d.gateLede}>
+<Base {locale} routeId="gate" title={`${d.gateTitle} - ${d.brand}`} description={d.gateLede}>
   <GateScreen {locale} />
 </Base>

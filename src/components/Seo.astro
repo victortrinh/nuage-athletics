@@ -1,6 +1,9 @@
 ---
 import { HTML_LANG, type Locale } from '../i18n/config'
-import { alternates, type RouteId } from '../i18n/utils'
+import { INDEXABLE, alternates, type RouteId } from '../i18n/utils'
+import { OG_IMAGE, SOCIAL_PROFILES, organizationId, websiteId } from '../lib/brand'
+import { SENDER_IDENTITY } from '../lib/consent'
+import { t } from '../i18n/ui'
 
 interface Props {
   locale: Locale
@@ -11,6 +14,12 @@ interface Props {
   alternates?: { locale: Locale; path: string }[]
   title: string
   description: string
+  /**
+   * Override. Pages with a `routeId` don't pass this — their indexability is
+   * INDEXABLE in src/i18n/utils.ts, which the sitemap reads from the same
+   * table so the two can't disagree. This exists for a page that has no
+   * routeId to be looked up by.
+   */
   noindex?: boolean
 }
 
@@ -20,8 +29,9 @@ const {
   alternates: altsOverride,
   title,
   description,
-  noindex = false,
+  noindex: noindexOverride,
 } = Astro.props
+const d = t(locale)
 const site = Astro.site?.origin ?? 'https://nuageathletics.com'
 if (!routeId && !altsOverride) {
   throw new Error('Seo requires either routeId or alternates')
@@ -29,13 +39,49 @@ if (!routeId && !altsOverride) {
 const alts = altsOverride ?? alternates(routeId!)
 const canonical = new URL(alts.find((a) => a.locale === locale)!.path, site).href
 
-const org = {
+const noindex = noindexOverride ?? (routeId ? !INDEXABLE[routeId] : false)
+const ogImage = new URL(OG_IMAGE.path, site).href
+
+const orgId = organizationId(site)
+
+/**
+ * One @graph rather than a bag of loose nodes.
+ *
+ * Separate top-level objects are separate entities as far as a consumer is
+ * concerned, so the Organization here and the Product in ProductView.astro
+ * used to be two unconnected islands that happened to share a brand name
+ * string. Sharing an @id is what actually says "the maker of this garment is
+ * this company" — see organizationId() in src/lib/brand.ts, which
+ * ProductView.astro points its `brand` at.
+ *
+ * Name and email come from SENDER_IDENTITY so the site and the CASL sender
+ * block can't drift into claiming two different identities. Its `address` is
+ * deliberately NOT published: it is still a placeholder, and a wrong postal
+ * address in structured data is worse than no postal address.
+ */
+const graph = {
   '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: 'Nuage Athletics',
-  url: site,
-  email: 'hello@nuageathletics.com',
-  areaServed: { '@type': 'Country', name: 'Canada' },
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': orgId,
+      name: SENDER_IDENTITY.name,
+      url: site,
+      email: SENDER_IDENTITY.email,
+      logo: { '@type': 'ImageObject', url: new URL('/logo-nuage.svg', site).href },
+      image: ogImage,
+      sameAs: Object.values(SOCIAL_PROFILES),
+      areaServed: { '@type': 'Country', name: 'Canada' },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': websiteId(site),
+      url: site,
+      name: SENDER_IDENTITY.name,
+      publisher: { '@id': orgId },
+      inLanguage: Object.values(HTML_LANG),
+    },
+  ],
 }
 ---
 
@@ -52,7 +98,21 @@ const org = {
 <link rel="canonical" href={canonical} />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
-{noindex && <meta name="robots" content="noindex, nofollow" />}
+{/*
+  On an indexable page, the positive directives are worth stating: without
+  max-snippet/max-image-preview a search or answer engine caps how much of
+  the page it will quote and shows a thumbnail at best. These raise those
+  caps; they say nothing about *whether* to index, which the line above
+  settles. Both are meaningless on a noindex page, so neither is emitted
+  there.
+*/}
+{
+  noindex ? (
+    <meta name="robots" content="noindex, nofollow" />
+  ) : (
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  )
+}
 
 {
   alts.map((a) => (
@@ -67,6 +127,26 @@ const org = {
 <meta property="og:description" content={description} />
 <meta property="og:url" content={canonical} />
 <meta property="og:locale" content={locale.replace('-', '_')} />
+{
+  alts
+    .filter((a) => a.locale !== locale)
+    .map((a) => <meta property="og:locale:alternate" content={a.locale.replace('-', '_')} />)
+}
+{/*
+  twitter:card has always claimed summary_large_image; until now there was no
+  image for it to be large about, so every unfurl — Slack, iMessage, X,
+  Discord, and the link previews AI assistants render — fell back to a bare
+  text stub. og:image is absolute because relative ones are unresolvable for
+  a parser that never loads the page, and dimensions are declared so the card
+  reserves the right shape before the bytes arrive.
+*/}
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:type" content={OG_IMAGE.type} />
+<meta property="og:image:width" content={String(OG_IMAGE.width)} />
+<meta property="og:image:height" content={String(OG_IMAGE.height)} />
+<meta property="og:image:alt" content={d.ogImageAlt} />
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content={ogImage} />
+<meta name="twitter:image:alt" content={d.ogImageAlt} />
 
-<script type="application/ld+json" set:html={JSON.stringify(org)} />
+<script type="application/ld+json" set:html={JSON.stringify(graph)} />

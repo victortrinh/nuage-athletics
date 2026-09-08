@@ -74,7 +74,11 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 ## Conventions
 
 - Localised URLs live in `ROUTES` (`src/i18n/utils.ts`). Add a route there first;
-  `Seo.astro` derives canonical + hreflang from it automatically.
+  `Seo.astro` derives canonical + hreflang from it automatically. Then say
+  whether it may be indexed in `INDEXABLE`, in the same file — it is
+  `Record<RouteId, boolean>`, so a new route won't compile until you do. That
+  one answer drives both the page's `robots` meta and whether the URL reaches
+  the sitemap, which is why pages no longer pass `noindex` themselves.
 - API routes need `export const prerender = false`.
 - React islands only where interaction requires it. Default to zero JS.
 - Tailwind utility classes inline; no component CSS files.

@@ -4,7 +4,8 @@ import ProductCarousel from './ProductCarousel.tsx'
 import ProductActions from './ProductActions.tsx'
 import CpaDisclosure from './CpaDisclosure.astro'
 import { t } from '../i18n/ui'
-import type { Locale } from '../i18n/config'
+import { HTML_LANG, type Locale } from '../i18n/config'
+import { organizationId } from '../lib/brand'
 import { editorialFor, featuredProduct, DEFAULT_FIT } from '../lib/catalogue'
 
 interface Props {
@@ -29,6 +30,9 @@ const signupSent = Astro.url.searchParams.get('sent') === '1'
 const signupErrorCode = Astro.url.searchParams.get('se')
 const redirectTo = Astro.url.pathname + Astro.url.search
 
+const site = Astro.site?.origin ?? 'https://nuageathletics.com'
+const productUrl = new URL(Astro.url.pathname, site).href
+
 /**
  * No price is rendered while commerce is off, and the price is left out of the
  * structured data for the same reason: an advertised price is one a Quebec
@@ -38,11 +42,27 @@ const redirectTo = Astro.url.pathname + Astro.url.search
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Product',
+  '@id': `${productUrl}#product`,
+  url: productUrl,
   name: product.name,
   description: product.description,
   image: product.images.map((src) => new URL(src, Astro.site).href),
-  brand: { '@type': 'Brand', name: d.brand },
+  /**
+   * A reference, not a copy. This used to be an inline
+   * `{'@type': 'Brand', name}`, which is a second, unrelated entity that
+   * happens to share a string with the Organization in Seo.astro — a
+   * consumer has no way to tell those are the same company. Pointing at that
+   * node's @id says it outright. See organizationId() in src/lib/brand.ts.
+   */
+  brand: { '@id': organizationId(site) },
   material: editorial.specs[0]?.value,
+  /**
+   * "Fabriqué au Canada" is already in the spec list as prose. Saying it in
+   * a field as well is what lets it be read as a fact about the garment
+   * rather than a sentence that happens to mention Canada.
+   */
+  countryOfOrigin: { '@type': 'Country', name: 'Canada' },
+  inLanguage: HTML_LANG[locale],
   ...(commerceEnabled
     ? {
         offers: {

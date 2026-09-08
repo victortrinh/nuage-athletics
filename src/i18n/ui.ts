@@ -37,11 +37,15 @@ import type { Locale } from './config.ts'
  *   - dropLine: it renders only in the meta description, so it is read in
  *     search results and nowhere else. Clarity sells there; the wink has no
  *     audience.
+ *   - ogImageAlt: alt text for the link-preview card, read aloud by the
+ *     clients that surface it. Same rule as the gallery alt text in
+ *     catalogue.ts — describe the photograph, don't perform.
  */
 export type Dict = {
   brand: string
   tagline: string
   dropLine: string
+  ogImageAlt: string
   emailLabel: string
   emailPlaceholder: string
   consentLabel: string
@@ -115,6 +119,8 @@ export const UI: Record<Locale, Dict> = {
     brand: 'Nuage Athletics',
     tagline: 'Vêtements techniques. Fabriqués au Canada.',
     dropLine: 'Première sortie. Automne 2026.',
+    ogImageAlt:
+      'Le chandail à manches longues 01 de Nuage Athletics, coupe classique, à plat sur fond clair.',
     emailLabel: 'Courriel',
     emailPlaceholder: 'vous@exemple.com',
     consentLabel:
@@ -186,6 +192,8 @@ export const UI: Record<Locale, Dict> = {
     brand: 'Nuage Athletics',
     tagline: 'Technical apparel. Made in Canada.',
     dropLine: 'First drop. Fall 2026.',
+    ogImageAlt:
+      'Nuage Athletics Long Sleeve 01, classic fit, laid flat on a light background.',
     emailLabel: 'Email',
     emailPlaceholder: 'you@example.com',
     consentLabel:

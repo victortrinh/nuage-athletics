@@ -10,6 +10,7 @@ import { route, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
 import { buttonVariants } from '../components/ui/button-variants'
 import { cn } from '../components/ui/cn'
+import { SOCIAL_PROFILES } from '../lib/brand'
 
 interface Props {
   locale: Locale
@@ -34,7 +35,7 @@ const navLinks = [
   { href: route('privacy', locale), label: d.privacy },
   { href: route('terms', locale), label: d.terms },
   { href: 'mailto:hello@nuageathletics.com', label: d.contact },
-  { href: 'https://instagram.com/nuageathletics', label: d.instagram, external: true },
+  { href: SOCIAL_PROFILES.instagram, label: d.instagram, external: true },
 ]
 ---
 
