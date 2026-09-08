@@ -26,9 +26,25 @@ const siteKey = env.PUBLIC_TURNSTILE_SITE_KEY
 // A no-JS "notify me" submit (ProductActions' SignupForm, shown only while
 // commerce is off) bounces back here the same way the gate's does — see the
 // matching comment in GateScreen.astro and subscribe.ts.
-const signupSent = Astro.url.searchParams.get('sent') === '1'
-const signupErrorCode = Astro.url.searchParams.get('se')
-const redirectTo = Astro.url.pathname + Astro.url.search
+//
+// The home route also carries the bottom-anchored signup prompt
+// (SignupPrompt.astro via Base.astro), whose own no-JS round trip marks
+// itself with 'sf=prompt' before it submits (see the comment in Base.astro).
+// 'sent'/'se' are otherwise page-global, so without this check a submit from
+// either form would render success on both.
+const sf = Astro.url.searchParams.get('sf')
+const signupSent = sf !== 'prompt' && Astro.url.searchParams.get('sent') === '1'
+const signupErrorCode = sf === 'prompt' ? null : Astro.url.searchParams.get('se')
+
+// Built fresh, not Astro.url.search verbatim — a page reached via the
+// prompt's own round trip still carries its 'sf=prompt' marker, which this
+// form's redirect target must not inherit: submitting *this* form while
+// that marker is present would otherwise redirect back here still tagged
+// 'sf=prompt', and the check above would then attribute this form's own
+// outcome to the prompt instead of itself.
+const redirectUrl = new URL(Astro.url.pathname + Astro.url.search, Astro.url.origin)
+redirectUrl.searchParams.delete('sf')
+const redirectTo = redirectUrl.pathname + redirectUrl.search
 
 const site = Astro.site?.origin ?? 'https://nuageathletics.com'
 const productUrl = new URL(Astro.url.pathname, site).href

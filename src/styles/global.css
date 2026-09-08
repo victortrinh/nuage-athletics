@@ -272,6 +272,49 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
   }
 }
 
+/*
+ * Ground for the bottom-anchored signup prompt (SignupPrompt.astro). It sits
+ * over the page rather than behind a scrim — the page stays scrollable and
+ * clickable underneath it — so a frosted, blurred ground is what reads as
+ * "this is a distinct surface" without a hard edge. It's also on brand for a
+ * site named after a cloud that otherwise runs a live WebGL sky right behind
+ * everything.
+ *
+ * @supports guards the blur: Firefox for Android and some older WebViews
+ * don't implement backdrop-filter. Those fall back to header-veil's own
+ * device (global.css), mirrored — solid at the bottom, fading to transparent
+ * toward the top — which is legible without ever blurring anything.
+ *
+ * prefers-reduced-transparency asks for exactly what it says: a ground you
+ * can't partly see through. forced-colors drops the blur and tint
+ * altogether — Canvas/CanvasText plus a real border are what makes the band
+ * read as a distinct surface there, same reasoning as the nav drawer panel's
+ * own forced-colors:border-[CanvasText].
+ */
+@utility prompt-veil {
+  background-color: rgb(250 250 250 / 90%);
+  background-image: linear-gradient(to bottom, transparent, var(--color-paper) 30%);
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    background-color: rgb(250 250 250 / 72%);
+    background-image: none;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    background-color: var(--color-paper);
+    background-image: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  @media (forced-colors: active) {
+    background-color: Canvas;
+    background-image: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-top: 1px solid CanvasText;
+  }
+}
+
 ::selection { background: var(--color-ink); color: var(--color-paper); }
 
 /* The one wordmark treatment, used for the brand mark and page headings —
@@ -350,3 +393,24 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 @keyframes drawer-out { from { translate: 0 0; } to { translate: -100% 0; } }
 @keyframes veil-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes veil-out { from { opacity: 1; } to { opacity: 0; } }
+
+/*
+ * The signup prompt (SignupPrompt.astro) slides up from the bottom edge on
+ * the same keyframe reasoning as the nav drawer above: its own script flips
+ * `hidden` off and sets data-state in the same synchronous call, and a
+ * transition never starts on an element whose display just changed in that
+ * same tick — a keyframe animation doesn't care what the "before" state was,
+ * because its own `from` is part of the animation, not derived from a
+ * previously-rendered frame.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  #signup-prompt[data-state='entering'] {
+    animation: prompt-in 300ms ease-out;
+  }
+  #signup-prompt[data-state='exiting'] {
+    animation: prompt-out 200ms ease-in;
+  }
+}
+
+@keyframes prompt-in { from { translate: 0 100%; } to { translate: 0 0; } }
+@keyframes prompt-out { from { translate: 0 0; } to { translate: 0 100%; } }

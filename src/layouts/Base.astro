@@ -1,12 +1,14 @@
 ---
+import { env } from 'cloudflare:workers'
 import '../styles/global.css'
 import Seo from '../components/Seo.astro'
 import Sky from '../components/Sky.astro'
 import Logo from '../components/Logo.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import NavIcon from '../components/NavIcon.astro'
+import SignupPrompt from '../components/SignupPrompt.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
-import { route, type RouteId } from '../i18n/utils'
+import { route, SHOWS_SIGNUP_PROMPT, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
 import { buttonVariants } from '../components/ui/button-variants'
 import { cn } from '../components/ui/cn'
@@ -37,6 +39,45 @@ const navLinks = [
   { href: 'mailto:hello@nuageathletics.com', label: d.contact },
   { href: SOCIAL_PROFILES.instagram, label: d.instagram, external: true },
 ]
+
+// Defaults to shown for a page with no routeId — same convention Seo.astro
+// uses for `noindex` when it has no INDEXABLE entry to read.
+const showPrompt = routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true
+// A Worker runtime binding ([vars] in wrangler.toml), not a Vite build-time
+// value — see the matching comment in ProductView.astro.
+const promptTurnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY
+// The home route already renders its own Turnstile api.js script alongside
+// ProductActions' "notify me" SignupForm (ProductView.astro) — a second
+// <script src> tag here would load it twice. Every other route that shows
+// the prompt has no SignupForm of its own, so it needs its own script.
+const promptNeedsOwnTurnstileScript =
+  showPrompt && routeId !== 'home' && Boolean(promptTurnstileSiteKey)
+
+/**
+ * The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
+ * submit back to `redirect` with the outcome folded into 'sent'/'se' (see
+ * subscribe.ts's formResponder and the matching comment in SignupForm.tsx).
+ * The home route already has its own SignupForm inside ProductActions, and
+ * those two params are page-global — without a marker, one no-JS submit
+ * from either form would render success on both. 'sf=prompt' is that
+ * marker: formResponder only ever deletes 'sent'/'se' from the redirect
+ * target, so it survives the round trip untouched, and ProductView.astro
+ * checks it before deciding whether the outcome belongs to *its* form.
+ */
+const sf = Astro.url.searchParams.get('sf')
+const promptSent = sf === 'prompt' && Astro.url.searchParams.get('sent') === '1'
+const promptErrorCode = sf === 'prompt' ? Astro.url.searchParams.get('se') : null
+const promptInitialOpen = promptSent || Boolean(promptErrorCode)
+
+// Built fresh rather than reusing Astro.url.search verbatim: a page reached
+// via an earlier round trip may still carry a stale 'sent'/'se' of its own
+// (e.g. the product form's), which a fresh prompt submission must not carry
+// forward as its own redirect target.
+const promptRedirectUrl = new URL(Astro.url.pathname + Astro.url.search, Astro.url.origin)
+promptRedirectUrl.searchParams.delete('sent')
+promptRedirectUrl.searchParams.delete('se')
+promptRedirectUrl.searchParams.set('sf', 'prompt')
+const promptRedirectTo = promptRedirectUrl.pathname + promptRedirectUrl.search
 ---
 
 <!doctype html>
@@ -288,5 +329,29 @@ const navLinks = [
         <p>© {year} {d.brand}. {d.rights}</p>
       </div>
     </footer>
+
+    {
+      showPrompt && (
+        <SignupPrompt
+          {locale}
+          {d}
+          turnstileSiteKey={promptTurnstileSiteKey}
+          redirectTo={promptRedirectTo}
+          initialOpen={promptInitialOpen}
+          initialSuccess={promptSent}
+          initialErrorCode={promptErrorCode ?? undefined}
+        />
+      )
+    }
+    {
+      promptNeedsOwnTurnstileScript && (
+        <script
+          is:inline
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          async
+          defer
+        />
+      )
+    }
   </body>
 </html>

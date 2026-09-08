@@ -19,7 +19,7 @@ import type { Locale } from './config.ts'
  *     emailLabel, gatePasswordLabel, productSizeLabel, productFitLabel,
  *     productGalleryLabel, productImagePosition, productImagePrev,
  *     productImageNext, skipToContent, switchTo, navMenu, navMenuClose,
- *     navLabel, navFooterLabel.
+ *     navLabel, navFooterLabel, promptClose.
  *     A weather word in an accessible name is a broken accessible name.
  *   - Errors that tell you how to fix the thing — errorEmail, errorConsent,
  *     productSelectSizeError, errorChallenge, errorEmailSend. Cute is hostile
@@ -119,6 +119,9 @@ export type Dict = {
   // background sky effect
   skyPause: string
   skyResume: string
+  // bottom-anchored signup prompt (SignupPrompt.astro)
+  promptLabel: string
+  promptClose: string
 }
 
 export const UI: Record<Locale, Dict> = {
@@ -194,6 +197,8 @@ export const UI: Record<Locale, Dict> = {
     orderCancelledBody: "Votre commande n'a pas été complétée. Aucun montant n'a été prélevé.",
     skyPause: 'Figer le ciel',
     skyResume: 'Animer le ciel',
+    promptLabel: 'Recevez nos actualités',
+    promptClose: "Fermer l'infolettre",
   },
   'en-CA': {
     brand: 'Nuage Athletics',
@@ -265,6 +270,8 @@ export const UI: Record<Locale, Dict> = {
     orderCancelledBody: 'Your order was not completed. You have not been charged.',
     skyPause: 'Pause the sky',
     skyResume: 'Animate the sky',
+    promptLabel: 'Get our updates',
+    promptClose: 'Close newsletter prompt',
   },
 }
 

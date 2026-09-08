@@ -152,8 +152,17 @@ export default function SignupForm({
   // this, focus (which was on the submit button) is dropped to <body> when
   // that button unmounts.
   useEffect(() => {
-    if (state.kind === 'success') successHeadingRef.current?.focus()
-  }, [state.kind])
+    if (state.kind !== 'success') return
+    successHeadingRef.current?.focus()
+    // A plain window event, not a prop: an island's props are serialized to
+    // hydrate it, so a live callback can't cross that boundary the way it
+    // could between two components in one React tree. SignupPrompt.astro
+    // listens for this (filtered by idPrefix) to suppress itself
+    // permanently once its own form succeeds, without this component
+    // needing to know that listener exists — same coupling-by-string as the
+    // 'sent'/'se' query params already shared with subscribe.ts.
+    window.dispatchEvent(new CustomEvent('nuage:signup-success', { detail: { idPrefix } }))
+  }, [state.kind, idPrefix])
 
   function resetTurnstile() {
     if (widgetId.current !== null) window.turnstile?.reset(widgetId.current)
