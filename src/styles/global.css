@@ -319,17 +319,20 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
  * saturation as it blurs is the same trick real frosted glass performs
  * (and the one macOS's own vibrancy effect leans on), so colour in the
  * carousel photo or the sky glow still comes through, just softened. The
- * lower alpha leans on the blur to keep text legible rather than on
- * opacity — a hairline top border (mirroring the ruled-edge language this
- * whole site is built from) is the other half of the read: real glass
- * catches a highlight along its edge, which a soft blur alone doesn't
- * suggest on its own.
+ * alpha is deliberately low — this band is meant to read as part of the
+ * page it's floating over, not a card dropped on top of it — and legibility
+ * comes from the blur doing its job, not from opacity propping the ground
+ * up. A hairline top border (mirroring the ruled-edge language this whole
+ * site is built from) is the other half of the read: real glass catches a
+ * highlight along its edge, which a soft blur alone doesn't suggest on its
+ * own — worth keeping visible even as the fill gets more see-through, since
+ * it's the one cue left that still says "this is a distinct surface."
  */
 @utility prompt-veil {
   background-color: rgb(250 250 250 / 90%);
   background-image: linear-gradient(to bottom, transparent, var(--color-paper) 30%);
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    background-color: rgb(250 250 250 / 55%);
+    background-color: rgb(250 250 250 / 32%);
     background-image: none;
     -webkit-backdrop-filter: blur(28px) saturate(1.7);
     backdrop-filter: blur(28px) saturate(1.7);

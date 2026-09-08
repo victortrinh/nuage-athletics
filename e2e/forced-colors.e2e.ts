@@ -18,8 +18,13 @@ test('consent checkbox stays visually distinct checked vs unchecked in forced-co
   await page.goto(ROUTES.gate['fr-CA'])
   // SignupForm now lives only inside the bottom-anchored SignupPrompt
   // (SignupPrompt.astro), which reveals itself for real ~6s after load —
-  // see the matching helper/comment in behavior.e2e.ts.
+  // see the matching helper/comment in behavior.e2e.ts. Waiting for the
+  // island to drop its ssr attribute matters here specifically: this test
+  // presses Space to toggle the checkbox, and a keypress that lands before
+  // hydration's onChange is listening is a silent no-op, not a failure —
+  // which is exactly the kind of thing that reads as "flaky" without this.
   await expect(page.locator('#signup-prompt')).toBeVisible({ timeout: 8_000 })
+  await page.locator('astro-island:not([ssr])').waitFor({ state: 'attached' })
 
   const indicator = page.locator('div.size-4')
   const unchecked = await indicator.evaluate((el) => getComputedStyle(el).backgroundColor)
@@ -27,8 +32,14 @@ test('consent checkbox stays visually distinct checked vs unchecked in forced-co
   await page.getByRole('checkbox').focus()
   await page.keyboard.press('Space')
 
-  const checked = await indicator.evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(checked).not.toBe(unchecked)
+  // React's state flip, re-render and style recalc aren't synchronous with
+  // the keypress — a single read right after it is a race that this test
+  // used to win often enough to look reliable, until running this suite
+  // back-to-back many times in one session left enough system load for the
+  // race to actually lose. Poll instead of reading once.
+  await expect
+    .poll(() => indicator.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .not.toBe(unchecked)
 
   const svg = indicator.locator('svg')
   await expect(svg).toBeVisible()
