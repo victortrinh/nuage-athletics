@@ -286,12 +286,11 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 }
 
 /*
- * Ground for the bottom-anchored signup prompt (SignupPrompt.astro). It sits
- * over the page rather than behind a scrim — the page stays scrollable and
- * clickable underneath it — so a frosted, blurred ground is what reads as
- * "this is a distinct surface" without a hard edge. It's also on brand for a
- * site named after a cloud that otherwise runs a live WebGL sky right behind
- * everything.
+ * Ground for the bottom-anchored signup prompt (SignupPrompt.astro). Matches
+ * yeezy.com's own reference (screenshots from the issue thread): a blurred
+ * ground with no hairline of its own — the defocus alone is what separates
+ * the band from the page, not an edge. It sits over the page rather than
+ * behind a scrim — the page stays scrollable and clickable underneath it.
  *
  * @supports guards the blur: Firefox for Android and some older WebViews
  * don't implement backdrop-filter. Those fall back to header-veil's own
@@ -302,7 +301,8 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
  * can't partly see through. forced-colors drops the blur and tint
  * altogether — Canvas/CanvasText plus a real border are what makes the band
  * read as a distinct surface there, same reasoning as the nav drawer panel's
- * own forced-colors:border-[CanvasText].
+ * own forced-colors:border-[CanvasText]; that border is specific to forced-
+ * colors mode; the normal state stays true to the reference and has none.
  *
  * -webkit-backdrop-filter has to come *before* backdrop-filter in every
  * declaration pair here, not after: written the other way around, the
@@ -313,30 +313,15 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
  * reports 'none', which is exactly what e2e/a11y.e2e.ts's neutralization
  * step reads to know whether to flatten this ground before an axe scan.
  * This order is what keeps both properties in the compiled output.
- *
- * saturate() alongside the blur is what actually reads as glass rather than
- * fog — blur alone flattens whatever's behind toward grey; boosting
- * saturation as it blurs is the same trick real frosted glass performs
- * (and the one macOS's own vibrancy effect leans on), so colour in the
- * carousel photo or the sky glow still comes through, just softened. The
- * alpha is deliberately low — this band is meant to read as part of the
- * page it's floating over, not a card dropped on top of it — and legibility
- * comes from the blur doing its job, not from opacity propping the ground
- * up. A hairline top border (mirroring the ruled-edge language this whole
- * site is built from) is the other half of the read: real glass catches a
- * highlight along its edge, which a soft blur alone doesn't suggest on its
- * own — worth keeping visible even as the fill gets more see-through, since
- * it's the one cue left that still says "this is a distinct surface."
  */
 @utility prompt-veil {
   background-color: rgb(250 250 250 / 90%);
   background-image: linear-gradient(to bottom, transparent, var(--color-paper) 30%);
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    background-color: rgb(250 250 250 / 32%);
+    background-color: rgb(250 250 250 / 72%);
     background-image: none;
-    -webkit-backdrop-filter: blur(28px) saturate(1.7);
-    backdrop-filter: blur(28px) saturate(1.7);
-    border-top: 1px solid rgb(255 255 255 / 40%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
   }
   @media (prefers-reduced-transparency: reduce) {
     background-color: var(--color-paper);
