@@ -97,12 +97,9 @@ export type Dict = {
   gatePasswordLabel: string
   gateSubmit: string
   gateErrorBad: string
-  gateSignupLede: string
   // product / checkout
   productDetails: string
   productGalleryLabel: string
-  productNotifyTitle: string
-  productNotifyBody: string
   productComingSoon: string
   productSizeLabel: string
   productOutOfStock: string
@@ -175,12 +172,8 @@ export const UI: Record<Locale, Dict> = {
     gatePasswordLabel: 'Mot de passe',
     gateSubmit: 'Entrer',
     gateErrorBad: 'Toujours couvert.',
-    gateSignupLede: "Pas de mot de passe? On vous écrit à l'éclaircie.",
     productDetails: 'Détails',
     productGalleryLabel: 'Images du produit',
-    productNotifyTitle: "Avis d'éclaircie",
-    productNotifyBody:
-      'Choisissez votre taille, laissez votre courriel. On vous écrit dès que le ciel se dégage.',
     productComingSoon: "À l'horizon",
     productSizeLabel: 'Taille',
     productOutOfStock: 'Épuisé',
@@ -249,12 +242,8 @@ export const UI: Record<Locale, Dict> = {
     gatePasswordLabel: 'Password',
     gateSubmit: 'Enter',
     gateErrorBad: 'Still overcast.',
-    gateSignupLede: "No password? We'll write when it clears.",
     productDetails: 'Details',
     productGalleryLabel: 'Product images',
-    productNotifyTitle: 'Clearing advisory',
-    productNotifyBody:
-      'Pick your size, leave your email. We write the moment the sky clears.',
     productComingSoon: 'On the horizon',
     productSizeLabel: 'Size',
     productOutOfStock: 'Out of stock',

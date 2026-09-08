@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { I18nProvider } from 'react-aria-components'
-import SignupForm from './SignupForm.tsx'
 import { Button } from './ui/button'
 import { RadioGroup, Radio } from './ui/radio-group'
 import { useFit } from '../lib/fit-store'
@@ -30,15 +29,11 @@ interface Props {
   initialFit: FitId
   /**
    * When false the size selector still works, but there is nothing to buy —
-   * the call to action captures an email instead, tagged with the size, so a
-   * visitor who came to buy is not simply turned away.
+   * the bottom-anchored SignupPrompt (SignupPrompt.astro, rendered by
+   * Base.astro on every page) is the call to action instead, so a visitor
+   * who came to buy is not simply turned away.
    */
   commerceEnabled: boolean
-  turnstileSiteKey?: string
-  /** Passed straight through to the notify-me SignupForm — see its own props. */
-  redirectTo?: string
-  initialErrorCode?: string
-  initialSuccess?: boolean
 }
 
 export default function ProductActions({
@@ -49,10 +44,6 @@ export default function ProductActions({
   fits,
   initialFit,
   commerceEnabled,
-  turnstileSiteKey,
-  redirectTo,
-  initialErrorCode,
-  initialSuccess,
 }: Props) {
   const [fit, setFit] = useFit(productId, initialFit)
   // Bound to the size string, not the variant id — with fit added as a
@@ -155,7 +146,7 @@ export default function ProductActions({
           ))}
         </RadioGroup>
 
-        {commerceEnabled ? (
+        {commerceEnabled && (
           <>
             <Button onPress={onBuy} isDisabled={loading} className="mt-8">
               {loading ? d.submitting : d.productBuy}
@@ -166,28 +157,6 @@ export default function ProductActions({
               </p>
             )}
           </>
-        ) : (
-          <div className="mt-10 border-t border-line pt-8">
-            <p className="text-[11px] uppercase tracking-label text-mute">{d.productNotifyTitle}</p>
-            <p className="mt-3 text-sm leading-relaxed">{d.productNotifyBody}</p>
-            <div className="mt-6">
-              {/*
-                The consent checkbox inside SignupForm stays visible and
-                unchecked. Wanting to be told when something ships is not consent
-                to be emailed, and /api/subscribe requires a literal true.
-              */}
-              <SignupForm
-                locale={locale}
-                d={d}
-                turnstileSiteKey={turnstileSiteKey}
-                source={`product:${productId}:${fit}:${size ?? 'unspecified'}`}
-                idPrefix={`signup-${productId}`}
-                redirectTo={redirectTo}
-                initialErrorCode={initialErrorCode}
-                initialSuccess={initialSuccess}
-              />
-            </div>
-          </div>
         )}
       </div>
     </I18nProvider>

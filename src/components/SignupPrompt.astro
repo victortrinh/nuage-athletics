@@ -10,13 +10,13 @@ interface Props {
   locale: Locale
   d: Dict
   turnstileSiteKey?: string
-  /** Carries `sf=prompt` — see the matching comment in Base.astro. */
+  /** The current page, so a no-JS submit's 303 lands back here. */
   redirectTo: string
   /**
    * True when a no-JS submit from this same prompt just bounced back here
-   * with an outcome (Base.astro reads `sf`/`sent`/`se`) — forces the band
-   * open on first paint, no timer, the same way GateScreen.astro's
-   * <details> forces itself open for the same reason.
+   * with an outcome (Base.astro reads `sent`/`se`) — forces the band open on
+   * first paint, no timer, no animation, the outcome already part of the
+   * first response.
    */
   initialOpen: boolean
   initialSuccess?: boolean
@@ -34,12 +34,19 @@ const { locale, d, turnstileSiteKey, redirectTo, initialOpen, initialSuccess, in
 
   hidden (not display:none via a class) is what the script below flips, the
   same signal Astro's client:visible directive already watches for on
-  SignupForm below: an island wrapped in something that starts hidden
-  defers its own hydration until that ancestor gets a layout box, exactly
-  like GateScreen.astro's <details> — see the note there and in
+  SignupForm below: an island wrapped in something that starts hidden defers
+  its own hydration until that ancestor gets a layout box — see the note in
   SignupForm.tsx's Turnstile mount effect. That's what lets Turnstile mount
   correctly with no extra plumbing: hydration itself never starts until the
   container is genuinely visible.
+
+  The reveal itself needs JS (the timer below), so a no-JS visitor would
+  otherwise never see this at all — the one JS-dependent thing standing
+  between them and a form that would work fine without it. The <noscript>
+  right after this element forces it visible immediately when JS is off,
+  the same role ProductView.astro's <noscript> image grid plays for the
+  carousel: a static equivalent for exactly the audience the JS version
+  can't reach.
 */}
 <div
   id="signup-prompt"
@@ -82,6 +89,25 @@ const { locale, d, turnstileSiteKey, redirectTo, initialOpen, initialSuccess, in
     </div>
   </div>
 </div>
+
+{/*
+  Tailwind's own preflight ships `[hidden]{display:none!important}` inside
+  its `base` layer — an !important rule in a *named* layer beats an
+  !important rule with no layer at all, regardless of selector specificity,
+  because cascade layers explicitly reverse priority order for !important
+  declarations (the mechanism that normally lets unlayered author styles
+  win over a framework's layered reset flips for !important, precisely so a
+  reset's !important rules stay hard to override by accident). A plain
+  unlayered override here would lose to it every time. `signup-prompt-
+  noscript` (registered first, before Tailwind, in global.css) sidesteps
+  that: an earlier layer's !important rule beats every later one, framework
+  reset included, no specificity contest needed.
+*/}
+<noscript>
+  <style
+    set:html={`@layer signup-prompt-noscript { #signup-prompt[hidden] { display: block !important; } }`}
+  />
+</noscript>
 
 <script>
   // Wires the band declared above: a delayed reveal, a dismiss that persists
@@ -149,8 +175,9 @@ const { locale, d, turnstileSiteKey, redirectTo, initialOpen, initialSuccess, in
 
     // SignupForm.tsx dispatches this on window when its own submission
     // succeeds — see the matching comment there for why a plain event
-    // rather than a callback prop. idPrefix scopes it to this prompt's own
-    // form, not e.g. the product page's "notify me" form on the same page.
+    // rather than a callback prop. idPrefix is this prompt's own, checked
+    // defensively — SignupPrompt is the only SignupForm on any page today,
+    // but the event is a page-wide signal and costs nothing to scope.
     window.addEventListener('nuage:signup-success', (event) => {
       const detail = (event as CustomEvent<{ idPrefix?: string }>).detail
       if (detail?.idPrefix !== 'signup-prompt') return

@@ -16,8 +16,10 @@ test('consent checkbox stays visually distinct checked vs unchecked in forced-co
   page,
 }) => {
   await page.goto(ROUTES.gate['fr-CA'])
-  // The gate's SignupForm lives inside a <details> disclosure.
-  await page.locator('details > summary').click()
+  // SignupForm now lives only inside the bottom-anchored SignupPrompt
+  // (SignupPrompt.astro), which reveals itself for real ~6s after load —
+  // see the matching helper/comment in behavior.e2e.ts.
+  await expect(page.locator('#signup-prompt')).toBeVisible({ timeout: 8_000 })
 
   const indicator = page.locator('div.size-4')
   const unchecked = await indicator.evaluate((el) => getComputedStyle(el).backgroundColor)

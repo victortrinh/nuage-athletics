@@ -11,24 +11,26 @@ const paths = LOCALES.flatMap((locale) =>
 )
 
 /**
- * axe's color-contrast rule can't resolve a CSS gradient to a background
- * color, so any text painted over one comes back `incomplete` rather than
- * pass/fail — asserting only on `violations` would pass while contrast goes
- * silently unevaluated wherever a gradient sits behind text. Sky.astro's
- * fixed full-page radial-gradient is the one spot left that does this
- * (ProductGallery's placeholder tiles, the other original source, are gone
- * now that real product photography replaced them). Kept generic rather
- * than a hardcoded selector — Tailwind's arbitrary-value gradient classes
- * aren't valid CSS selectors without heavy escaping anyway — by flattening
- * every element whose *computed* background is a gradient to the real
- * paper color.
+ * axe's color-contrast rule can't resolve a CSS gradient — or a blurred,
+ * translucent backdrop-filter — to a flat background color, so any text
+ * painted over either comes back `incomplete` rather than pass/fail;
+ * asserting only on `violations` would pass while contrast goes silently
+ * unevaluated wherever one sits behind text. Sky.astro's fixed full-page
+ * radial-gradient is the gradient case; SignupPrompt.astro's `prompt-veil`
+ * (its backdrop-filter: blur ground, sitting directly over that same sky
+ * layer) is the backdrop-filter one. Kept generic rather than hardcoded
+ * selectors — Tailwind's arbitrary-value classes for either aren't valid
+ * CSS selectors without heavy escaping anyway — by flattening every element
+ * whose *computed* background or backdrop-filter is one of these to the
+ * real paper color.
  */
-async function neutralizeGradients(page: Page) {
+async function neutralizeUnresolvableBackgrounds(page: Page) {
   await page.evaluate(() => {
     for (const el of document.querySelectorAll<HTMLElement>('*')) {
-      const bg = getComputedStyle(el).backgroundImage
-      if (bg.includes('gradient')) {
+      const style = getComputedStyle(el)
+      if (style.backgroundImage.includes('gradient') || style.backdropFilter !== 'none') {
         el.style.backgroundImage = 'none'
+        el.style.backdropFilter = 'none'
         el.style.backgroundColor = '#fafafa'
       }
     }
@@ -60,52 +62,28 @@ function isKnownSafeConsentLabelOverlap(node: {
   )
 }
 
-// Sky.astro's `sky-fallback` and `sky-canvas` are both `absolute inset-0`
-// inside a `fixed inset-0 -z-10` wrapper — pinned to the viewport, not the
-// document, and `sky-canvas` sits at `opacity-0` until its script fades it
-// in. Two stacked, partly-transparent full-viewport layers at the same
-// query point is what axe can't cleanly resolve into a single background
-// color ("elmPartiallyObscured" — the reverse of the consent label's case
-// above, where the *foreground* text was flagged as obscuring; here it's the
-// flagged text's own background that's ambiguous). It doesn't matter which
-// layer axe would pick: `body` (global.css) paints `--color-paper` under all
-// of it regardless, and this paragraph has no color override, so it
-// inherits `body`'s `--color-ink` — ~19.5:1, nowhere near the 4.5:1 line.
-//
-// This only started firing on ProductActions' notify-me copy because that
-// paragraph's line-wrap shifts with its text length, moving its box within
-// the first viewport height where the fixed sky sits behind it — a layout
-// accident, not a property of the copy, so match on the node's own html
-// (stable here — this paragraph has one fixed class list in both locales)
-// rather than on which words happen to be in it.
-function isKnownSafeSkyBackgroundOverlap(node: {
-  html: string
-  any: { data?: { messageKey?: string } | null }[]
-}) {
-  return (
-    node.html.startsWith('<p class="mt-3 text-sm leading-relaxed">') &&
-    node.any.some((a) => a.data?.messageKey === 'elmPartiallyObscured')
-  )
-}
-
 /**
- * axe only sees rendered markup, so the gate's signup form — which sits
- * inside a collapsed <details> (GateScreen.astro) — would drop out of the
- * scan entirely. Expand every disclosure first so the scan covers what a
- * visitor who opens it sees. Generic rather than gate-specific: any
- * <details> added later is covered without touching this file.
+ * axe only sees rendered markup, so anything that starts collapsed or
+ * hidden would drop out of the scan entirely. Two such cases today: a
+ * <details> (none currently on the site, kept generic in case one returns)
+ * and SignupPrompt.astro's `#signup-prompt`, which starts `hidden` and only
+ * becomes visible ~6s after load via its own script — forcing it open here
+ * is the same idea as GateScreen.astro's old expandDisclosures() call, just
+ * for an element that isn't a native disclosure.
  */
-async function expandDisclosures(page: Page) {
+async function openHiddenContent(page: Page) {
   await page.evaluate(() => {
     for (const el of document.querySelectorAll('details')) el.open = true
+    const prompt = document.getElementById('signup-prompt')
+    if (prompt) prompt.hidden = false
   })
 }
 
 for (const path of paths) {
   test(`a11y: ${path}`, async ({ page }) => {
     await page.goto(path)
-    await expandDisclosures(page)
-    await neutralizeGradients(page)
+    await openHiddenContent(page)
+    await neutralizeUnresolvableBackgrounds(page)
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
@@ -118,7 +96,7 @@ for (const path of paths) {
     const unresolvedContrast = results.incomplete
       .filter((r) => r.id === 'color-contrast')
       .flatMap((r) => r.nodes)
-      .filter((n) => !isKnownSafeConsentLabelOverlap(n) && !isKnownSafeSkyBackgroundOverlap(n))
+      .filter((n) => !isKnownSafeConsentLabelOverlap(n))
 
     expect(unresolvedContrast, JSON.stringify(unresolvedContrast, null, 2)).toEqual([])
   })

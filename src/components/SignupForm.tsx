@@ -107,12 +107,12 @@ export default function SignupForm({
    * touched before React is done with it.
    *
    * Two things have to be true before rendering: api.js has loaded, and the
-   * container actually has a layout box. The gate screen keeps this form
-   * inside a collapsed <details>, whose contents aren't rendered at all —
-   * Turnstile draws an iframe, and one rendered into nothing never finishes
-   * its challenge, so we'd hand the endpoint an empty token. Whichever of
-   * the two happens last triggers the mount; `mount` is idempotent, so
-   * being called from both paths is harmless.
+   * container actually has a layout box. SignupPrompt.astro keeps this form
+   * inside a container that starts `hidden`, whose contents aren't rendered
+   * at all — Turnstile draws an iframe, and one rendered into nothing never
+   * finishes its challenge, so we'd hand the endpoint an empty token.
+   * Whichever of the two happens last triggers the mount; `mount` is
+   * idempotent, so being called from both paths is harmless.
    */
   useEffect(() => {
     if (!turnstileSiteKey) return

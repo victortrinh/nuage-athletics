@@ -46,38 +46,19 @@ const showPrompt = routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true
 // A Worker runtime binding ([vars] in wrangler.toml), not a Vite build-time
 // value — see the matching comment in ProductView.astro.
 const promptTurnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY
-// The home route already renders its own Turnstile api.js script alongside
-// ProductActions' "notify me" SignupForm (ProductView.astro) — a second
-// <script src> tag here would load it twice. Every other route that shows
-// the prompt has no SignupForm of its own, so it needs its own script.
-const promptNeedsOwnTurnstileScript =
-  showPrompt && routeId !== 'home' && Boolean(promptTurnstileSiteKey)
+const showTurnstileScript = showPrompt && Boolean(promptTurnstileSiteKey)
 
-/**
- * The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
- * submit back to `redirect` with the outcome folded into 'sent'/'se' (see
- * subscribe.ts's formResponder and the matching comment in SignupForm.tsx).
- * The home route already has its own SignupForm inside ProductActions, and
- * those two params are page-global — without a marker, one no-JS submit
- * from either form would render success on both. 'sf=prompt' is that
- * marker: formResponder only ever deletes 'sent'/'se' from the redirect
- * target, so it survives the round trip untouched, and ProductView.astro
- * checks it before deciding whether the outcome belongs to *its* form.
- */
-const sf = Astro.url.searchParams.get('sf')
-const promptSent = sf === 'prompt' && Astro.url.searchParams.get('sent') === '1'
-const promptErrorCode = sf === 'prompt' ? Astro.url.searchParams.get('se') : null
+// The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
+// submit back to `redirect` with the outcome folded into 'sent'/'se' (see
+// subscribe.ts's formResponder and the matching comment in SignupForm.tsx).
+// SignupPrompt is the only SignupForm on any page now, so there's no second
+// form to disambiguate from — the endpoint already self-cleans a stale
+// 'sent'/'se' on the next submit (formResponder deletes both before setting
+// either), so the redirect target needs no scrubbing here either.
+const promptSent = Astro.url.searchParams.get('sent') === '1'
+const promptErrorCode = Astro.url.searchParams.get('se')
 const promptInitialOpen = promptSent || Boolean(promptErrorCode)
-
-// Built fresh rather than reusing Astro.url.search verbatim: a page reached
-// via an earlier round trip may still carry a stale 'sent'/'se' of its own
-// (e.g. the product form's), which a fresh prompt submission must not carry
-// forward as its own redirect target.
-const promptRedirectUrl = new URL(Astro.url.pathname + Astro.url.search, Astro.url.origin)
-promptRedirectUrl.searchParams.delete('sent')
-promptRedirectUrl.searchParams.delete('se')
-promptRedirectUrl.searchParams.set('sf', 'prompt')
-const promptRedirectTo = promptRedirectUrl.pathname + promptRedirectUrl.search
+const promptRedirectTo = Astro.url.pathname + Astro.url.search
 ---
 
 <!doctype html>
@@ -344,7 +325,7 @@ const promptRedirectTo = promptRedirectUrl.pathname + promptRedirectUrl.search
       )
     }
     {
-      promptNeedsOwnTurnstileScript && (
+      showTurnstileScript && (
         <script
           is:inline
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"

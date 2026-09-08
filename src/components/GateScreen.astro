@@ -1,6 +1,4 @@
 ---
-import { env } from 'cloudflare:workers'
-import SignupForm from './SignupForm.tsx'
 import { t } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
 import { cn } from './ui/cn'
@@ -13,9 +11,6 @@ interface Props {
 
 const { locale } = Astro.props
 const d = t(locale)
-// A Worker runtime binding ([vars] in wrangler.toml), not a Vite build-time
-// value — see the matching comment in ProductView.astro.
-const turnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY
 
 // The middleware rewrites here while preserving the URL the visitor asked
 // for, and passes it along so unlocking returns them to it rather than
@@ -23,15 +18,6 @@ const turnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY
 const to = Astro.url.searchParams.get('to') ?? '/'
 const error = Astro.url.searchParams.get('e')
 const errorMessage = error === 'rate' ? d.errorRate : error === 'bad' ? d.gateErrorBad : null
-
-// /api/subscribe redirects a no-JS signup submit back to this same page with
-// its outcome folded into these two params (see SignupForm.tsx's props and
-// the matching comment in subscribe.ts). A signup outcome must force the
-// disclosure open — otherwise the confirmation or error renders correctly
-// but sits inside a <details> that a fresh page load always starts closed.
-const signupSent = Astro.url.searchParams.get('sent') === '1'
-const signupErrorCode = Astro.url.searchParams.get('se')
-const redirectTo = Astro.url.pathname + Astro.url.search
 ---
 
 {/*
@@ -41,6 +27,12 @@ const redirectTo = Astro.url.pathname + Astro.url.search
   heading stays for screen readers (a page still needs an h1) and the lede
   stays visible, because a visitor who lands here cold otherwise gets a
   password box with no explanation of what it belongs to.
+
+  Signup used to live here too, in a <details> disclosure below the
+  password form — SHOWS_SIGNUP_PROMPT (src/i18n/utils.ts) now includes
+  'gate', so the bottom-anchored SignupPrompt (rendered by Base.astro on
+  every page that shows it) covers this page as well, and having both would
+  put two consent forms in front of the same visitor.
 */}
 <section class="mx-auto flex min-h-[60vh] w-full max-w-sm flex-col justify-center py-16">
   <h1 class="sr-only">{d.gateTitle}</h1>
@@ -76,62 +68,4 @@ const redirectTo = Astro.url.pathname + Astro.url.search
       {d.gateSubmit}
     </button>
   </form>
-
-  {/*
-    Signup is secondary here — most visitors who reach the gate have the
-    password. A native <details> keeps it to one line until someone wants
-    it, and needs no JS of its own. Forced open when a no-JS submit just
-    bounced back here with an outcome (signupSent / signupErrorCode) — a
-    closed <details> would hide the very message the redirect exists to show.
-
-    The island hydrates on client:visible rather than client:load: the form
-    itself is a working native POST before any JS runs (SignupForm.tsx), so
-    there's no "looks ready but isn't" window to worry about, and a closed
-    disclosure has no layout box for the observer to fire on — most visitors
-    never pay for this island at all. Turnstile still can't render into a
-    collapsed <details>, hence its own toggle listener in SignupForm.tsx.
-  */}
-  <details class="mt-12 border-t border-line pt-6" open={signupSent || signupErrorCode ? true : undefined}>
-    <summary
-      class={cn(
-        // cursor-pointer is global now (global.css) — <summary> is a
-        // control in every browser and was the one place already patching
-        // around Tailwind v4's preflight by hand.
-        'press list-none text-[11px] uppercase tracking-label text-mute hover:text-accent-ink',
-        // list-none kills the marker in every engine but WebKit, which
-        // needs its own pseudo-element hidden.
-        '[&::-webkit-details-marker]:hidden',
-        // Without a marker of its own, a muted uppercase line reads as a
-        // caption rather than a control. The +/– is the whole affordance,
-        // so it's decorative to a screen reader — the summary already
-        // announces as an expandable button with its own state.
-        "before:mr-2 before:content-['+'] [[open]>&]:before:content-['–']"
-      )}
-    >
-      {d.gateSignupLede}
-    </summary>
-    <div class="mt-6">
-      <SignupForm
-        client:visible
-        {locale}
-        {d}
-        {turnstileSiteKey}
-        source="gate"
-        {redirectTo}
-        initialErrorCode={signupErrorCode ?? undefined}
-        initialSuccess={signupSent}
-      />
-    </div>
-  </details>
 </section>
-
-{
-  turnstileSiteKey && (
-    <script
-      is:inline
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-      async
-      defer
-    />
-  )
-}

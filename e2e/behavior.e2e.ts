@@ -4,21 +4,24 @@ import { ROUTES } from '../src/i18n/utils'
 import { LOCALES } from '../src/i18n/config'
 
 /**
- * The gate screen keeps its SignupForm inside a <details> disclosure, so
- * the form is in the DOM but not rendered until the summary is clicked.
- * Every gate test below needs it open first.
+ * SignupForm now lives only inside the bottom-anchored SignupPrompt
+ * (SignupPrompt.astro), which every route in SHOWS_SIGNUP_PROMPT renders —
+ * the gate screen included. It starts `hidden` and its own script reveals
+ * it for real, ~6s after load (no test-only shortcut — see the file's own
+ * comment on why waiting for it is preferable to faking the timer), so
+ * every test below needs to wait that out before it can interact.
  *
- * SignupForm hydrates on client:visible here, which only starts once the
- * disclosure becomes visible — i.e. right after the click below. Unlike the
- * old client:load (which had a head start before any test or user could
- * reach the form), there's now a real window where the checkbox's native
- * <input> accepts a click before React's onChange is listening — the click
- * lands, but the (still-unhydrated) `consent` state never sees it. Astro
- * drops the island's `ssr` attribute the moment hydration finishes, so
- * waiting for that closes the window before any test interacts.
+ * SignupForm hydrates on client:visible, which only starts once the prompt
+ * becomes visible — i.e. right after that reveal. Unlike the old
+ * client:load (which had a head start before any test or user could reach
+ * the form), there's a real window where the checkbox's native <input>
+ * accepts a click before React's onChange is listening — the click lands,
+ * but the (still-unhydrated) `consent` state never sees it. Astro drops the
+ * island's `ssr` attribute the moment hydration finishes, so waiting for
+ * that closes the window before any test interacts.
  */
-async function openGateSignup(page: Page) {
-  await page.locator('details > summary').click()
+async function openSignupPrompt(page: Page) {
+  await expect(page.locator('#signup-prompt')).toBeVisible({ timeout: 8_000 })
   await expect(page.getByRole('checkbox')).toBeVisible()
   await page.locator('astro-island:not([ssr])').waitFor({ state: 'attached' })
 }
@@ -32,7 +35,7 @@ async function openGateSignup(page: Page) {
 for (const locale of LOCALES) {
   test(`consent checkbox is unchecked on load (${locale})`, async ({ page }) => {
     await page.goto(ROUTES.gate[locale])
-    await openGateSignup(page)
+    await openSignupPrompt(page)
     const consent = page.getByRole('checkbox')
     await expect(consent).not.toBeChecked()
   })
@@ -50,7 +53,7 @@ test('consent checkbox toggles by keyboard, and a bad email wires aria-invalid',
   page,
 }) => {
   await page.goto(ROUTES.gate['fr-CA'])
-  await openGateSignup(page)
+  await openSignupPrompt(page)
 
   const consent = page.getByRole('checkbox')
   await consent.focus()
@@ -77,7 +80,7 @@ test('focus moves into the success panel, and the live region announces it', asy
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
   )
 
-  await openGateSignup(page)
+  await openSignupPrompt(page)
   await page.getByRole('checkbox').focus()
   await page.keyboard.press('Space')
   await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
@@ -103,7 +106,7 @@ test('a hydrated submit resolves in place, without navigating', async ({ page })
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
   )
 
-  await openGateSignup(page)
+  await openSignupPrompt(page)
   await page.getByRole('checkbox').focus()
   await page.keyboard.press('Space')
   await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
@@ -116,9 +119,12 @@ test('a hydrated submit resolves in place, without navigating', async ({ page })
 /**
  * The whole point of SignupForm.tsx's <form method="POST" action="...">:
  * without this, a no-JS visitor's "notify me" silently does nothing, which
- * is the bug this branch exists to fix. The gate's disclosure is a native
- * <details>, so opening it and submitting need no JS of their own — only
- * the request/response cycle differs from the hydrated tests above.
+ * is the bug this branch exists to fix. SignupPrompt.astro's reveal is
+ * driven entirely by JS (the ~6s timer), so with JS off the prompt would
+ * never appear at all if it depended on that — the <noscript><style> in
+ * SignupPrompt.astro forces it visible immediately instead, no click
+ * needed, so only the request/response cycle differs from the hydrated
+ * tests above.
  */
 test.describe('signup form works before hydration (no JS)', () => {
   test.use({ javaScriptEnabled: false })
@@ -132,7 +138,6 @@ test.describe('signup form works before hydration (no JS)', () => {
     )
 
     await page.goto(ROUTES.gate['fr-CA'])
-    await page.locator('details > summary').click()
     await expect(page.getByRole('checkbox')).toBeVisible()
 
     await page.getByRole('checkbox').focus()
@@ -146,11 +151,10 @@ test.describe('signup form works before hydration (no JS)', () => {
     await expect(page.locator('p[tabindex="-1"]')).toHaveText('Vérifiez vos courriels')
   })
 
-  test('submitting with consent unchecked bounces back with the French error, disclosure forced open', async ({
+  test('submitting with consent unchecked bounces back with the French error, prompt forced open', async ({
     page,
   }) => {
     await page.goto(ROUTES.gate['fr-CA'])
-    await page.locator('details > summary').click()
     await expect(page.getByRole('checkbox')).toBeVisible()
 
     await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
@@ -342,34 +346,6 @@ test('carousel advances on a horizontal drag and clamps at the ends', async ({ p
   await expect(carousel.getByRole('img')).toHaveCount(1)
 })
 
-test('notify-me source tag records fit and size', async ({ page }) => {
-  await page.goto(ROUTES.home['fr-CA'])
-
-  let posted: { source?: string } = {}
-  await page.route('**/api/subscribe', async (route) => {
-    posted = route.request().postDataJSON()
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
-  })
-
-  // Click the label, not the (visually-hidden) input the "radio" role
-  // resolves to — see the comment on the fit-selector test above.
-  await page
-    .getByRole('radiogroup', { name: 'Coupe' })
-    .locator('label')
-    .filter({ hasText: 'Crop' })
-    .click()
-  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').nth(2).click()
-
-  await page.getByRole('checkbox').focus()
-  await page.keyboard.press('Space')
-  await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
-  // ProductActions doesn't override SignupForm's submitLabel, so the button
-  // reads "M'inscrire" here too, same as the gate screen.
-  await page.getByRole('button', { name: /m.inscrire/i }).click({ force: true })
-
-  await expect.poll(() => posted.source).toBe('product:ls-01:crop:M')
-})
-
 /**
  * Tailwind v4's preflight stopped restoring `cursor: pointer` on buttons,
  * so every <button> on the site rendered with an arrow — nothing in axe or
@@ -390,9 +366,6 @@ test('controls report a pointer cursor', async ({ page }) => {
   expect(
     await cursorOf(page.getByRole('radiogroup', { name: 'Coupe' }).locator('label').first())
   ).toBe('pointer')
-
-  await page.goto(ROUTES.gate['fr-CA'])
-  expect(await cursorOf(page.locator('details > summary'))).toBe('pointer')
 })
 
 /**
