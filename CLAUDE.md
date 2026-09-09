@@ -43,6 +43,15 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    `catalogue.ts` is a placeholder, and an advertised price is one a Quebec
    merchant is expected to honour. Set the real one before flipping the flag.
 
+5.6 **Preview is per-visitor, so a preview render must never be cached.**
+   `commerceEnabled()` (`src/lib/commerce/index.ts`) answers yes either because
+   `COMMERCE_ENABLED` is on for everyone or because this one visitor carries the
+   founder-preview cookie. Since that answer gates a *price*, `applyPreview()`
+   (`src/lib/preview.ts`) stamps `Cache-Control: private, no-store` on any
+   response rendered in preview. Nothing else in the codebase sets
+   `Cache-Control`, so this is currently belt and braces — which is exactly why
+   it must survive the day someone adds caching.
+
 6. **Every commercial email needs sender name, mailing address and unsubscribe.**
    See `SENDER_IDENTITY` in `src/lib/consent.ts`. CASL requires all three.
 
@@ -70,6 +79,26 @@ These look like arbitrary choices and are not. Do not "simplify" them.
   nuage-athletics` check run. When watching a PR, don't investigate or reply
   to this bot's comments; just note the deploy status from the check run and
   move on.
+
+## Founder preview
+
+The pre-launch password gate is gone; the home page is public and announces the
+drop instead (`dropAnnounceProduct` / `dropAnnounceAvailability` in
+`src/i18n/ui.ts` — the availability line is the one string per locale to change
+when the date firms up). What replaced the gate is narrower: a way for the four
+of us to see the real buy flow on the real site before it opens.
+
+- `/?preview=<PREVIEW_PASSWORD>` on any path sets a signed cookie and redirects
+  to the same path with the secret stripped, so it does not linger in history
+  or leak through `Referer`. `/?preview=` (empty) leaves preview again.
+- Wrong guesses are rate-limited through the same limiter the gate used
+  (`gate_attempts`, kept under its original name) and answered with 404 rather
+  than 401, so a guess does not confirm preview exists.
+- The cookie carries a signed expiry, never the password. Rotating
+  `PREVIEW_PASSWORD` invalidates every session already handed out.
+- Preview turns on commerce **only** — same render as launch day, nothing else
+  diverges. Resist widening it: every extra conditional is a way for what you
+  tested to differ from what ships.
 
 ## Conventions
 
@@ -147,7 +176,7 @@ must degrade to a working native POST**, method/action and all, with hidden
 fields for whatever its hydrated `fetch()` call sends explicitly. `SignupForm.tsx`
 is the reference: `/api/subscribe` branches on `Content-Type` and answers a
 form-encoded POST with a 303 back to the referring page (`redirect` field,
-validated by `safeRedirect()` in `src/lib/gate.ts`) with the outcome folded into
+validated by `safeRedirect()` in `src/lib/preview.ts`) with the outcome folded into
 that page's query string (`sent=1` / `se=<code>`) rather than JSON, since a
 no-JS submit can't stay on the page to render one. The page reads that back out
 of `Astro.url.searchParams` and passes it into the form as `initialSuccess` /
@@ -159,16 +188,17 @@ same-origin check (`isSameOrigin` in `subscribe.ts`) on top of Astro 7's own
 any route handler runs — no bot-verification widget, which would need JS to
 render at all and so could never cover the no-JS path anyway.
 
-An island wrapped in a `<details>` that switches from `client:load` to
-`client:visible` gets its hydration deferred until the disclosure actually
-opens, not before — real savings on a page most visitors never expand (the
-gate screen: `GateScreen.astro`). But `client:visible` starting hydration only
-*then*, instead of well before any interaction (as `client:load` does), opens a
-real if narrow window where a fast click on the now-visible control lands before
-React's own handlers attach — `e2e/behavior.e2e.ts`'s `openGateSignup()` waits
-for the island to drop its `ssr` attribute (Astro's own hydration-complete
-signal) before interacting, for exactly this reason. `ProductCarousel` and
-`ProductActions` don't get this treatment — see the `fit-store.ts` note above.
+An island that starts inside something hidden and switches from `client:load`
+to `client:visible` gets its hydration deferred until that ancestor gets a
+layout box, not before — real savings on a band most visitors never see
+(`SignupPrompt.astro`, revealed ~6s after load). But `client:visible` starting
+hydration only *then*, instead of well before any interaction (as `client:load`
+does), opens a real if narrow window where a fast click on the now-visible
+control lands before React's own handlers attach — `e2e/behavior.e2e.ts`'s
+`openSignupPrompt()` waits for the island to drop its `ssr` attribute (Astro's
+own hydration-complete signal) before interacting, for exactly this reason.
+`ProductCarousel` and `ProductActions` don't get this treatment — see the
+`fit-store.ts` note above.
 
 - **Variant tables (`*-variants.ts`) are plain `.ts`, zero React/RAC imports.**
   `.astro` files (`GateScreen.astro`, `Base.astro`) import `buttonVariants`,
@@ -222,12 +252,11 @@ Two things worth knowing before touching it:
   exclusive buttons is valid ARIA even though it's the wrong widget. Treat it
   as a regression net for markup a component generates, and write an explicit
   Playwright assertion (`e2e/behavior.e2e.ts`) for anything it can't see.
-- **`e2e/global-setup.ts` logs into the pre-launch gate** and saves
-  `storageState` so the suite scans the real locked site. If you add a page
-  behind the gate, it's covered automatically via `ROUTES` — nothing to update
-  there. If you touch `src/lib/gate.ts` or `src/middleware.ts`, rerun
-  `npm run test:a11y` locally before pushing: a broken gate breaks the whole
-  suite's login step, not just one test.
+- **The suite scans the public site — there is no login step.** Every route in
+  `ROUTES` × both locales is covered automatically, so a new page needs nothing
+  added here. The scan sees the pre-drop render (no price, no buy panel), which
+  is what the public gets; the buy flow behind founder preview is asserted
+  explicitly in `e2e/behavior.e2e.ts` instead.
 
 ## Verify before claiming done
 
@@ -244,9 +273,11 @@ D1, and boots `wrangler dev` itself) — run it before claiming an accessibility
 
 Pages are **not** prerendered — every route under `src/pages` sets
 `prerender = false`, because Workers serves a prerendered file straight from
-static assets without invoking the Worker, and the password gate in
-`src/middleware.ts` would never see it. So there is no `dist/client/index.html`
-to inspect. Check the rendered response instead:
+static assets without invoking the Worker. Two things depend on the Worker
+running: founder preview in `src/middleware.ts` would never see the request,
+and one build-time render would be cached and served to everyone — including
+the preview render, price and all. So there is no `dist/client/index.html` to
+inspect. Check the rendered response instead:
 
 ```bash
 npx wrangler dev --local

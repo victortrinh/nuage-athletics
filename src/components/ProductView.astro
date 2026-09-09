@@ -2,7 +2,7 @@
 import ProductCarousel from './ProductCarousel.tsx'
 import ProductActions from './ProductActions.tsx'
 import CpaDisclosure from './CpaDisclosure.astro'
-import { t } from '../i18n/ui'
+import { fmt, t } from '../i18n/ui'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { organizationId } from '../lib/brand'
 import { editorialFor, featuredProduct, DEFAULT_FIT } from '../lib/catalogue'
@@ -105,10 +105,23 @@ const jsonLd = {
   <div class="lg:sticky lg:top-[calc(var(--header-h)+2rem)] lg:self-start">
     <h1 class="wordmark text-3xl leading-none sm:text-4xl">{product.name}</h1>
 
+    {/*
+      The drop announcement — what a visitor gets instead of a buy panel, and
+      what replaced the pre-launch password screen as the answer to "what is
+      this site for right now".
+
+      It is the availability statement, so the old bordered "coming soon" badge
+      went with it: a badge saying the drop is ahead sitting above a line
+      naming the season is the same sentence twice. Monospace, uppercase and
+      tracked out, set apart from the editorial copy below — this is a notice,
+      not prose, and it should read as one at a glance.
+    */}
     {
       !commerceEnabled && (
-        <p class="mt-4 inline-block border border-ink px-2 py-1 text-[10px] uppercase tracking-label">
-          {d.productComingSoon}
+        <p class="mt-6 font-mono text-xs uppercase leading-loose tracking-label">
+          {fmt(d.dropAnnounceProduct, { product: product.name })}
+          <br />
+          {d.dropAnnounceAvailability}
         </p>
       )
     }

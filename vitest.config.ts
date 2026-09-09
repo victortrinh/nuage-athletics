@@ -19,10 +19,8 @@ export default defineConfig({
           // Fixed test-only value so the Resend path runs instead of the
           // no-key dev branch. test/stub-resend.ts intercepts the request.
           RESEND_API_KEY: 're_test_not_a_real_key',
-          // The gate under test. SITE_LOCKED stays "true" here so the
-          // endpoint's locked-only behaviour is what gets exercised.
-          SITE_LOCKED: 'true',
-          SITE_PASSWORD: 'test-gate-password',
+          // Fixed test-only value so preview tests can mint valid tokens.
+          PREVIEW_PASSWORD: 'test-preview-password',
         },
       },
     }),

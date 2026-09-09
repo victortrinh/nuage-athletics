@@ -21,7 +21,11 @@ function json(body: unknown, status = 200) {
 }
 
 export const POST: APIRoute = async ({ request, url }) => {
-  if (!commerceEnabled(env)) return json({ ok: false, code: 'not_found' }, 404)
+  // Same answer the page render got, from the same cookie — otherwise a
+  // founder previewing the buy flow would be shown a buy button that 404s.
+  if (!(await commerceEnabled(env, request.headers.get('Cookie')))) {
+    return json({ ok: false, code: 'not_found' }, 404)
+  }
 
   let parsed
   try {

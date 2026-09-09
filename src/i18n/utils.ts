@@ -13,7 +13,6 @@ export function localePath(locale: Locale, path: string): string {
  */
 export const ROUTES = {
   home: { 'fr-CA': '/', 'en-CA': '/en/' },
-  gate: { 'fr-CA': '/acces/', 'en-CA': '/en/access/' },
   privacy: { 'fr-CA': '/confidentialite/', 'en-CA': '/en/privacy/' },
   terms: { 'fr-CA': '/conditions/', 'en-CA': '/en/terms/' },
   confirmed: { 'fr-CA': '/inscription-confirmee/', 'en-CA': '/en/confirmed/' },
@@ -40,9 +39,7 @@ export function alternates(id: RouteId): { locale: Locale; path: string }[] {
  * `noindex` meta `Seo.astro` renders, and the URLs `@astrojs/sitemap`
  * publishes. Each page used to pass `noindex` itself while the sitemap
  * published every route it could find, so the sitemap advertised fourteen
- * noindex pages — two of them `/acces/` and `/en/access/`, which
- * `src/middleware.ts` answers with a hard 404 the moment the pre-launch gate
- * comes off. Now `Seo.astro` reads this and so does the sitemap's `filter`
+ * noindex pages. Now `Seo.astro` reads this and so does the sitemap's `filter`
  * (astro.config.mjs), and flipping a page's indexability is one edit here.
  *
  * `Record<RouteId, boolean>` is exhaustive by construction, so a route added
@@ -51,9 +48,6 @@ export function alternates(id: RouteId): { locale: Locale; path: string }[] {
  */
 export const INDEXABLE: Record<RouteId, boolean> = {
   home: true,
-  // 401 while the site is locked, 404 once it isn't. Never a page anyone
-  // should reach from a search result, in either state.
-  gate: false,
   // Drafts pending legal review — see the notice at the top of each. Flip
   // these when the reviewed text ships and the sitemap follows on its own.
   privacy: false,
@@ -69,24 +63,20 @@ export const INDEXABLE: Record<RouteId, boolean> = {
 
 /**
  * Which routes show the bottom-anchored signup prompt (SignupPrompt.astro) —
- * the site's only signup surface. GateScreen.astro and the "notify me" block
- * in ProductActions.tsx used to carry their own inline SignupForm; both were
- * removed once this could cover them, rather than showing two consent forms
- * on one page.
+ * the site's only signup surface. The pre-launch gate screen and the "notify
+ * me" block in ProductActions.tsx used to carry their own inline SignupForm;
+ * both were removed once this could cover them, rather than showing two
+ * consent forms on one page.
  *
  * `Record<RouteId, boolean>` for the same reason INDEXABLE is one: a route
  * added to ROUTES is a type error here until someone decides.
  *
- * `gate` is on: the middleware serves a locked page by rewriting it to the
- * gate screen (src/middleware.ts), so Base.astro — and this prompt — render
- * there like anywhere else. Off for the three dead ends reached only from an
- * email link or a checkout return: offering a signup to someone who just
- * subscribed, or just unsubscribed, is a CASL-flavoured problem, not only a
- * UX one.
+ * Off for the three dead ends reached only from an email link or a checkout
+ * return: offering a signup to someone who just subscribed, or just
+ * unsubscribed, is a CASL-flavoured problem, not only a UX one.
  */
 export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   home: true,
-  gate: true,
   privacy: true,
   terms: true,
   confirmed: false,

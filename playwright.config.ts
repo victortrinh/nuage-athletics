@@ -1,15 +1,28 @@
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test'
-
-const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const PORT = 8791
 export const BASE_URL = `http://localhost:${PORT}`
 // Not a real secret — only ever used against a throwaway local D1 instance
 // started fresh for this test run (see the --persist-to path below).
-export const E2E_GATE_PASSWORD = 'e2e-gate-password'
-export const STORAGE_STATE = path.join(dirname, 'e2e/.auth/unlocked.json')
+export const E2E_PREVIEW_PASSWORD = 'e2e-preview-password'
+
+/**
+ * src/pages/index.astro nudges an English-primary browser from / to /en/ once,
+ * then records `na-locale-nudge` in localStorage and never does it again. The
+ * runner's browser reports en-US, so without this every visit to a French route
+ * would land on the English one and any assertion about French copy would fail.
+ *
+ * This used to happen by accident: the suite logged into the pre-launch gate in
+ * a globalSetup and saved the whole storageState, flag included. The gate is
+ * gone, so the flag is stated outright — the nudge itself is real behaviour and
+ * still fires for real visitors.
+ */
+export const NUDGE_DISMISSED = {
+  cookies: [],
+  origins: [
+    { origin: BASE_URL, localStorage: [{ name: 'na-locale-nudge', value: '1' }] },
+  ],
+}
 
 const PERSIST_DIR = '.wrangler-e2e'
 
@@ -20,9 +33,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
-  globalSetup: './e2e/global-setup.ts',
   use: {
     baseURL: BASE_URL,
+    storageState: NUDGE_DISMISSED,
     trace: 'retain-on-failure',
     // Unset in normal use — Playwright resolves its own downloaded browser.
     // Only for environments (like sandboxes) that pre-bundle a Chromium
@@ -32,15 +45,14 @@ export default defineConfig({
       : undefined,
   },
   webServer: {
-    // A clean D1 every run: the gate rate-limiter caps at 8 attempts per
+    // A clean D1 every run: the preview rate-limiter caps at 8 attempts per
     // 10 minutes (src/lib/db.ts), and every request from `wrangler dev`
     // shares one clientAddress, so a persisted state directory would lock
     // the suite out after ~8 local re-runs. Build first — `wrangler dev`
     // serves the Worker astro build produces, it doesn't build on its own.
-    command: `rm -rf ${PERSIST_DIR} && npm run build && npx wrangler d1 migrations apply nuage-athletics --local --persist-to ${PERSIST_DIR} && npx wrangler dev --local --port ${PORT} --persist-to ${PERSIST_DIR} --var SITE_PASSWORD:${E2E_GATE_PASSWORD} --show-interactive-dev-session=false`,
-    // /robots.txt is in OPEN_PREFIXES (src/lib/gate.ts) so it always
-    // returns 200 regardless of lock state — / returns 401 while locked,
-    // which most webServer readiness checks would treat as not-ready.
+    command: `rm -rf ${PERSIST_DIR} && npm run build && npx wrangler d1 migrations apply nuage-athletics --local --persist-to ${PERSIST_DIR} && npx wrangler dev --local --port ${PORT} --persist-to ${PERSIST_DIR} --var PREVIEW_PASSWORD:${E2E_PREVIEW_PASSWORD} --show-interactive-dev-session=false`,
+    // A cheap static route to poll for readiness; the site is public now,
+    // so any path would do.
     url: `${BASE_URL}/robots.txt`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
@@ -58,7 +70,6 @@ export default defineConfig({
       testIgnore: ['**/sky-motion.e2e.ts', '**/forced-colors.e2e.ts', '**/mobile-layout.e2e.ts'],
       use: {
         ...devices['Desktop Chrome'],
-        storageState: STORAGE_STATE,
         // Playwright's Chromium has WebGL2 via SwiftShader, so without this
         // the full sky fluid sim (src/components/sky/engine.ts) would mount
         // on the runner, pin the CPU, and let its give-up path flip
@@ -72,14 +83,13 @@ export default defineConfig({
     {
       name: 'a11y-motion',
       testMatch: '**/sky-motion.e2e.ts',
-      use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
+      use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'a11y-forced-colors',
       testMatch: '**/forced-colors.e2e.ts',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: STORAGE_STATE,
         contextOptions: { forcedColors: 'active', reducedMotion: 'reduce' },
       },
     },
@@ -92,7 +102,6 @@ export default defineConfig({
       testMatch: '**/mobile-layout.e2e.ts',
       use: {
         ...devices['Pixel 5'],
-        storageState: STORAGE_STATE,
         contextOptions: { reducedMotion: 'reduce' },
       },
     },

@@ -5,13 +5,14 @@ import ProductView from '../../components/ProductView.astro'
 import { t } from '../../i18n/ui'
 import { commerceEnabled } from '../../lib/commerce/index.ts'
 
-// The gate in src/middleware.ts never runs for a prerendered page —
-// Workers serves those straight from assets. Do not remove.
+// Founder preview in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets — and a prerendered page would
+// also cache one render for everyone. Do not remove.
 export const prerender = false
 
 const locale = 'en-CA' as const
 const d = t(locale)
-const canBuy = commerceEnabled(env)
+const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
 ---
 
 <Base

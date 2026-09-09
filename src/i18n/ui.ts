@@ -6,17 +6,17 @@ import type { Locale } from './config.ts'
  * one. The Dict type makes an omission a type error.
  *
  * VOICE — the brand is a cloud, so the copy reads as weather. Two clipped
- * fragments, periods, vouvoiement, no exclamation marks: "Ciel couvert. Le mot
- * de passe dégage la vue." French is written first and English written beside
- * it, not translated from it — a pun that only works in one language stays in
- * that language ("First drop" is already both a release and a raindrop; the
- * French says "éclaircie" instead of forcing it).
+ * fragments, periods, vouvoiement, no exclamation marks: "Turbulences.
+ * Réessayez dans un moment." French is written first and English written
+ * beside it, not translated from it — a pun that only works in one language
+ * stays in that language ("First drop" is already both a release and a
+ * raindrop; the French says "éclaircie" instead of forcing it).
  *
  * The metaphor is for ambience only. These stay literal, deliberately, and a
  * future pass should leave them alone:
  *
  *   - Anything that names a control or is read by a screen reader —
- *     emailLabel, gatePasswordLabel, productSizeLabel, productFitLabel,
+ *     emailLabel, productSizeLabel, productFitLabel,
  *     productGalleryLabel, productImagePosition, productImagePrev,
  *     productImageNext, skipToContent, switchTo, navMenu, navMenuClose,
  *     navLabel, navFooterLabel, promptClose.
@@ -30,6 +30,11 @@ import type { Locale } from './config.ts'
  *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
  *     mailUnsub, mailSubject/mailHeading/mailCta, orderCancelled*, privacy,
  *     terms, rights, productOutOfStock, productBuy.
+ *   - dropAnnounceAvailability most of the rest: it is the only place the site
+ *     tells a shopper when they can buy, on a page anyone can now reach. A
+ *     stated availability date is a representation, so it says a real date
+ *     plainly or it says nothing — and when the date firms up, this is the
+ *     one string per locale that changes.
  *   - consentLabel most of all: it is pinned to CONSENT_VERSION in
  *     src/lib/consent.ts and every subscriber row records the version it was
  *     captured under. Rewording it is a version bump plus two live wordings
@@ -90,16 +95,12 @@ export type Dict = {
   mailCta: string
   mailIgnore: string
   mailUnsub: string
-  // password gate
-  gateTitle: string
-  gateLede: string
-  gatePasswordLabel: string
-  gateSubmit: string
-  gateErrorBad: string
+  // drop announcement
+  dropAnnounceProduct: string
+  dropAnnounceAvailability: string
   // product / checkout
   productDetails: string
   productGalleryLabel: string
-  productComingSoon: string
   productSizeLabel: string
   productOutOfStock: string
   productBuy: string
@@ -165,14 +166,10 @@ export const UI: Record<Locale, Dict> = {
     mailCta: 'Confirmer mon inscription',
     mailIgnore: "Si cette inscription ne vient pas de vous, ignorez ce courriel.",
     mailUnsub: 'Se désabonner',
-    gateTitle: 'Ciel couvert',
-    gateLede: 'Ciel couvert. Le mot de passe dégage la vue.',
-    gatePasswordLabel: 'Mot de passe',
-    gateSubmit: 'Entrer',
-    gateErrorBad: 'Toujours couvert.',
+    dropAnnounceProduct: 'LE NOUVEAU {product}',
+    dropAnnounceAvailability: 'DISPONIBLE AUTOMNE 2026',
     productDetails: 'Détails',
     productGalleryLabel: 'Images du produit',
-    productComingSoon: "À l'horizon",
     productSizeLabel: 'Taille',
     productOutOfStock: 'Épuisé',
     productBuy: 'Acheter',
@@ -234,14 +231,10 @@ export const UI: Record<Locale, Dict> = {
     mailCta: 'Confirm my signup',
     mailIgnore: "If this signup wasn't you, ignore this email.",
     mailUnsub: 'Unsubscribe',
-    gateTitle: 'Overcast',
-    gateLede: 'Overcast. The password clears the view.',
-    gatePasswordLabel: 'Password',
-    gateSubmit: 'Enter',
-    gateErrorBad: 'Still overcast.',
+    dropAnnounceProduct: 'THE NEW {product}',
+    dropAnnounceAvailability: 'AVAILABLE FALL 2026',
     productDetails: 'Details',
     productGalleryLabel: 'Product images',
-    productComingSoon: 'On the horizon',
     productSizeLabel: 'Size',
     productOutOfStock: 'Out of stock',
     productBuy: 'Buy now',

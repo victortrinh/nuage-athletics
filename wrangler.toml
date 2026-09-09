@@ -18,19 +18,16 @@ migrations_dir = "migrations"
 
 [vars]
 PUBLIC_SITE_URL = "https://nuageathletics.com"
-# "true" to expose the commerce routes. Keep this "false" until Stripe is
-# actually configured — see src/lib/commerce/index.ts.
+# "true" shows prices and the buy flow to everyone. Keep this "false" until
+# the drop: while it is off, only a visitor carrying the preview cookie sees
+# them — see src/lib/commerce/index.ts.
 COMMERCE_ENABLED = "false"
-# "true" puts the entire site behind the password gate. Ignored unless the
-# SITE_PASSWORD secret is also set — a lock with no key would brick the site,
-# so it fails open rather than shut. See src/lib/gate.ts.
-SITE_LOCKED = "true"
 
 # Secrets — set with `wrangler secret put <NAME>`, never commit:
 #   RESEND_API_KEY
 #   STRIPE_SECRET_KEY
 #   STRIPE_WEBHOOK_SECRET
-#   SITE_PASSWORD
+#   PREVIEW_PASSWORD
 
 # The Cloudflare adapter enables Astro sessions backed by KV and expects a
 # "SESSION" binding.

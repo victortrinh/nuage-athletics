@@ -36,8 +36,7 @@ const { locale, d, redirectTo, initialOpen, initialSuccess, initialErrorCode } =
   hydration until that ancestor gets a layout box. Most visitors never see
   this band at all inside the ~6s reveal window (they navigate away, or
   dismiss it once and it stays suppressed) — client:visible means they never
-  pay SignupForm's hydration cost either, the same reasoning GateScreen.astro
-  uses for its own collapsed <details>.
+  pay SignupForm's hydration cost either.
 
   The reveal itself needs JS (the timer below), so a no-JS visitor would
   otherwise never see this at all — the one JS-dependent thing standing

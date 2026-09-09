@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config'
 import { CONSENT_VERSION, consentText } from '../../lib/consent'
 import { sendConfirmationEmail } from '../../lib/email'
-import { safeRedirect } from '../../lib/gate'
+import { safeRedirect } from '../../lib/preview'
 import {
   findByEmail,
   insertSubscriber,
@@ -55,9 +55,7 @@ function jsonResponder(): Responder {
 
 function formResponder(redirectField: string, origin: string): Responder {
   function redirectTo(param: string, value: string) {
-    // Unlike the password gate's own `to` field, bouncing back to the gate
-    // screen itself is exactly right here — that's where this form lives.
-    const target = new URL(safeRedirect(redirectField, { excludeGatePath: false }), origin)
+    const target = new URL(safeRedirect(redirectField), origin)
     // The hidden `redirect` field is just "the page the visitor was on" and
     // may itself still carry a stale outcome from an earlier round trip
     // (e.g. ?se=rate_limited, resubmitted successfully this time) — clear

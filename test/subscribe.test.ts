@@ -70,7 +70,7 @@ function validFormFields(overrides: Record<string, string | undefined> = {}) {
     email: uniqueEmail(),
     locale: 'fr-CA',
     consent: 'on',
-    redirect: '/acces/',
+    redirect: '/',
     ...overrides,
   }
 }
@@ -244,7 +244,7 @@ describe('POST /api/subscribe (form-encoded — the no-JS <form> fallback)', () 
     const fields = validFormFields()
     const res = await POST(makeFormContext(fields, { ip: '203.0.113.60' }))
     expect(res.status).toBe(303)
-    expect(res.headers.get('Location')).toBe('/acces/?sent=1')
+    expect(res.headers.get('Location')).toBe('/?sent=1')
 
     const row = await env.DB.prepare('SELECT status FROM subscribers WHERE email = ?')
       .bind(fields.email)
@@ -252,11 +252,11 @@ describe('POST /api/subscribe (form-encoded — the no-JS <form> fallback)', () 
     expect(row?.status).toBe('pending')
   })
 
-  it('honours the locale hidden field and the English gate path', async () => {
-    const fields = validFormFields({ locale: 'en-CA', redirect: '/en/access/' })
+  it('honours the locale hidden field and the English page it was posted from', async () => {
+    const fields = validFormFields({ locale: 'en-CA', redirect: '/en/' })
     const res = await POST(makeFormContext(fields, { ip: '203.0.113.61' }))
     expect(res.status).toBe(303)
-    expect(res.headers.get('Location')).toBe('/en/access/?sent=1')
+    expect(res.headers.get('Location')).toBe('/en/?sent=1')
 
     const row = await env.DB.prepare('SELECT locale FROM subscribers WHERE email = ?')
       .bind(fields.email)
@@ -268,7 +268,7 @@ describe('POST /api/subscribe (form-encoded — the no-JS <form> fallback)', () 
     const fields = validFormFields({ consent: undefined })
     const res = await POST(makeFormContext(fields, { ip: '203.0.113.62' }))
     expect(res.status).toBe(303)
-    expect(res.headers.get('Location')).toBe('/acces/?se=consent_required')
+    expect(res.headers.get('Location')).toBe('/?se=consent_required')
 
     const row = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
       .bind(fields.email)
@@ -277,10 +277,10 @@ describe('POST /api/subscribe (form-encoded — the no-JS <form> fallback)', () 
   })
 
   it('overwrites a stale outcome param on the redirect target instead of accumulating it', async () => {
-    const fields = validFormFields({ redirect: '/acces/?se=rate_limited' })
+    const fields = validFormFields({ redirect: '/?se=rate_limited' })
     const res = await POST(makeFormContext(fields, { ip: '203.0.113.63' }))
     expect(res.status).toBe(303)
-    expect(res.headers.get('Location')).toBe('/acces/?sent=1')
+    expect(res.headers.get('Location')).toBe('/?sent=1')
   })
 
   it('rejects a cross-origin form POST and writes no row', async () => {

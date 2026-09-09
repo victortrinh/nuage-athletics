@@ -1,11 +1,10 @@
 import { cva } from 'class-variance-authority'
 
 /**
- * The two text inputs in the codebase share one underline treatment and
- * differ only in type scale: the email field is body text, the gate
- * password field is set in a wide-tracked monospace to read like a PIN
- * entry. Also imported directly by .astro (GateScreen.astro) — keep this
- * file free of React/RAC imports.
+ * One underline treatment, with a `mono` variant that sets a field in
+ * wide-tracked monospace to read like a PIN entry. Kept free of React/RAC
+ * imports so .astro files can import it directly, the same rule
+ * button-variants.ts follows.
  *
  * No focus-visible:border-accent-ink and no focus:outline-none: the global
  * :focus-visible rule in global.css is unlayered CSS, which wins over any

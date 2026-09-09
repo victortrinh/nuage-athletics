@@ -26,7 +26,7 @@ interface Props {
    */
   idPrefix?: string
   /**
-   * The page this form lives on, e.g. `/acces/` or the current product path
+   * The page this form lives on, e.g. `/` or the current product path
    * — carried as a hidden field so /api/subscribe knows where to bounce a
    * no-JS submit back to. Omitted only means a caller forgot; the endpoint
    * falls back to '/' rather than failing.
