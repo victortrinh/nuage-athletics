@@ -14,3 +14,4 @@ dist/
 e2e/.auth/
 playwright-report/
 test-results/
+tmp/

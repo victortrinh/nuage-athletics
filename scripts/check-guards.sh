@@ -16,6 +16,18 @@ if grep -rnE '(class|className)=(\{|")[^}"]*\brounded(-[a-zA-Z0-9]+)?\b' src/; t
   fail=1
 fi
 
+# Same rule, inline styles. Outbound email (src/lib/email.ts) can't use
+# Tailwind classes at all, so the check above can't see it — this catches a
+# hand-written `style="border-radius:4px"` slipping into the shell. Two
+# passes rather than one lookahead regex: -P isn't available in every grep
+# this runs under (notably BSD grep, plain -E only), so this lists every
+# declaration and then subtracts the "0" / "0px" ones a plain ERE can match
+# directly.
+if grep -rnE 'border-radius:\s*[^;]+;' src/ | grep -vE 'border-radius:\s*0(px)?\s*;'; then
+  echo "✘ found a non-zero inline border-radius — this site has no radii (see global.css)" >&2
+  fail=1
+fi
+
 # .astro files must import shared button/field variants from the plain .ts
 # modules only (src/components/ui/*-variants.ts), never from the .tsx
 # primitives — importing the .tsx would pull react-aria-components into the
