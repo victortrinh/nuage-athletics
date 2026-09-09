@@ -179,7 +179,9 @@ test.describe('signup form works before hydration (no JS)', () => {
 test('size selector is a real radiogroup with roving-tabindex arrow navigation', async ({
   page,
 }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+  // The picker only renders once there's something to buy — see the note in
+  // ProductView.astro — so this exercises it the way a founder would.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   // Scoped to "Taille" — the fit selector (ProductActions.tsx) is a second
   // radiogroup on this page since the fit/carousel work, so a bare
@@ -203,7 +205,8 @@ test('size selector is a real radiogroup with roving-tabindex arrow navigation',
 test('fit selector is a radiogroup, defaults to Classique, and switching fit updates the carousel', async ({
   page,
 }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+  // Preview, same reason as the size-selector test above.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const fitGroup = page.getByRole('radiogroup', { name: 'Coupe' })
   await expect(fitGroup).toBeVisible()
@@ -365,7 +368,9 @@ test('carousel advances on a horizontal drag and clamps at the ends', async ({ p
  * lives in global.css; this is what holds it there.
  */
 test('controls report a pointer cursor', async ({ page }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+  // Preview: this checks the fit radiogroup, which only renders once
+  // there's something to buy.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const cursorOf = (locator: ReturnType<Page['locator']>) =>
     locator.evaluate((el) => getComputedStyle(el).cursor)

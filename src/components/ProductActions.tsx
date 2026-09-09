@@ -27,13 +27,6 @@ interface Props {
   /** Fit id + display label only — the photography lives in ProductCarousel's props, not here. */
   fits: FitOption[]
   initialFit: FitId
-  /**
-   * When false the size selector still works, but there is nothing to buy —
-   * the bottom-anchored SignupPrompt (SignupPrompt.astro, rendered by
-   * Base.astro on every page) is the call to action instead, so a visitor
-   * who came to buy is not simply turned away.
-   */
-  commerceEnabled: boolean
 }
 
 export default function ProductActions({
@@ -43,7 +36,6 @@ export default function ProductActions({
   variants,
   fits,
   initialFit,
-  commerceEnabled,
 }: Props) {
   const [fit, setFit] = useFit(productId, initialFit)
   // Bound to the size string, not the variant id — with fit added as a
@@ -146,17 +138,19 @@ export default function ProductActions({
           ))}
         </RadioGroup>
 
-        {commerceEnabled && (
-          <>
-            <Button onPress={onBuy} isDisabled={loading} className="mt-8">
-              {loading ? d.submitting : d.productBuy}
-            </Button>
-            {error && (
-              <p role="alert" className="mt-4 text-sm text-danger">
-                {error}
-              </p>
-            )}
-          </>
+        {/*
+          No commerceEnabled gate here any more: ProductView.astro only
+          mounts this island at all once commerceEnabled is true (either the
+          public launch flag or a founder's preview cookie), so by the time
+          this renders there is always something to buy.
+        */}
+        <Button onPress={onBuy} isDisabled={loading} className="mt-8">
+          {loading ? d.submitting : d.productBuy}
+        </Button>
+        {error && (
+          <p role="alert" className="mt-4 text-sm text-danger">
+            {error}
+          </p>
         )}
       </div>
     </I18nProvider>
