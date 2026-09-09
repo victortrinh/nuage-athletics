@@ -225,19 +225,26 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
           yeezy.com's own reference is careful never to let happen.
 
           So the frame is sized by *height* first: `--chrome-h` is
-          everything else in the column — the fixed ~7rem of header plus
-          article padding, and `belowFrameRem` (the caller's own pagination
-          row, fit caption, fit picker and band, or just the drop
-          announcement — see the prop) — measured at each breakpoint, and
-          the frame's height is whatever's left of 100dvh after that,
-          clamped between a floor (so it never vanishes on a genuinely tiny
-          window; scrolling is the fallback past that point, not a broken
-          layout) and the old 26rem-equivalent ceiling (so a tall window
-          doesn't inflate the photo either). `aspect-[2/1]` turns that
-          height into a width automatically — this is a real `<div>`, not
-          an `<img>`, so nothing here needs the old two-div spacer/stage
-          split: this one box IS the reserved size, and the stage below
-          fills it exactly via inset-0.
+          everything else in the column — the fixed 11.25rem of header,
+          article padding, and this frame's own pagination row and fit
+          caption, plus `belowFrameRem` (the caller's own fit picker and
+          band, or just the drop announcement — see the prop) — measured
+          at each breakpoint, and the frame's height is whatever's left of
+          100dvh after that, clamped between a floor (so it never vanishes
+          on a genuinely tiny window; scrolling is the fallback past that
+          point, not a broken layout) and a generous ceiling (so a tall
+          window doesn't inflate the photo past the column's own width —
+          `max-w-full` is what actually stops it going wider than that).
+          `aspect-[2/1]` turns that height into a width automatically —
+          this is a real `<div>`, not an `<img>`, so nothing here needs the
+          old two-div spacer/stage split: this one box IS the reserved
+          size, and the stage below fills it exactly via inset-0.
+
+          The ceiling only bounds the photo itself — the section around it
+          (ProductView.astro's wrapper, commerce-enabled branch) separately
+          reserves a full `100dvh - header` regardless of how tall the
+          photo ends up, so the CPA disclosure below never peeks into the
+          first screenful even when the frame stops short of that ceiling.
 
           `--chrome-*` are deliberately hand-measured constants passed down
           as props, not a `ResizeObserver` computing them live — they need
@@ -261,7 +268,7 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
               // which caller renders below `belowFrameRem`.
               '--chrome-base': `${belowFrameRem.base + 11.25}rem`,
               '--chrome-sm': `${belowFrameRem.sm + 11.25}rem`,
-              width: 'clamp(10rem, calc((100dvh - var(--chrome-h)) * 2), 26rem)',
+              width: 'clamp(10rem, calc((100dvh - var(--chrome-h)) * 2), 32rem)',
             } as CSSProperties
           }
         >
