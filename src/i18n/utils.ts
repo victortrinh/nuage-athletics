@@ -67,6 +67,34 @@ export const INDEXABLE: Record<RouteId, boolean> = {
   orderCancelled: false,
 }
 
+/**
+ * Which routes show the bottom-anchored signup prompt (SignupPrompt.astro) —
+ * the site's only signup surface. GateScreen.astro and the "notify me" block
+ * in ProductActions.tsx used to carry their own inline SignupForm; both were
+ * removed once this could cover them, rather than showing two consent forms
+ * on one page.
+ *
+ * `Record<RouteId, boolean>` for the same reason INDEXABLE is one: a route
+ * added to ROUTES is a type error here until someone decides.
+ *
+ * `gate` is on: the middleware serves a locked page by rewriting it to the
+ * gate screen (src/middleware.ts), so Base.astro — and this prompt — render
+ * there like anywhere else. Off for the three dead ends reached only from an
+ * email link or a checkout return: offering a signup to someone who just
+ * subscribed, or just unsubscribed, is a CASL-flavoured problem, not only a
+ * UX one.
+ */
+export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
+  home: true,
+  gate: true,
+  privacy: true,
+  terms: true,
+  confirmed: false,
+  unsubscribed: false,
+  orderConfirmed: false,
+  orderCancelled: true,
+}
+
 /** Every indexable route's path, in every locale — the sitemap's allowlist. */
 export const INDEXABLE_PATHS: readonly string[] = (Object.keys(ROUTES) as RouteId[])
   .filter((id) => INDEXABLE[id])

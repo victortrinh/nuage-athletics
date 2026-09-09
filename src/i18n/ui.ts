@@ -19,11 +19,11 @@ import type { Locale } from './config.ts'
  *     emailLabel, gatePasswordLabel, productSizeLabel, productFitLabel,
  *     productGalleryLabel, productImagePosition, productImagePrev,
  *     productImageNext, skipToContent, switchTo, navMenu, navMenuClose,
- *     navLabel, navFooterLabel.
+ *     navLabel, navFooterLabel, promptClose.
  *     A weather word in an accessible name is a broken accessible name.
  *   - Errors that tell you how to fix the thing — errorEmail, errorConsent,
- *     productSelectSizeError, errorChallenge, errorEmailSend. Cute is hostile
- *     when someone is stuck. Errors that are only "wait and retry"
+ *     productSelectSizeError, errorEmailSend. Cute is hostile when someone
+ *     is stuck. Errors that are only "wait and retry"
  *     (errorGeneric, errorRate) carry the voice instead.
  *   - submitting, successTitle: progress and success are announced through a
  *     live region, where being understood on the first hearing beats charm.
@@ -64,7 +64,6 @@ export type Dict = {
   errorEmail: string
   errorConsent: string
   errorRate: string
-  errorChallenge: string
   errorEmailSend: string
   alreadySubscribed: string
   confirmTitle: string
@@ -97,12 +96,9 @@ export type Dict = {
   gatePasswordLabel: string
   gateSubmit: string
   gateErrorBad: string
-  gateSignupLede: string
   // product / checkout
   productDetails: string
   productGalleryLabel: string
-  productNotifyTitle: string
-  productNotifyBody: string
   productComingSoon: string
   productSizeLabel: string
   productOutOfStock: string
@@ -119,6 +115,9 @@ export type Dict = {
   // background sky effect
   skyPause: string
   skyResume: string
+  // bottom-anchored signup prompt (SignupPrompt.astro)
+  promptLabel: string
+  promptClose: string
 }
 
 export const UI: Record<Locale, Dict> = {
@@ -141,7 +140,6 @@ export const UI: Record<Locale, Dict> = {
     errorEmail: 'Entrez une adresse courriel valide.',
     errorConsent: 'Vous devez accepter de recevoir nos courriels.',
     errorRate: 'Trop de tentatives. Laissez passer quelques minutes.',
-    errorChallenge: 'La vérification a échoué. Réessayez.',
     errorEmailSend: "L'envoi du courriel a échoué. Réessayez dans un moment.",
     alreadySubscribed: 'Cette adresse est déjà dans nos prévisions.',
     confirmTitle: 'Inscription confirmée',
@@ -172,12 +170,8 @@ export const UI: Record<Locale, Dict> = {
     gatePasswordLabel: 'Mot de passe',
     gateSubmit: 'Entrer',
     gateErrorBad: 'Toujours couvert.',
-    gateSignupLede: "Pas de mot de passe? On vous écrit à l'éclaircie.",
     productDetails: 'Détails',
     productGalleryLabel: 'Images du produit',
-    productNotifyTitle: "Avis d'éclaircie",
-    productNotifyBody:
-      'Choisissez votre taille, laissez votre courriel. On vous écrit dès que le ciel se dégage.',
     productComingSoon: "À l'horizon",
     productSizeLabel: 'Taille',
     productOutOfStock: 'Épuisé',
@@ -194,6 +188,8 @@ export const UI: Record<Locale, Dict> = {
     orderCancelledBody: "Votre commande n'a pas été complétée. Aucun montant n'a été prélevé.",
     skyPause: 'Figer le ciel',
     skyResume: 'Animer le ciel',
+    promptLabel: 'Recevez nos actualités',
+    promptClose: "Fermer l'infolettre",
   },
   'en-CA': {
     brand: 'Nuage Athletics',
@@ -214,7 +210,6 @@ export const UI: Record<Locale, Dict> = {
     errorEmail: 'Enter a valid email address.',
     errorConsent: 'You need to agree to receive our emails.',
     errorRate: 'Too many attempts. Let a few minutes pass.',
-    errorChallenge: 'Verification failed. Try again.',
     errorEmailSend: 'Sending the email failed. Try again in a moment.',
     alreadySubscribed: 'That address is already in the forecast.',
     confirmTitle: 'Signup confirmed',
@@ -244,12 +239,8 @@ export const UI: Record<Locale, Dict> = {
     gatePasswordLabel: 'Password',
     gateSubmit: 'Enter',
     gateErrorBad: 'Still overcast.',
-    gateSignupLede: "No password? We'll write when it clears.",
     productDetails: 'Details',
     productGalleryLabel: 'Product images',
-    productNotifyTitle: 'Clearing advisory',
-    productNotifyBody:
-      'Pick your size, leave your email. We write the moment the sky clears.',
     productComingSoon: 'On the horizon',
     productSizeLabel: 'Size',
     productOutOfStock: 'Out of stock',
@@ -265,6 +256,8 @@ export const UI: Record<Locale, Dict> = {
     orderCancelledBody: 'Your order was not completed. You have not been charged.',
     skyPause: 'Pause the sky',
     skyResume: 'Animate the sky',
+    promptLabel: 'Get our updates',
+    promptClose: 'Close newsletter prompt',
   },
 }
 

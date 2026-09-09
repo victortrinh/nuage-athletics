@@ -237,21 +237,6 @@ describe('POST /api/subscribe', () => {
     expect(await readJson(results[5])).toEqual({ ok: false, code: 'rate_limited' })
   })
 
-  it('still rejects a missing Turnstile token when a secret is configured', async () => {
-    // vitest.config.ts binds no TURNSTILE_SECRET_KEY, so every other test in
-    // this file exercises the "no secret configured, don't block" branch.
-    // This is the one that proves the JSON path stays strictly enforced —
-    // unlike the form-encoded path below, which is allowed to skip it.
-    env.TURNSTILE_SECRET_KEY = 'test-secret'
-    try {
-      const body = validBody()
-      const res = await POST(makeContext(body, { ip: '203.0.113.40' }))
-      expect(res.status).toBe(400)
-      expect(await readJson(res)).toEqual({ ok: false, code: 'challenge_failed' })
-    } finally {
-      delete env.TURNSTILE_SECRET_KEY
-    }
-  })
 })
 
 describe('POST /api/subscribe (form-encoded — the no-JS <form> fallback)', () => {
@@ -296,18 +281,6 @@ describe('POST /api/subscribe (form-encoded — the no-JS <form> fallback)', () 
     const res = await POST(makeFormContext(fields, { ip: '203.0.113.63' }))
     expect(res.status).toBe(303)
     expect(res.headers.get('Location')).toBe('/acces/?sent=1')
-  })
-
-  it('accepts a missing Turnstile token even with a secret configured', async () => {
-    env.TURNSTILE_SECRET_KEY = 'test-secret'
-    try {
-      const fields = validFormFields()
-      const res = await POST(makeFormContext(fields, { ip: '203.0.113.64' }))
-      expect(res.status).toBe(303)
-      expect(res.headers.get('Location')).toBe('/acces/?sent=1')
-    } finally {
-      delete env.TURNSTILE_SECRET_KEY
-    }
   })
 
   it('rejects a cross-origin form POST and writes no row', async () => {

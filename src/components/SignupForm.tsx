@@ -9,7 +9,6 @@ import { TextField, Label, Input, FieldError } from './ui/text-field'
 interface Props {
   locale: Locale
   d: Dict
-  turnstileSiteKey?: string
   /**
    * Where this signup came from — recorded on the subscriber row. The product
    * page passes the selected size so a "notify me" tells us which size to
@@ -57,28 +56,14 @@ function errorMessage(d: Dict, code: string): string {
     consent_required: d.errorConsent,
     rate_limited: d.errorRate,
     already_subscribed: d.alreadySubscribed,
-    challenge_failed: d.errorChallenge,
     email_failed: d.errorEmailSend,
   }
   return map[code] ?? d.errorGeneric
 }
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (el: HTMLElement, opts: Record<string, unknown>) => string
-      remove: (id: string) => void
-      reset: (id?: string) => void
-    }
-  }
-}
-
-const TURNSTILE_SRC = 'script[src*="turnstile/v0/api.js"]'
-
 export default function SignupForm({
   locale,
   d,
-  turnstileSiteKey,
   source,
   submitLabel,
   idPrefix = 'signup',
@@ -95,69 +80,23 @@ export default function SignupForm({
   })
   const [email, setEmail] = useState('')
   const [consent, setConsent] = useState(false)
-  const widgetRef = useRef<HTMLDivElement>(null)
-  const widgetId = useRef<string | null>(null)
   const successHeadingRef = useRef<HTMLParagraphElement>(null)
-
-  /**
-   * Render Turnstile ourselves rather than letting api.js auto-scan the page.
-   * Auto-render injects into this container while React is still hydrating,
-   * which breaks hydration and costs us the widget (and therefore the token).
-   * An effect runs after hydration, so the DOM the server sent is never
-   * touched before React is done with it.
-   *
-   * Two things have to be true before rendering: api.js has loaded, and the
-   * container actually has a layout box. The gate screen keeps this form
-   * inside a collapsed <details>, whose contents aren't rendered at all —
-   * Turnstile draws an iframe, and one rendered into nothing never finishes
-   * its challenge, so we'd hand the endpoint an empty token. Whichever of
-   * the two happens last triggers the mount; `mount` is idempotent, so
-   * being called from both paths is harmless.
-   */
-  useEffect(() => {
-    if (!turnstileSiteKey) return
-
-    function mount() {
-      const el = widgetRef.current
-      if (!el || !window.turnstile || widgetId.current !== null) return
-      // checkVisibility is Baseline-2023; treat its absence as visible,
-      // which is the pre-<details> behaviour.
-      if (el.checkVisibility && !el.checkVisibility()) return
-      widgetId.current = window.turnstile.render(el, {
-        sitekey: turnstileSiteKey,
-        theme: 'light',
-      })
-    }
-
-    // api.js is async: it may already be there, or still in flight.
-    const script = document.querySelector<HTMLScriptElement>(TURNSTILE_SRC)
-    if (window.turnstile) mount()
-    else script?.addEventListener('load', mount, { once: true })
-
-    // No-op for every form that isn't inside a disclosure.
-    const disclosure = widgetRef.current?.closest('details')
-    disclosure?.addEventListener('toggle', mount)
-
-    return () => {
-      script?.removeEventListener('load', mount)
-      disclosure?.removeEventListener('toggle', mount)
-      if (widgetId.current !== null) {
-        window.turnstile?.remove(widgetId.current)
-        widgetId.current = null
-      }
-    }
-  }, [turnstileSiteKey])
 
   // Moves focus into the success panel once it replaces the form — without
   // this, focus (which was on the submit button) is dropped to <body> when
   // that button unmounts.
   useEffect(() => {
-    if (state.kind === 'success') successHeadingRef.current?.focus()
-  }, [state.kind])
-
-  function resetTurnstile() {
-    if (widgetId.current !== null) window.turnstile?.reset(widgetId.current)
-  }
+    if (state.kind !== 'success') return
+    successHeadingRef.current?.focus()
+    // A plain window event, not a prop: an island's props are serialized to
+    // hydrate it, so a live callback can't cross that boundary the way it
+    // could between two components in one React tree. SignupPrompt.astro
+    // listens for this (filtered by idPrefix) to suppress itself
+    // permanently once its own form succeeds, without this component
+    // needing to know that listener exists — same coupling-by-string as the
+    // 'sent'/'se' query params already shared with subscribe.ts.
+    window.dispatchEvent(new CustomEvent('nuage:signup-success', { detail: { idPrefix } }))
+  }, [state.kind, idPrefix])
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -185,7 +124,6 @@ export default function SignupForm({
           locale,
           consent,
           company,
-          turnstileToken: form.get('cf-turnstile-response') ?? undefined,
           source: source ?? (typeof document !== 'undefined' ? document.referrer || null : null),
         }),
       })
@@ -198,12 +136,8 @@ export default function SignupForm({
       }
 
       const code = data.code ?? ''
-      // Turnstile tokens are single use. Without a reset, retrying after an
-      // error submits the spent token and fails the challenge every time.
-      resetTurnstile()
       setState({ kind: 'error', code, message: errorMessage(d, code) })
     } catch {
-      resetTurnstile()
       setState({ kind: 'error', code: 'network', message: d.errorGeneric })
     }
   }
@@ -211,8 +145,8 @@ export default function SignupForm({
   // A field-level error (the email itself is invalid) gets FieldError,
   // scoped to that input via TextField's built-in aria-invalid/
   // aria-describedby wiring. Every other error (consent, rate limit,
-  // already-subscribed, Turnstile, Resend) is form-level, not about what's
-  // in the email box, and keeps the standalone alert below.
+  // already-subscribed, Resend) is form-level, not about what's in the
+  // email box, and keeps the standalone alert below.
   const emailInvalid = state.kind === 'error' && state.code === 'invalid_email'
   const formError = state.kind === 'error' && state.code !== 'invalid_email' ? state.message : null
 
@@ -299,9 +233,6 @@ export default function SignupForm({
           >
             <span className="text-mute">{d.consentLabel}</span>
           </Checkbox>
-
-          {/* Left empty on the server; the effect above fills it after hydration. */}
-          {turnstileSiteKey && <div ref={widgetRef} className="mt-6" />}
 
           <Button type="submit" isDisabled={state.kind === 'submitting'} className="mt-8">
             {state.kind === 'submitting' ? d.submitting : (submitLabel ?? d.submit)}

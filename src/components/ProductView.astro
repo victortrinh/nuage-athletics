@@ -1,5 +1,4 @@
 ---
-import { env } from 'cloudflare:workers'
 import ProductCarousel from './ProductCarousel.tsx'
 import ProductActions from './ProductActions.tsx'
 import CpaDisclosure from './CpaDisclosure.astro'
@@ -17,18 +16,6 @@ const { locale, commerceEnabled } = Astro.props
 const d = t(locale)
 const product = featuredProduct(locale)
 const editorial = editorialFor(product.id, locale)
-// PUBLIC_TURNSTILE_SITE_KEY is a [vars] entry in wrangler.toml, i.e. a Worker
-// runtime binding — not a Vite build-time value, so it must come from the
-// `env` import, not `import.meta.env` (which is never populated here and
-// silently produced undefined, disabling the widget on every request).
-const siteKey = env.PUBLIC_TURNSTILE_SITE_KEY
-
-// A no-JS "notify me" submit (ProductActions' SignupForm, shown only while
-// commerce is off) bounces back here the same way the gate's does — see the
-// matching comment in GateScreen.astro and subscribe.ts.
-const signupSent = Astro.url.searchParams.get('sent') === '1'
-const signupErrorCode = Astro.url.searchParams.get('se')
-const redirectTo = Astro.url.pathname + Astro.url.search
 
 const site = Astro.site?.origin ?? 'https://nuageathletics.com'
 const productUrl = new URL(Astro.url.pathname, site).href
@@ -138,10 +125,6 @@ const jsonLd = {
         fits={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
         initialFit={DEFAULT_FIT}
         {commerceEnabled}
-        turnstileSiteKey={siteKey}
-        {redirectTo}
-        initialErrorCode={signupErrorCode ?? undefined}
-        initialSuccess={signupSent}
       />
     </div>
 
@@ -162,14 +145,3 @@ const jsonLd = {
     {commerceEnabled && <CpaDisclosure {locale} productName={product.name} />}
   </div>
 </article>
-
-{
-  siteKey && (
-    <script
-      is:inline
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-      async
-      defer
-    />
-  )
-}

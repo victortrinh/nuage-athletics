@@ -1,0 +1,198 @@
+---
+import SignupForm from './SignupForm.tsx'
+import NavIcon from './NavIcon.astro'
+import { cn } from './ui/cn'
+import { buttonVariants } from './ui/button-variants'
+import type { Locale } from '../i18n/config'
+import type { Dict } from '../i18n/ui'
+
+interface Props {
+  locale: Locale
+  d: Dict
+  /** The current page, so a no-JS submit's 303 lands back here. */
+  redirectTo: string
+  /**
+   * True when a no-JS submit from this same prompt just bounced back here
+   * with an outcome (Base.astro reads `sent`/`se`) — forces the band open on
+   * first paint, no timer, no animation, the outcome already part of the
+   * first response.
+   */
+  initialOpen: boolean
+  initialSuccess?: boolean
+  initialErrorCode?: string
+}
+
+const { locale, d, redirectTo, initialOpen, initialSuccess, initialErrorCode } = Astro.props
+---
+
+{/*
+  A labelled region, not a <dialog> — non-blocking, no scrim, no focus trap,
+  and it never takes focus when it appears. A role="dialog" that doesn't trap
+  focus would promise modal behaviour it doesn't deliver.
+
+  hidden (not display:none via a class) is what the script below flips, the
+  same signal Astro's client:visible directive watches for on SignupForm
+  below: an island wrapped in something that starts hidden defers its own
+  hydration until that ancestor gets a layout box. Most visitors never see
+  this band at all inside the ~6s reveal window (they navigate away, or
+  dismiss it once and it stays suppressed) — client:visible means they never
+  pay SignupForm's hydration cost either, the same reasoning GateScreen.astro
+  uses for its own collapsed <details>.
+
+  The reveal itself needs JS (the timer below), so a no-JS visitor would
+  otherwise never see this at all — the one JS-dependent thing standing
+  between them and a form that would work fine without it. The <noscript>
+  right after this element forces it visible immediately when JS is off,
+  the same role ProductView.astro's <noscript> image grid plays for the
+  carousel: a static equivalent for exactly the audience the JS version
+  can't reach.
+*/}
+<div
+  id="signup-prompt"
+  hidden={initialOpen ? undefined : true}
+  role="region"
+  aria-labelledby="signup-prompt-label"
+  class="prompt-veil fixed inset-x-0 bottom-0 z-50"
+>
+  <div class="mx-auto max-w-7xl px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:px-10">
+    <div class="mx-auto max-w-md">
+      <div class="flex items-start justify-between gap-4">
+        <p id="signup-prompt-label" class="text-[11px] uppercase tracking-label text-mute">
+          {d.promptLabel}
+        </p>
+        <button
+          type="button"
+          id="signup-prompt-close"
+          aria-label={d.promptClose}
+          class={cn(
+            buttonVariants({ variant: 'quiet' }),
+            'flex size-8 shrink-0 items-center justify-center -mt-2 -mr-2'
+          )}
+        >
+          <NavIcon variant="close" />
+        </button>
+      </div>
+      <div class="mt-4">
+        <SignupForm
+          client:visible
+          {locale}
+          {d}
+          source="popup"
+          idPrefix="signup-prompt"
+          {redirectTo}
+          {initialErrorCode}
+          {initialSuccess}
+        />
+      </div>
+    </div>
+  </div>
+</div>
+
+{/*
+  Tailwind's own preflight ships `[hidden]{display:none!important}` inside
+  its `base` layer — an !important rule in a *named* layer beats an
+  !important rule with no layer at all, regardless of selector specificity,
+  because cascade layers explicitly reverse priority order for !important
+  declarations (the mechanism that normally lets unlayered author styles
+  win over a framework's layered reset flips for !important, precisely so a
+  reset's !important rules stay hard to override by accident). A plain
+  unlayered override here would lose to it every time. `signup-prompt-
+  noscript` (registered first, before Tailwind, in global.css) sidesteps
+  that: an earlier layer's !important rule beats every later one, framework
+  reset included, no specificity contest needed.
+*/}
+<noscript>
+  <style
+    set:html={`@layer signup-prompt-noscript { #signup-prompt[hidden] { display: block !important; } }`}
+  />
+</noscript>
+
+<script>
+  // Wires the band declared above: a delayed reveal, a dismiss that persists
+  // (src/lib/signup-prompt.ts), Escape while focus is inside it, and the
+  // same enter/exit keyframe pattern as the nav drawer in Base.astro (see
+  // that script's own comments for why keyframes, not transitions).
+  import { getStoredPromptState, shouldShow, dismissPrompt, markSubscribed } from '../lib/signup-prompt'
+
+  const root = document.getElementById('signup-prompt')
+  const closeButton = document.getElementById('signup-prompt-close')
+
+  if (root instanceof HTMLElement && closeButton instanceof HTMLButtonElement) {
+    function prefersReducedMotion() {
+      return matchMedia('(prefers-reduced-motion: reduce)').matches
+    }
+
+    function requestIdle(cb: () => void) {
+      if ('requestIdleCallback' in window) {
+        ;(
+          window as unknown as { requestIdleCallback: (cb: () => void) => void }
+        ).requestIdleCallback(cb)
+      } else {
+        setTimeout(cb, 200)
+      }
+    }
+
+    function show() {
+      root.hidden = false
+      root.dataset.state = 'entering'
+    }
+
+    // Reduced-motion visitors get no animation-name at all (the keyframes
+    // are gated motion-safe in global.css), so 'animationend' would never
+    // fire and the band would stay on screen forever — close it immediately
+    // instead of waiting for an event that isn't coming.
+    function requestClose() {
+      if (prefersReducedMotion()) {
+        root.hidden = true
+        root.dataset.state = ''
+        return
+      }
+      root.dataset.state = 'exiting'
+    }
+
+    root.addEventListener('animationend', (event) => {
+      if (event.target !== root) return
+      if (root.dataset.state === 'exiting') root.hidden = true
+      root.dataset.state = ''
+    })
+
+    closeButton.addEventListener('click', () => {
+      dismissPrompt()
+      requestClose()
+    })
+
+    // Scoped to "focus is inside it", not global — this is a non-blocking
+    // region, not a modal, so Escape elsewhere on the page shouldn't reach
+    // in and close something the visitor isn't even looking at.
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return
+      if (root.hidden) return
+      if (!root.contains(document.activeElement)) return
+      requestClose()
+    })
+
+    // SignupForm.tsx dispatches this on window when its own submission
+    // succeeds — see the matching comment there for why a plain event
+    // rather than a callback prop. idPrefix is this prompt's own, checked
+    // defensively — SignupPrompt is the only SignupForm on any page today,
+    // but the event is a page-wide signal and costs nothing to scope.
+    window.addEventListener('nuage:signup-success', (event) => {
+      const detail = (event as CustomEvent<{ idPrefix?: string }>).detail
+      if (detail?.idPrefix !== 'signup-prompt') return
+      markSubscribed()
+    })
+
+    // Already open means Base.astro forced it, because a no-JS submit from
+    // this same prompt just bounced back with an outcome — show it
+    // regardless of any past dismissal, no timer, no animation (it's
+    // already part of the first paint).
+    const alreadyOpen = !root.hidden
+
+    if (!alreadyOpen && shouldShow(getStoredPromptState(), Date.now())) {
+      // Deferred behind requestIdleCallback so the timer's registration
+      // itself never competes with first paint or the sky's own startup
+      // (src/components/Sky.astro uses the same guard for the same reason).
+      requestIdle(() => setTimeout(show, 6000))
+    }
+  }
+</script>

@@ -26,7 +26,6 @@ test('sky toggle appears with an accessible name once motion is allowed', async 
 
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa'])
-    .exclude('iframe[src*="challenges.cloudflare.com"]')
     .analyze()
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
 })

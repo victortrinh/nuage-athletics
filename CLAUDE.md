@@ -8,7 +8,7 @@ Landing page + email capture for a single-SKU Canadian apparel brand. First drop
 fall 2026. Commerce is scaffolded behind an adapter but not wired to any page.
 
 **Stack:** Astro 7 (static output + SSR endpoints) · React islands (shadcn/ui on
-React Aria Components) · Tailwind 4 · Cloudflare Workers · D1 · Resend · Turnstile ·
+React Aria Components) · Tailwind 4 · Cloudflare Workers · D1 · Resend ·
 Stripe (phase 2)
 
 ## Non-negotiables
@@ -152,13 +152,12 @@ that page's query string (`sent=1` / `se=<code>`) rather than JSON, since a
 no-JS submit can't stay on the page to render one. The page reads that back out
 of `Astro.url.searchParams` and passes it into the form as `initialSuccess` /
 `initialErrorCode`, so the server render and the first client render agree and
-there's nothing for hydration to reconcile. Turnstile is the one input a no-JS
-POST can never carry — the widget needs JS to render at all — so `subscribe.ts`
-skips the challenge only on that path, leaning instead on the honeypot, the
-per-IP rate limit, and double opt-in; standing anti-abuse for that skip is a
-same-origin check (`isSameOrigin` in `subscribe.ts`), on top of Astro 7's own
+there's nothing for hydration to reconcile. Anti-abuse on this endpoint is the
+honeypot field, the per-IP rate limit, and double opt-in, backed by a
+same-origin check (`isSameOrigin` in `subscribe.ts`) on top of Astro 7's own
 `checkOrigin` middleware, which already rejects a cross-origin form POST before
-any route handler runs.
+any route handler runs — no bot-verification widget, which would need JS to
+render at all and so could never cover the no-JS path anyway.
 
 An island wrapped in a `<details>` that switches from `client:load` to
 `client:visible` gets its hydration deferred until the disclosure actually
@@ -256,11 +255,6 @@ curl -s localhost:8787/ | grep -o 'lang="fr-CA"\|hreflang="[^"]*"'
 
 The French root must report `lang="fr-CA"` and carry three `rel="alternate"`
 links (`fr-CA`, `en-CA`, `x-default`).
-
-**`.dev.vars` is read by vitest too.** Setting `TURNSTILE_SECRET_KEY` there makes
-`subscribe.ts` start verifying challenges the tests never send, and the suite
-fails with 400s that look like a code bug. Leave it commented out unless you are
-deliberately exercising Turnstile.
 
 ## Agent skills
 

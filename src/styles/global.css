@@ -1,3 +1,15 @@
+/*
+ * Registers this layer's position — first, before Tailwind's own — without
+ * adding any rules to it yet. Cascade layers are ordered by first
+ * appearance across the whole document, and `@import`ing Tailwind below
+ * is what declares its own `theme, base, components, utilities` layers;
+ * this line has to come first in the file to land before them. The actual
+ * rule lives in SignupPrompt.astro's <noscript> block — see the comment
+ * there for why it needs a named layer at all rather than just an
+ * unlayered override.
+ */
+@layer signup-prompt-noscript;
+
 @import "tailwindcss";
 
 @theme {
@@ -184,9 +196,10 @@ button, input, textarea, select, img, video { border-radius: 0; }
    on buttons — it matches the browser default instead, which is an arrow.
    Every <button> on this site therefore looked inert to a mouse, which is
    how the carousel arrows, the numbered pagination and the sky toggle all
-   ended up reading as decoration. Two files had already patched around it
-   one control at a time (the <summary> in GateScreen.astro, the <label>
-   RAC renders for a Radio); this states it once for everything.
+   ended up reading as decoration. `summary` is included pre-emptively for
+   the same reason, even with no live <details> on the site right now —
+   this states it once for everything, so the next one doesn't need its own
+   patch either.
 
    <label> is not in the list: a label is only a control when it wraps or
    points at one, which the selector can't know — radio-group.tsx and
@@ -272,6 +285,68 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
   }
 }
 
+/*
+ * Ground for the bottom-anchored signup prompt (SignupPrompt.astro). Same
+ * device as yeezy.com's own reference (screenshots from the issue thread): a
+ * blurred ground with no hairline of its own — the defocus alone is what
+ * separates the band from the page, not an edge. It sits over the page
+ * rather than behind a scrim — the page stays scrollable and clickable
+ * underneath it.
+ *
+ * The blur radius is lower than the reference's (12px, not 20px) for a
+ * reason specific to what's behind it here: the reference blurs high-
+ * contrast product photography, which stays visibly blobby even under a
+ * heavy blur, while this site blurs Sky's soft cloud texture — at 20px that
+ * washed out to a near-flat tint, losing the sense that there's a moving
+ * canvas under the glass at all. A lighter blur lets more of the cloud
+ * shapes read through without giving up legibility.
+ *
+ * @supports guards the blur: Firefox for Android and some older WebViews
+ * don't implement backdrop-filter. Those fall back to header-veil's own
+ * device (global.css), mirrored — solid at the bottom, fading to transparent
+ * toward the top — which is legible without ever blurring anything.
+ *
+ * prefers-reduced-transparency asks for exactly what it says: a ground you
+ * can't partly see through. forced-colors drops the blur and tint
+ * altogether — Canvas/CanvasText plus a real border are what makes the band
+ * read as a distinct surface there, same reasoning as the nav drawer panel's
+ * own forced-colors:border-[CanvasText]; that border is specific to forced-
+ * colors mode; the normal state stays true to the reference and has none.
+ *
+ * -webkit-backdrop-filter has to come *before* backdrop-filter in every
+ * declaration pair here, not after: written the other way around, the
+ * build's Lightning CSS pass silently dropped the unprefixed property
+ * entirely (kept only the -webkit- one) rather than keeping both — no
+ * warning, no error, just a stylesheet that visually blurs in Chromium
+ * (which still honours the prefix) while getComputedStyle().backdropFilter
+ * reports 'none', which is exactly what e2e/a11y.e2e.ts's neutralization
+ * step reads to know whether to flatten this ground before an axe scan.
+ * This order is what keeps both properties in the compiled output.
+ */
+@utility prompt-veil {
+  background-color: rgb(250 250 250 / 90%);
+  background-image: linear-gradient(to bottom, transparent, var(--color-paper) 30%);
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    background-color: rgb(250 250 250 / 72%);
+    background-image: none;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    background-color: var(--color-paper);
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  @media (forced-colors: active) {
+    background-color: Canvas;
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-top: 1px solid CanvasText;
+  }
+}
+
 ::selection { background: var(--color-ink); color: var(--color-paper); }
 
 /* The one wordmark treatment, used for the brand mark and page headings —
@@ -350,3 +425,36 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 @keyframes drawer-out { from { translate: 0 0; } to { translate: -100% 0; } }
 @keyframes veil-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes veil-out { from { opacity: 1; } to { opacity: 0; } }
+
+/*
+ * The signup prompt (SignupPrompt.astro) slides up from the bottom edge on
+ * the same keyframe reasoning as the nav drawer above: its own script flips
+ * `hidden` off and sets data-state in the same synchronous call, and a
+ * transition never starts on an element whose display just changed in that
+ * same tick — a keyframe animation doesn't care what the "before" state was,
+ * because its own `from` is part of the animation, not derived from a
+ * previously-rendered frame.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  #signup-prompt[data-state='entering'] {
+    /*
+     * A slower, gentler curve than the nav drawer's plain ease-out — this is
+     * an unprompted interruption rising in from the edge of the viewport,
+     * not a direct response to a click, so it earns a softer arrival.
+     * cubic-bezier(0.16, 1, 0.3, 1) ("ease-out-expo") keeps decelerating
+     * through nearly its whole length instead of easing off only in the
+     * last third the way ease-out does, which is what actually reads as
+     * gliding into place rather than snapping to a stop. The one deviation
+     * from this file's usual named easings, for that reason.
+     */
+    animation: prompt-in 650ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #signup-prompt[data-state='exiting'] {
+    /* Dismissal is a direct response to a click, so it stays quick and
+       plain — same asymmetry as the nav drawer's entering/exiting pair. */
+    animation: prompt-out 350ms ease-in;
+  }
+}
+
+@keyframes prompt-in { from { translate: 0 100%; } to { translate: 0 0; } }
+@keyframes prompt-out { from { translate: 0 0; } to { translate: 0 100%; } }

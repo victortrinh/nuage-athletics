@@ -5,8 +5,9 @@ import Sky from '../components/Sky.astro'
 import Logo from '../components/Logo.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import NavIcon from '../components/NavIcon.astro'
+import SignupPrompt from '../components/SignupPrompt.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
-import { route, type RouteId } from '../i18n/utils'
+import { route, SHOWS_SIGNUP_PROMPT, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
 import { buttonVariants } from '../components/ui/button-variants'
 import { cn } from '../components/ui/cn'
@@ -37,6 +38,22 @@ const navLinks = [
   { href: 'mailto:hello@nuageathletics.com', label: d.contact },
   { href: SOCIAL_PROFILES.instagram, label: d.instagram, external: true },
 ]
+
+// Defaults to shown for a page with no routeId — same convention Seo.astro
+// uses for `noindex` when it has no INDEXABLE entry to read.
+const showPrompt = routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true
+
+// The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
+// submit back to `redirect` with the outcome folded into 'sent'/'se' (see
+// subscribe.ts's formResponder and the matching comment in SignupForm.tsx).
+// SignupPrompt is the only SignupForm on any page now, so there's no second
+// form to disambiguate from — the endpoint already self-cleans a stale
+// 'sent'/'se' on the next submit (formResponder deletes both before setting
+// either), so the redirect target needs no scrubbing here either.
+const promptSent = Astro.url.searchParams.get('sent') === '1'
+const promptErrorCode = Astro.url.searchParams.get('se')
+const promptInitialOpen = promptSent || Boolean(promptErrorCode)
+const promptRedirectTo = Astro.url.pathname + Astro.url.search
 ---
 
 <!doctype html>
@@ -288,5 +305,18 @@ const navLinks = [
         <p>© {year} {d.brand}. {d.rights}</p>
       </div>
     </footer>
+
+    {
+      showPrompt && (
+        <SignupPrompt
+          {locale}
+          {d}
+          redirectTo={promptRedirectTo}
+          initialOpen={promptInitialOpen}
+          initialSuccess={promptSent}
+          initialErrorCode={promptErrorCode ?? undefined}
+        />
+      )
+    }
   </body>
 </html>
