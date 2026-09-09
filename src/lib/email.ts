@@ -35,9 +35,31 @@ export const EMAIL_THEME = {
 
 /** Absolute path to the committed wordmark PNG. See scripts/email-wordmark.mjs. */
 export const WORDMARK_PATH = '/img/wordmark-email.png'
-/** Displayed width; the source asset is rendered at 2x this for retina. */
-const WORDMARK_WIDTH = 160
-const WORDMARK_HEIGHT = 39
+/** Displayed width; the source asset (320x79, scripts/email-wordmark.mjs) is
+ * more than 2x this, so it stays sharp at retina. Small on purpose — this
+ * sits inside a padded card now, not full-width across the message. */
+const WORDMARK_WIDTH = 120
+const WORDMARK_HEIGHT = 29
+
+/**
+ * The outer backdrop around the message card, standing in for the site's own
+ * background (Sky.astro's WebGL canvas / the `sky-fallback` utility in
+ * global.css) — email can't run either. This is not a token copy the way
+ * EMAIL_THEME is: it's a deliberately simplified approximation, a couple of
+ * soft grey masses over a light wash in the same hue sky-fallback uses
+ * (rgba(158,158,158,...) on near-white), because email clients that ignore
+ * background-image entirely (Outlook desktop chief among them) still need
+ * *something* — hence the solid OUTER_BG color as the real fallback, with
+ * the gradient layered on as a progressive enhancement for clients that
+ * render it (Apple Mail, iOS Mail, Gmail's webmail and app).
+ */
+const OUTER_BG = '#e8e8e6'
+const OUTER_BG_IMAGE = [
+  'radial-gradient(46% 38% at 18% 10%, rgba(158,158,158,0.16) 0%, rgba(158,158,158,0) 100%)',
+  'radial-gradient(50% 40% at 84% 6%, rgba(158,158,158,0.14) 0%, rgba(158,158,158,0) 100%)',
+  'radial-gradient(60% 46% at 50% 100%, rgba(158,158,158,0.18) 0%, rgba(158,158,158,0) 100%)',
+  'linear-gradient(to bottom, #eeeeec 0%, #e4e4e2 100%)',
+].join(', ')
 
 function escapeHtml(s: string): string {
   return s
@@ -61,6 +83,13 @@ function escapeHtml(s: string): string {
  * conditional comment below is what keeps the column at 520px there instead
  * of full-bleed. `color-scheme: light only` stops Gmail/Apple Mail from
  * auto-inverting a site that has no dark mode of its own.
+ *
+ * The message itself sits in a paper card — border, not shadow, matching the
+ * site's own "no shadows" rule — floated on OUTER_BG, the email's stand-in
+ * for the site's sky background. `bgcolor` attributes ride alongside the CSS
+ * on both the outer wrapper and the card because Outlook's Word engine
+ * ignores `background`/`background-color` in `style=` but does honour the
+ * HTML attribute.
  */
 export function renderEmailShell({
   locale,
@@ -99,57 +128,63 @@ export function renderEmailShell({
     <![endif]-->
     <title>${escapeHtml(heading)}</title>
   </head>
-  <body style="margin:0;padding:0;background:${t.paper};">
+  <body style="margin:0;padding:0;background-color:${OUTER_BG};">
     ${
       preheader
         ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>`
         : ''
     }
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${t.paper};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${OUTER_BG}" style="background-color:${OUTER_BG};background-image:${OUTER_BG_IMAGE};background-repeat:no-repeat;">
       <tr>
-        <td align="center" style="padding:32px 16px;">
+        <td align="center" style="padding:48px 16px;">
           <!--[if mso]>
           <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0"><tr><td>
           <![endif]-->
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;font-family:${t.fontSans};color:${t.ink};">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${t.paper}" style="max-width:520px;background-color:${t.paper};border:1px solid ${t.line};">
             <tr>
-              <td style="padding:0 0 32px;">
-                <img
-                  src="${wordmarkUrl}"
-                  width="${WORDMARK_WIDTH}"
-                  height="${WORDMARK_HEIGHT}"
-                  alt="${escapeHtml(d.brand)}"
-                  style="display:block;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
-                />
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 0 16px;font-family:${t.fontDisplay};font-size:22px;font-weight:600;line-height:1.3;">
-                ${heading}
-              </td>
-            </tr>
-            <tr>
-              <td>
-                ${bodyHtml}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px 0 16px;">
-                <div style="border-top:1px solid ${t.line};line-height:0;font-size:0;">&nbsp;</div>
-              </td>
-            </tr>
-            <!-- CASL: sender identification + physical address are mandatory on
-                 every commercial message; unsubscribe only applies when unsubUrl
-                 is given (see doc comment above). -->
-            <tr>
-              <td style="font-size:12px;color:${t.mute};line-height:1.6;">
-                ${SENDER_IDENTITY.name}<br />
-                ${escapeHtml(SENDER_IDENTITY.address)}<br />
-                <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t.mute};">${SENDER_IDENTITY.email}</a>${
-                  unsubUrl
-                    ? `<br /><a href="${unsubUrl}" style="color:${t.mute};">${d.mailUnsub}</a>`
-                    : ''
-                }
+              <td style="padding:40px 32px;font-family:${t.fontSans};color:${t.ink};">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:0 0 28px;">
+                      <img
+                        src="${wordmarkUrl}"
+                        width="${WORDMARK_WIDTH}"
+                        height="${WORDMARK_HEIGHT}"
+                        alt="${escapeHtml(d.brand)}"
+                        style="display:block;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 0 16px;font-family:${t.fontDisplay};font-size:22px;font-weight:600;line-height:1.3;">
+                      ${heading}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      ${bodyHtml}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:32px 0 16px;">
+                      <div style="border-top:1px solid ${t.line};line-height:0;font-size:0;">&nbsp;</div>
+                    </td>
+                  </tr>
+                  <!-- CASL: sender identification + physical address are mandatory on
+                       every commercial message; unsubscribe only applies when unsubUrl
+                       is given (see doc comment above). -->
+                  <tr>
+                    <td style="font-size:12px;color:${t.mute};line-height:1.6;">
+                      ${SENDER_IDENTITY.name}<br />
+                      ${escapeHtml(SENDER_IDENTITY.address)}<br />
+                      <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t.mute};">${SENDER_IDENTITY.email}</a>${
+                        unsubUrl
+                          ? `<br /><a href="${unsubUrl}" style="color:${t.mute};">${d.mailUnsub}</a>`
+                          : ''
+                      }
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
