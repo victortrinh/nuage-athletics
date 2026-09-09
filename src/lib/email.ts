@@ -1,5 +1,5 @@
 import type { Locale } from '../i18n/config.ts'
-import { UI } from '../i18n/ui.ts'
+import { UI, type Dict } from '../i18n/ui.ts'
 import { SENDER_IDENTITY } from './consent.ts'
 
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails'
@@ -44,22 +44,18 @@ const WORDMARK_HEIGHT = 29
 /**
  * The outer backdrop around the message card, standing in for the site's own
  * background (Sky.astro's WebGL canvas / the `sky-fallback` utility in
- * global.css) — email can't run either. This is not a token copy the way
- * EMAIL_THEME is: it's a deliberately simplified approximation, a couple of
- * soft grey masses over a light wash in the same hue sky-fallback uses
- * (rgba(158,158,158,...) on near-white), because email clients that ignore
- * background-image entirely (Outlook desktop chief among them) still need
- * *something* — hence the solid OUTER_BG color as the real fallback, with
- * the gradient layered on as a progressive enhancement for clients that
- * render it (Apple Mail, iOS Mail, Gmail's webmail and app).
+ * global.css) — email can't run either. OUTER_BG_IMAGE is a raster
+ * reproduction of sky-fallback's soft grey masses (scripts/email-sky-bg.mjs,
+ * public/img/email-sky.png), wired in through the legacy HTML `background=`
+ * attribute — Outlook's Word engine ignores CSS `background-image` outright
+ * but has always honoured that attribute on <table>/<td>. OUTER_BG is the
+ * solid colour every client falls back to first: images are typically
+ * blocked until a recipient explicitly loads them, so most opens see this,
+ * not the picture.
  */
 const OUTER_BG = '#e8e8e6'
-const OUTER_BG_IMAGE = [
-  'radial-gradient(46% 38% at 18% 10%, rgba(158,158,158,0.16) 0%, rgba(158,158,158,0) 100%)',
-  'radial-gradient(50% 40% at 84% 6%, rgba(158,158,158,0.14) 0%, rgba(158,158,158,0) 100%)',
-  'radial-gradient(60% 46% at 50% 100%, rgba(158,158,158,0.18) 0%, rgba(158,158,158,0) 100%)',
-  'linear-gradient(to bottom, #eeeeec 0%, #e4e4e2 100%)',
-].join(', ')
+/** Absolute path to the committed sky asset. See scripts/email-sky-bg.mjs. */
+export const SKY_BG_PATH = '/img/email-sky.png'
 
 function escapeHtml(s: string): string {
   return s
@@ -85,11 +81,14 @@ function escapeHtml(s: string): string {
  * auto-inverting a site that has no dark mode of its own.
  *
  * The message itself sits in a paper card — border, not shadow, matching the
- * site's own "no shadows" rule — floated on OUTER_BG, the email's stand-in
- * for the site's sky background. `bgcolor` attributes ride alongside the CSS
- * on both the outer wrapper and the card because Outlook's Word engine
- * ignores `background`/`background-color` in `style=` but does honour the
- * HTML attribute.
+ * site's own "no shadows" rule — floated on the sky backdrop (OUTER_BG /
+ * SKY_BG_PATH, see the doc comment on OUTER_BG). `bgcolor`/`background`
+ * attributes ride alongside the equivalent CSS on both the outer wrapper and
+ * the card because Outlook's Word engine ignores `background`/
+ * `background-color`/`background-image` in `style=` but does honour the
+ * HTML attributes. Content is centered (`align`/`text-align` on every cell,
+ * not just the outer wrapper) because table-cell alignment doesn't reliably
+ * inherit down through nested tables in every client.
  */
 export function renderEmailShell({
   locale,
@@ -109,6 +108,7 @@ export function renderEmailShell({
   const d = UI[locale]
   const t = EMAIL_THEME
   const wordmarkUrl = `${siteUrl}${WORDMARK_PATH}`
+  const skyUrl = `${siteUrl}${SKY_BG_PATH}`
 
   return `<!doctype html>
 <html lang="${locale}">
@@ -134,7 +134,7 @@ export function renderEmailShell({
         ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>`
         : ''
     }
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${OUTER_BG}" style="background-color:${OUTER_BG};background-image:${OUTER_BG_IMAGE};background-repeat:no-repeat;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${OUTER_BG}" background="${skyUrl}" style="background-color:${OUTER_BG};background-image:url('${skyUrl}');background-repeat:no-repeat;background-position:center top;background-size:cover;">
       <tr>
         <td align="center" style="padding:48px 16px;">
           <!--[if mso]>
@@ -142,26 +142,26 @@ export function renderEmailShell({
           <![endif]-->
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${t.paper}" style="max-width:520px;background-color:${t.paper};border:1px solid ${t.line};">
             <tr>
-              <td style="padding:40px 32px;font-family:${t.fontSans};color:${t.ink};">
+              <td align="center" style="padding:40px 32px;font-family:${t.fontSans};color:${t.ink};text-align:center;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td style="padding:0 0 28px;">
+                    <td align="center" style="padding:0 0 28px;text-align:center;">
                       <img
                         src="${wordmarkUrl}"
                         width="${WORDMARK_WIDTH}"
                         height="${WORDMARK_HEIGHT}"
                         alt="${escapeHtml(d.brand)}"
-                        style="display:block;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
+                        style="display:block;margin:0 auto;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
                       />
                     </td>
                   </tr>
                   <tr>
-                    <td style="padding:0 0 16px;font-family:${t.fontDisplay};font-size:22px;font-weight:600;line-height:1.3;">
+                    <td align="center" style="padding:0 0 16px;font-family:${t.fontDisplay};font-size:22px;font-weight:600;line-height:1.3;text-align:center;">
                       ${heading}
                     </td>
                   </tr>
                   <tr>
-                    <td>
+                    <td align="center" style="text-align:center;">
                       ${bodyHtml}
                     </td>
                   </tr>
@@ -174,7 +174,7 @@ export function renderEmailShell({
                        every commercial message; unsubscribe only applies when unsubUrl
                        is given (see doc comment above). -->
                   <tr>
-                    <td style="font-size:12px;color:${t.mute};line-height:1.6;">
+                    <td align="center" style="font-size:12px;color:${t.mute};line-height:1.6;text-align:center;">
                       ${SENDER_IDENTITY.name}<br />
                       ${escapeHtml(SENDER_IDENTITY.address)}<br />
                       <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t.mute};">${SENDER_IDENTITY.email}</a>${
@@ -237,15 +237,35 @@ export function renderEmailText({
 export function styleMarkdownHtml(html: string): string {
   const t = EMAIL_THEME
   return html
-    .replace(/<h2>/g, `<h2 style="font-family:${t.fontDisplay};font-size:18px;font-weight:600;line-height:1.3;margin:24px 0 12px;color:${t.ink};">`)
-    .replace(/<h3>/g, `<h3 style="font-family:${t.fontDisplay};font-size:16px;font-weight:600;line-height:1.3;margin:20px 0 10px;color:${t.ink};">`)
-    .replace(/<p>/g, `<p style="font-size:15px;line-height:1.6;margin:0 0 16px;color:${t.ink};">`)
+    .replace(/<h2>/g, `<h2 style="font-family:${t.fontDisplay};font-size:18px;font-weight:600;line-height:1.3;margin:24px 0 12px;color:${t.ink};text-align:center;">`)
+    .replace(/<h3>/g, `<h3 style="font-family:${t.fontDisplay};font-size:16px;font-weight:600;line-height:1.3;margin:20px 0 10px;color:${t.ink};text-align:center;">`)
+    .replace(/<p>/g, `<p style="font-size:15px;line-height:1.6;margin:0 0 16px;color:${t.ink};text-align:center;">`)
     .replace(/<li>/g, `<li style="font-size:15px;line-height:1.6;color:${t.ink};">`)
-    .replace(/<ul>/g, `<ul style="margin:0 0 16px;padding-left:20px;">`)
-    .replace(/<ol>/g, `<ol style="margin:0 0 16px;padding-left:20px;">`)
+    // The list itself centers as a block (inline-block + an auto side margin
+    // has no anchor to center against in table-cell layout, so this rides on
+    // the ancestor td's text-align:center instead); list items stay
+    // left-aligned inside it — centering bullet text item-by-item reads as
+    // broken, not intentional.
+    .replace(/<ul>/g, `<ul style="display:inline-block;text-align:left;margin:0 0 16px;padding-left:20px;">`)
+    .replace(/<ol>/g, `<ol style="display:inline-block;text-align:left;margin:0 0 16px;padding-left:20px;">`)
     .replace(/<a href=/g, `<a style="color:${t.accentInk};" href=`)
     .replace(/<hr\s*\/?>/g, `<hr style="border:none;border-top:1px solid ${t.line};margin:24px 0;" />`)
-    .replace(/<img /g, `<img style="width:100%;max-width:520px;display:block;border:0;" `)
+    .replace(/<img /g, `<img style="width:100%;max-width:520px;display:block;margin:0 auto;border:0;" `)
+}
+
+/**
+ * The confirmation email's body markup — pulled out so scripts/email-preview.ts
+ * can render exactly what a real send would, instead of a hand-kept copy that
+ * silently drifts from this one (it did, once, before this existed).
+ */
+export function confirmationBodyHtml(d: Dict, confirmUrl: string): string {
+  const t = EMAIL_THEME
+  return `
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};text-align:center;">${d.mailBody}</p>
+      <p style="margin:0 0 32px;text-align:center;">
+        <a href="${confirmUrl}" style="display:inline-block;background:${t.ink};color:${t.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${d.mailCta}</a>
+      </p>
+      <p style="font-size:13px;color:${t.mute};line-height:1.6;margin:0 0 24px;text-align:center;">${d.mailIgnore}</p>`
 }
 
 /**
@@ -261,7 +281,6 @@ export async function sendConfirmationEmail({
   token,
 }: SendArgs): Promise<{ ok: boolean; error?: string }> {
   const d = UI[locale]
-  const t = EMAIL_THEME
   const confirmUrl = `${siteUrl}/api/confirm?token=${token}`
   const unsubUrl = `${siteUrl}/api/unsubscribe?token=${token}`
 
@@ -270,12 +289,7 @@ export async function sendConfirmationEmail({
     siteUrl,
     heading: d.mailHeading,
     preheader: d.mailBody,
-    bodyHtml: `
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};">${d.mailBody}</p>
-      <p style="margin:0 0 32px;">
-        <a href="${confirmUrl}" style="display:inline-block;background:${t.ink};color:${t.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${d.mailCta}</a>
-      </p>
-      <p style="font-size:13px;color:${t.mute};line-height:1.6;margin:0 0 24px;">${d.mailIgnore}</p>`,
+    bodyHtml: confirmationBodyHtml(d, confirmUrl),
     unsubUrl,
   })
   const text = renderEmailText({
@@ -326,6 +340,17 @@ interface OrderEmailArgs {
 }
 
 /**
+ * The order confirmation's body markup — see confirmationBodyHtml's doc
+ * comment for why this is pulled out rather than inlined.
+ */
+export function orderConfirmedBodyHtml(d: Dict, total: string): string {
+  const t = EMAIL_THEME
+  return `
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};text-align:center;">${d.orderConfirmedBody}</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;font-weight:600;color:${t.ink};text-align:center;">${total}</p>`
+}
+
+/**
  * Order confirmation — transactional, sent from the Stripe webhook once a
  * payment actually succeeds. Bill 96 requires this in the buyer's language
  * just as much as any marketing page; it isn't exempt just for being a
@@ -340,7 +365,6 @@ export async function sendOrderConfirmationEmail({
   currency,
 }: OrderEmailArgs): Promise<{ ok: boolean; error?: string }> {
   const d = UI[locale]
-  const t = EMAIL_THEME
   const total = new Intl.NumberFormat(locale, { style: 'currency', currency }).format(
     amountTotal / 100
   )
@@ -350,9 +374,7 @@ export async function sendOrderConfirmationEmail({
     siteUrl,
     heading: d.orderConfirmedTitle,
     preheader: d.orderConfirmedBody,
-    bodyHtml: `
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};">${d.orderConfirmedBody}</p>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;font-weight:600;color:${t.ink};">${total}</p>`,
+    bodyHtml: orderConfirmedBodyHtml(d, total),
   })
   const text = renderEmailText({
     heading: d.orderConfirmedTitle,

@@ -19,7 +19,8 @@ import {
   renderEmailShell,
   renderEmailText,
   styleMarkdownHtml,
-  EMAIL_THEME,
+  confirmationBodyHtml,
+  orderConfirmedBodyHtml,
 } from '../src/lib/email.ts'
 import { UI } from '../src/i18n/ui.ts'
 
@@ -45,12 +46,7 @@ for (const locale of LOCALES) {
     siteUrl: SITE_URL,
     heading: d.mailHeading,
     preheader: d.mailBody,
-    bodyHtml: `
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${EMAIL_THEME.ink};">${d.mailBody}</p>
-      <p style="margin:0 0 32px;">
-        <a href="${confirmUrl}" style="display:inline-block;background:${EMAIL_THEME.ink};color:${EMAIL_THEME.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${d.mailCta}</a>
-      </p>
-      <p style="font-size:13px;color:${EMAIL_THEME.mute};line-height:1.6;margin:0 0 24px;">${d.mailIgnore}</p>`,
+    bodyHtml: confirmationBodyHtml(d, confirmUrl),
     unsubUrl,
   })
   const confirmationText = renderEmailText({
@@ -66,9 +62,7 @@ for (const locale of LOCALES) {
     siteUrl: SITE_URL,
     heading: d.orderConfirmedTitle,
     preheader: d.orderConfirmedBody,
-    bodyHtml: `
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${EMAIL_THEME.ink};">${d.orderConfirmedBody}</p>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;font-weight:600;color:${EMAIL_THEME.ink};">${total}</p>`,
+    bodyHtml: orderConfirmedBodyHtml(d, total),
   })
   const orderText = renderEmailText({
     heading: d.orderConfirmedTitle,

@@ -96,6 +96,24 @@ describe('renderEmailShell', () => {
     expect(html).toContain('/img/wordmark-email.png')
     expect(html).toContain('alt="Nuage Athletics"')
   })
+
+  it('floats the card on the sky backdrop, with a solid colour Outlook can fall back to', () => {
+    const html = renderEmailShell(base)
+    expect(html).toContain('/img/email-sky.png')
+    // The legacy HTML attribute, not just the CSS — Outlook's Word engine
+    // ignores background-image in style= entirely.
+    expect(html).toMatch(/background="[^"]*email-sky\.png"/)
+    expect(html).toContain('bgcolor="#e8e8e6"')
+  })
+
+  it('centers content — table-cell text-align doesn\'t reliably inherit down nested tables', () => {
+    const html = renderEmailShell(base)
+    // Every cell that holds text gets its own text-align:center rather than
+    // relying on one ancestor declaration to cascade through every nested
+    // <table>.
+    const centeredCells = html.match(/text-align:center/g) ?? []
+    expect(centeredCells.length).toBeGreaterThanOrEqual(4)
+  })
 })
 
 describe('renderEmailText', () => {
