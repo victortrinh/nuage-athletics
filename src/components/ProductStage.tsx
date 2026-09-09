@@ -171,8 +171,18 @@ export default function ProductStage(props: Props) {
     // announcement are rendered by ProductView.astro itself, outside this
     // island, exactly as they were before this redesign; see the note
     // there on why that stays a plain server-rendered heading rather than
-    // moving into slot A.
-    return <ProductCarousel d={d} fit={fit} fits={fits} initialFit={initialFit} />
+    // moving into slot A. belowFrameRem is hand-measured from just that
+    // heading + one line of announcement text, with a little cushion —
+    // see ProductCarousel.tsx's frame-sizing comment.
+    return (
+      <ProductCarousel
+        d={d}
+        fit={fit}
+        fits={fits}
+        initialFit={initialFit}
+        belowFrameRem={{ base: 14, sm: 13 }}
+      />
+    )
   }
 
   const { fitOptions, variants, price, description, specs } = props
@@ -188,7 +198,17 @@ export default function ProductStage(props: Props) {
   return (
     <I18nProvider locale={locale}>
       <div>
-        <ProductCarousel d={d} fit={fit} fits={fits} initialFit={initialFit} />
+        {/* belowFrameRem is hand-measured from the fit picker + band that
+            follow — see ProductCarousel.tsx's frame-sizing comment. `sm:`
+            is smaller because the band itself is shorter there (its own
+            `sm:` slot-C height, ProductStage's Slot classNames below). */}
+        <ProductCarousel
+          d={d}
+          fit={fit}
+          fits={fits}
+          initialFit={initialFit}
+          belowFrameRem={{ base: 22.5, sm: 20.5 }}
+        />
 
         <div className="mt-6">
           <p id={`fit-label-${uid}`} className="text-center text-[11px] uppercase tracking-label text-mute">

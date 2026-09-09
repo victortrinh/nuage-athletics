@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react'
 import type { FitId, ProductFit } from '../lib/catalogue'
 import { fmt, type Dict } from '../i18n/ui'
 import { cn } from './ui/cn'
@@ -8,6 +15,19 @@ interface Props {
   fit: FitId
   fits: ProductFit[]
   initialFit: FitId
+  /**
+   * Everything in the column *below* the frame — pagination row, fit
+   * caption, and whatever the caller puts after this component (the fit
+   * picker and buy band, or just the drop announcement) — hand-measured in
+   * rem at the base and `sm:` breakpoints. See the frame-sizing comment
+   * below for what this drives. The two callers (ProductStage.tsx) pass
+   * very different values: the full band is a lot more chrome than a
+   * one-line announcement, and reusing one constant for both either
+   * shrinks the pre-launch photo for no reason or risks the band falling
+   * off a short screen post-launch — see e2e/mobile-layout.e2e.ts's sticky
+   * header test, which is what caught the first version reusing one value.
+   */
+  belowFrameRem: { base: number; sm: number }
 }
 
 /** Distance (px) a pointer must travel horizontally before the gesture counts
@@ -38,7 +58,7 @@ const DRAG_INTENT_PX = 8
  * finger — a fade has nothing to drag. The two fits are still two stacked
  * tracks that crossfade, so the DOM invariant above is unchanged.
  */
-export default function ProductCarousel({ d, fit, fits, initialFit }: Props) {
+export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRem }: Props) {
   const [index, setIndex] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const [warm, setWarm] = useState(false)
@@ -194,28 +214,57 @@ export default function ProductCarousel({ d, fit, fits, initialFit }: Props) {
       >
         {/*
           The frame is one fixed box, sized by nothing the visitor can
-          change: the spacer below reserves the height, the stage lies on
-          top of it at the column's full width, and every photo is fitted
-          inside with object-contain. Paging or switching fit therefore
-          never moves the pagination row, the fit label or the band below —
-          on mobile especially, where the carousel is the first thing in
-          the document flow and a reflow here shifts the whole page.
+          change — paging or switching fit never moves the pagination row,
+          the fit label or the band below. It used to be sized by width
+          alone (a spacer reserving a 4:5 shape, capped at 26rem); now that
+          the worn shots are gone (catalogue.ts) and every photo is a
+          landscape flat-lay (~2:1–2.6:1), that tall a frame was mostly
+          empty letterboxing, and — the actual reason this changed — a
+          width-only cap does nothing to stop the frame from pushing the
+          band below the fold on a short browser window, the one thing
+          yeezy.com's own reference is careful never to let happen.
 
-          The spacer keeps the 4/5-at-26rem shape, which is the tallest the
-          gallery gets (the worn shots) at the largest height that still
-          leaves the pagination row and band above the fold on an ordinary
-          laptop. Below 26rem the cap stops biting and it tracks the
-          viewport, as before.
+          So the frame is sized by *height* first: `--chrome-h` is
+          everything else in the column — the fixed ~7rem of header plus
+          article padding, and `belowFrameRem` (the caller's own pagination
+          row, fit caption, fit picker and band, or just the drop
+          announcement — see the prop) — measured at each breakpoint, and
+          the frame's height is whatever's left of 100dvh after that,
+          clamped between a floor (so it never vanishes on a genuinely tiny
+          window; scrolling is the fallback past that point, not a broken
+          layout) and the old 26rem-equivalent ceiling (so a tall window
+          doesn't inflate the photo either). `aspect-[2/1]` turns that
+          height into a width automatically — this is a real `<div>`, not
+          an `<img>`, so nothing here needs the old two-div spacer/stage
+          split: this one box IS the reserved size, and the stage below
+          fills it exactly via inset-0.
 
-          The stage is deliberately wider than that cap: front and back are
-          flat-lay shots at roughly 2:1, so a 26rem-wide frame left them
-          barely 200px tall in a 520px box. Spanning the whole centred
-          column (max-w-[34rem], set by ProductView.astro) gives those two
-          a little more room, while the worn shots — bounded by the reserved
-          height, not the width — come out exactly as they did before.
+          `--chrome-*` are deliberately hand-measured constants passed down
+          as props, not a `ResizeObserver` computing them live — they need
+          updating if the band, fit picker or announcement's own height
+          ever changes (all already fixed-height or one line by design, so
+          that's a rare, deliberate edit, not a moving target this
+          component should be watching for). Two CSS custom properties
+          rather than one: `sm:[--chrome-h:var(--chrome-sm)]` is a static
+          class Tailwind can see at build time; the numbers behind
+          `--chrome-base`/`--chrome-sm` are the only part that's dynamic,
+          set via `style` below, which Tailwind's class scanner never needs
+          to look at.
         */}
-        <div className="relative w-full">
-          <div aria-hidden="true" className="mx-auto aspect-[4/5] w-full max-w-[26rem]" />
+        <div
+          className="relative mx-auto aspect-[2/1] max-w-full [--chrome-h:var(--chrome-base)] sm:[--chrome-h:var(--chrome-sm)]"
+          style={
+            {
+              // 11.25rem: header (4rem) + this frame's own pagination row
+              // and fit caption below it, at every breakpoint — the part
+              // of "everything but the frame" that's fixed regardless of
+              // which caller renders below `belowFrameRem`.
+              '--chrome-base': `${belowFrameRem.base + 11.25}rem`,
+              '--chrome-sm': `${belowFrameRem.sm + 11.25}rem`,
+              width: 'clamp(10rem, calc((100dvh - var(--chrome-h)) * 2), 26rem)',
+            } as CSSProperties
+          }
+        >
           {/*
             touch-pan-y, not touch-none: a vertical flick that happens to
             start on the photo has to scroll the page — on mobile the
