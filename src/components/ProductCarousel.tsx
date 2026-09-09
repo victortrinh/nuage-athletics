@@ -230,21 +230,24 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
           caption, plus `belowFrameRem` (the caller's own fit picker and
           band, or just the drop announcement — see the prop) — measured
           at each breakpoint, and the frame's height is whatever's left of
-          100dvh after that, clamped between a floor (so it never vanishes
-          on a genuinely tiny window; scrolling is the fallback past that
-          point, not a broken layout) and a generous ceiling (so a tall
-          window doesn't inflate the photo past the column's own width —
-          `max-w-full` is what actually stops it going wider than that).
-          `aspect-[2/1]` turns that height into a width automatically —
-          this is a real `<div>`, not an `<img>`, so nothing here needs the
-          old two-div spacer/stage split: this one box IS the reserved
-          size, and the stage below fills it exactly via inset-0.
+          100dvh after that, floored (so it never vanishes on a genuinely
+          tiny window; scrolling is the fallback past that point, not a
+          broken layout) but *not* separately ceilinged — `max-w-full` is
+          the only upper bound, so a tall window lets the photo keep
+          growing all the way to the column's own width instead of
+          stopping short and leaving whitespace behind. `aspect-[2/1]`
+          turns that height into a width automatically — this is a real
+          `<div>`, not an `<img>`, so nothing here needs the old two-div
+          spacer/stage split: this one box IS the reserved size, and the
+          stage below fills it exactly via inset-0.
 
-          The ceiling only bounds the photo itself — the section around it
-          (ProductView.astro's wrapper, commerce-enabled branch) separately
-          reserves a full `100dvh - header` regardless of how tall the
-          photo ends up, so the CPA disclosure below never peeks into the
-          first screenful even when the frame stops short of that ceiling.
+          Growing the photo like this is safe specifically because nothing
+          below it needs protecting from a tall window: ProductView.astro's
+          wrapper (commerce-enabled branch) separately reserves a full
+          `100dvh - header` regardless of how tall the photo ends up, so the
+          CPA disclosure after it never peeks into the first screenful
+          either way — the photo filling more of that reserved space is
+          pure upside, not a tradeoff against that guarantee.
 
           `--chrome-*` are deliberately hand-measured constants passed down
           as props, not a `ResizeObserver` computing them live — they need
@@ -268,7 +271,11 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
               // which caller renders below `belowFrameRem`.
               '--chrome-base': `${belowFrameRem.base + 11.25}rem`,
               '--chrome-sm': `${belowFrameRem.sm + 11.25}rem`,
-              width: 'clamp(10rem, calc((100dvh - var(--chrome-h)) * 2), 32rem)',
+              // No numeric ceiling — `max-w-full` on the className is the
+              // only cap, so a tall window lets the photo grow all the way
+              // to the column's own width instead of stopping short and
+              // leaving whitespace before the reserved screenful ends.
+              width: 'max(10rem, calc((100dvh - var(--chrome-h)) * 2))',
             } as CSSProperties
           }
         >
