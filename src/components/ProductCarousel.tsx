@@ -232,14 +232,32 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
           at each breakpoint, and the frame's height is whatever's left of
           100dvh after that, floored (so it never vanishes on a genuinely
           tiny window; scrolling is the fallback past that point, not a
-          broken layout) but *not* separately ceilinged — `max-w-full` is
-          the only upper bound, so a tall window lets the photo keep
-          growing all the way to the column's own width instead of
-          stopping short and leaving whitespace behind. `aspect-[2/1]`
-          turns that height into a width automatically — this is a real
-          `<div>`, not an `<img>`, so nothing here needs the old two-div
-          spacer/stage split: this one box IS the reserved size, and the
-          stage below fills it exactly via inset-0.
+          broken layout). `aspect-[2/1]` turns that height into a width
+          automatically — this is a real `<div>`, not an `<img>`, so
+          nothing here needs the old two-div spacer/stage split: this one
+          box IS the reserved size, and the stage below fills it exactly
+          via inset-0.
+
+          `max-w-[min(56rem,calc(100vw-3rem))]`, not `max-w-full`: the fit
+          picker and band below live in ProductView.astro's 34rem article
+          column, and capping the photo at that same 34rem badly
+          undersells the height-fit above it — a 2:1 photo can't get past
+          ~17rem tall at a 34rem width no matter how much vertical room a
+          tall window actually has, which is exactly the dead space this
+          was meant to close. Letting the frame break out wider than the
+          column it sits in — same idea the pre-height-fit version of this
+          component used to apply to the *stage* alone, extended to the
+          whole frame now that stage and frame are one box — means width
+          stops binding well before a realistic window's height does, so
+          the photo actually uses the room `100dvh - chrome` computes
+          instead of stalling at the text column's width. `mx-auto`
+          still centers it correctly even wider than its own containing
+          block, via negative margins, same mechanism as any breakout.
+          `calc(100vw-3rem)` is the real floor on a narrow phone, where
+          56rem never binds and the column's own width would have; 56rem
+          is deliberately less than `main`'s 80rem ceiling (Base.astro) —
+          wide enough to fill real vertical headroom, not so wide a single
+          garment photo reads as mostly empty background.
 
           Growing the photo like this is safe specifically because nothing
           below it needs protecting from a tall window: ProductView.astro's
@@ -261,98 +279,114 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
           set via `style` below, which Tailwind's class scanner never needs
           to look at.
         */}
-        <div
-          className="relative mx-auto aspect-[2/1] max-w-full [--chrome-h:var(--chrome-base)] sm:[--chrome-h:var(--chrome-sm)]"
-          style={
-            {
-              // 11.25rem: header (4rem) + this frame's own pagination row
-              // and fit caption below it, at every breakpoint — the part
-              // of "everything but the frame" that's fixed regardless of
-              // which caller renders below `belowFrameRem`.
-              '--chrome-base': `${belowFrameRem.base + 11.25}rem`,
-              '--chrome-sm': `${belowFrameRem.sm + 11.25}rem`,
-              // No numeric ceiling — `max-w-full` on the className is the
-              // only cap, so a tall window lets the photo grow all the way
-              // to the column's own width instead of stopping short and
-              // leaving whitespace before the reserved screenful ends.
-              width: 'max(10rem, calc((100dvh - var(--chrome-h)) * 2))',
-            } as CSSProperties
-          }
-        >
-          {/*
-            touch-pan-y, not touch-none: a vertical flick that happens to
-            start on the photo has to scroll the page — on mobile the
-            carousel is most of the first screen, so swallowing vertical
-            gestures here would strand the visitor.
-          */}
+        {/*
+          flex + justify-center, not mx-auto, on the frame below: `margin:
+          auto` only centers a box *narrower* than its containing block —
+          CSS resolves both auto margins to 0 (left-aligning, not
+          centering) the moment the box is wider, which is exactly the
+          breakout case above. Flexbox's justify-content doesn't have that
+          edge case; it centers an overflowing item the same way as a
+          normal one, symmetrically past the container's own edges — as
+          long as the item doesn't shrink back down to fit first, which a
+          flex child does by default; `shrink-0` on the frame below is
+          what keeps it at its full computed width instead of being
+          compressed to the flex container's own (narrower) box.
+        */}
+        <div className="flex justify-center">
           <div
-            ref={stageRef}
-            // A swipe that nothing announces is a swipe nobody on a desktop
-            // ever finds: the grab cursor is the only affordance the drag
-            // has there, and it is driven by the same `dragging` state the
-            // track is, not by :active, so it holds for the whole gesture —
-            // pointer capture included — and lets go exactly when the
-            // gesture does.
-            className={cn(
-              'absolute inset-0 touch-pan-y select-none overflow-hidden',
-              dragging ? 'cursor-grabbing' : 'cursor-grab'
-            )}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerEnd}
-            onPointerCancel={onPointerEnd}
+            className="relative shrink-0 aspect-[2/1] max-w-[min(56rem,calc(100vw-3rem))] [--chrome-h:var(--chrome-base)] sm:[--chrome-h:var(--chrome-sm)]"
+            style={
+              {
+                // 11.25rem: header (4rem) + this frame's own pagination row
+                // and fit caption below it, at every breakpoint — the part
+                // of "everything but the frame" that's fixed regardless of
+                // which caller renders below `belowFrameRem`.
+                '--chrome-base': `${belowFrameRem.base + 11.25}rem`,
+                '--chrome-sm': `${belowFrameRem.sm + 11.25}rem`,
+                // No numeric ceiling here — the className's max-w is the
+                // only cap, and it's deliberately wider than the column
+                // (above), so a tall window lets the photo grow toward the
+                // room `100dvh - chrome` actually leaves, instead of
+                // stalling at the text column's width well short of that.
+                width: 'max(10rem, calc((100dvh - var(--chrome-h)) * 2))',
+              } as CSSProperties
+            }
           >
-            {fits.map((f) => {
-              const isActiveFit = f.id === fit
-              return (
-                <div
-                  key={f.id}
-                  className={cn(
-                    'absolute inset-0 transition-opacity duration-150 motion-reduce:transition-none',
-                    isActiveFit ? 'opacity-100' : 'pointer-events-none opacity-0'
-                  )}
-                >
+            {/*
+              touch-pan-y, not touch-none: a vertical flick that happens to
+              start on the photo has to scroll the page — on mobile the
+              carousel is most of the first screen, so swallowing vertical
+              gestures here would strand the visitor.
+            */}
+            <div
+              ref={stageRef}
+              // A swipe that nothing announces is a swipe nobody on a desktop
+              // ever finds: the grab cursor is the only affordance the drag
+              // has there, and it is driven by the same `dragging` state the
+              // track is, not by :active, so it holds for the whole gesture —
+              // pointer capture included — and lets go exactly when the
+              // gesture does.
+              className={cn(
+                'absolute inset-0 touch-pan-y select-none overflow-hidden',
+                dragging ? 'cursor-grabbing' : 'cursor-grab'
+              )}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerEnd}
+              onPointerCancel={onPointerEnd}
+            >
+              {fits.map((f) => {
+                const isActiveFit = f.id === fit
+                return (
                   <div
+                    key={f.id}
                     className={cn(
-                      'flex h-full w-full',
-                      dragging ? 'transition-none' : 'transition-transform duration-300 ease-out motion-reduce:transition-none'
+                      'absolute inset-0 transition-opacity duration-150 motion-reduce:transition-none',
+                      isActiveFit ? 'opacity-100' : 'pointer-events-none opacity-0'
                     )}
-                    style={{
-                      transform: `translate3d(calc(${index * -100}% + ${isActiveFit ? dragDx : 0}px), 0, 0)`,
-                    }}
                   >
-                    {f.gallery.map((image, i) => {
-                      const isActive = isActiveFit && i === index
-                      // The one image blocking first paint. Everything else
-                      // starts lazy and is flipped to eager once `warm` (see
-                      // effect above).
-                      const isInitial = f.id === initialFit && i === 0
-                      return (
-                        <img
-                          key={`${f.id}-${i}`}
-                          src={image.src}
-                          width={image.width}
-                          height={image.height}
-                          alt={image.alt}
-                          // Driven by the selection, never by what a drag
-                          // happens to have slid into view: exactly one of
-                          // the 8 is in the accessibility tree at any moment.
-                          aria-hidden={isActive ? undefined : true}
-                          loading={isInitial || warm ? 'eager' : 'lazy'}
-                          fetchPriority={isInitial ? 'high' : 'low'}
-                          decoding="async"
-                          // Without this a mouse drag on the photo starts a
-                          // native image drag and the swipe dies on the
-                          // first pixel.
-                          draggable={false}
-                          className="h-full w-full shrink-0 object-contain"
-                        />
-                      )
-                    })}
+                    <div
+                      className={cn(
+                        'flex h-full w-full',
+                        dragging ? 'transition-none' : 'transition-transform duration-300 ease-out motion-reduce:transition-none'
+                      )}
+                      style={{
+                        transform: `translate3d(calc(${index * -100}% + ${isActiveFit ? dragDx : 0}px), 0, 0)`,
+                      }}
+                    >
+                      {f.gallery.map((image, i) => {
+                        const isActive = isActiveFit && i === index
+                        // The one image blocking first paint. Everything else
+                        // starts lazy and is flipped to eager once `warm` (see
+                        // effect above).
+                        const isInitial = f.id === initialFit && i === 0
+                        return (
+                          <img
+                            key={`${f.id}-${i}`}
+                            src={image.src}
+                            width={image.width}
+                            height={image.height}
+                            alt={image.alt}
+                            // Driven by the selection, never by what a drag
+                            // happens to have slid into view: exactly one of
+                            // the 4 is in the accessibility tree at any moment.
+                            aria-hidden={isActive ? undefined : true}
+                            loading={isInitial || warm ? 'eager' : 'lazy'}
+                            fetchPriority={isInitial ? 'high' : 'low'}
+                            decoding="async"
+                            // Without this a mouse drag on the photo starts a
+                            // native image drag and the swipe dies on the
+                            // first pixel.
+                            draggable={false}
+                            className="h-full w-full shrink-0 object-contain"
+                          />
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         </div>
 
