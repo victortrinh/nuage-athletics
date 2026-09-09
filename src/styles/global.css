@@ -286,11 +286,20 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 }
 
 /*
- * Ground for the bottom-anchored signup prompt (SignupPrompt.astro). Matches
- * yeezy.com's own reference (screenshots from the issue thread): a blurred
- * ground with no hairline of its own — the defocus alone is what separates
- * the band from the page, not an edge. It sits over the page rather than
- * behind a scrim — the page stays scrollable and clickable underneath it.
+ * Ground for the bottom-anchored signup prompt (SignupPrompt.astro). Same
+ * device as yeezy.com's own reference (screenshots from the issue thread): a
+ * blurred ground with no hairline of its own — the defocus alone is what
+ * separates the band from the page, not an edge. It sits over the page
+ * rather than behind a scrim — the page stays scrollable and clickable
+ * underneath it.
+ *
+ * The blur radius is lower than the reference's (12px, not 20px) for a
+ * reason specific to what's behind it here: the reference blurs high-
+ * contrast product photography, which stays visibly blobby even under a
+ * heavy blur, while this site blurs Sky's soft cloud texture — at 20px that
+ * washed out to a near-flat tint, losing the sense that there's a moving
+ * canvas under the glass at all. A lighter blur lets more of the cloud
+ * shapes read through without giving up legibility.
  *
  * @supports guards the blur: Firefox for Android and some older WebViews
  * don't implement backdrop-filter. Those fall back to header-veil's own
@@ -320,8 +329,8 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     background-color: rgb(250 250 250 / 72%);
     background-image: none;
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
   }
   @media (prefers-reduced-transparency: reduce) {
     background-color: var(--color-paper);
