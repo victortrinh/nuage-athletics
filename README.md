@@ -64,7 +64,10 @@ Then point DNS at the Worker. **Adding the web records does not touch MX** —
 | `npm run dev` | local dev server |
 | `npm run check` | `tsc --noEmit` |
 | `npm run build` | production build |
-| `npm run db:subscribers` | last 50 signups from remote D1 |
+| `npm run db:subscribers` | subscriber counts by status + recent rows from remote D1 (`-- --local`, `--status`, `--csv <path outside the repo>`) |
+| `npm run broadcast` | send a one-off email to confirmed subscribers (`-- <file> --dry-run` first, `--local` to test against local D1) |
+| `npm run email:preview` | render every outbound email to `tmp/email-preview/` for eyeballing, no Resend account needed |
+| `npm run email:wordmark` | regenerate `public/img/wordmark-email.png` from `public/logo-nuage.svg` |
 
 `astro check` is currently unusable: TypeScript 7 dropped the programmatic API the
 Astro language server needs. `tsc --noEmit` covers the same ground for now.

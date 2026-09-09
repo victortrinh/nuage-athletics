@@ -4,15 +4,17 @@
  * Usage:
  *   node scripts/broadcast.ts <markdown-file> --dry-run
  *   RESEND_API_KEY=... node scripts/broadcast.ts <markdown-file> [--limit N]
+ *   node scripts/broadcast.ts <markdown-file> --dry-run --local
  *
  * Always run --dry-run first. Sending for real requires RESEND_API_KEY and
  * the absence of --dry-run — there is no other confirmation prompt, so treat
  * the dry run as the only safety net before this reaches real inboxes.
  *
- * Reads confirmed subscribers straight from the remote D1 database via
- * `wrangler d1 execute --remote`, so it needs you to already be logged in
- * (`wrangler login`). Only ever selects status = 'confirmed' — pending and
- * unsubscribed rows are never touched.
+ * Reads confirmed subscribers via `wrangler d1 execute` (scripts/d1.ts),
+ * against the remote D1 database by default — which needs you to already be
+ * logged in (`wrangler login`) — or the local one with --local, useful for a
+ * dry run against test data. Only ever selects status = 'confirmed' —
+ * pending and unsubscribed rows are never touched.
  *
  * Markdown source format:
  *
@@ -26,12 +28,12 @@
  *   <!-- en -->
  *   Body in **Markdown**...
  */
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { marked } from 'marked'
-import { renderEmailShell, RESEND_ENDPOINT } from '../src/lib/email.ts'
+import { renderEmailShell, renderEmailText, styleMarkdownHtml, RESEND_ENDPOINT } from '../src/lib/email.ts'
 import { SENDER_IDENTITY } from '../src/lib/consent.ts'
 import { isLocale, type Locale } from '../src/i18n/config.ts'
+import { queryD1 } from './d1.ts'
 
 const SITE_URL = process.env.PUBLIC_SITE_URL ?? 'https://nuageathletics.com'
 const BATCH_SIZE = 100
@@ -41,6 +43,8 @@ const BATCH_DELAY_MS = 600
 interface Broadcast {
   subject: Record<Locale, string>
   bodyHtml: Record<Locale, string>
+  // Raw markdown source, unparsed — the plain-text part sent alongside html.
+  bodyText: Record<Locale, string>
 }
 
 interface SubscriberRow {
@@ -53,13 +57,16 @@ interface SubscriberRow {
 function parseArgs(argv: string[]) {
   const [file, ...rest] = argv
   if (!file) {
-    console.error('Usage: node scripts/broadcast.ts <markdown-file> [--dry-run] [--limit N]')
+    console.error(
+      'Usage: node scripts/broadcast.ts <markdown-file> [--dry-run] [--limit N] [--local]'
+    )
     process.exit(1)
   }
   const dryRun = rest.includes('--dry-run')
+  const remote = !rest.includes('--local')
   const limitIndex = rest.indexOf('--limit')
   const limit = limitIndex !== -1 ? Number(rest[limitIndex + 1]) : undefined
-  return { file, dryRun, limit }
+  return { file, dryRun, limit, remote }
 }
 
 function parseBroadcastMarkdown(raw: string): Broadcast {
@@ -86,29 +93,21 @@ function parseBroadcastMarkdown(raw: string): Broadcast {
   return {
     subject: { 'fr-CA': subjectFr, 'en-CA': subjectEn },
     bodyHtml: {
-      'fr-CA': marked.parse(frMatch[1].trim()) as string,
-      'en-CA': marked.parse(enMatch[1].trim()) as string,
+      'fr-CA': styleMarkdownHtml(marked.parse(frMatch[1].trim()) as string),
+      'en-CA': styleMarkdownHtml(marked.parse(enMatch[1].trim()) as string),
+    },
+    bodyText: {
+      'fr-CA': frMatch[1].trim(),
+      'en-CA': enMatch[1].trim(),
     },
   }
 }
 
-function fetchConfirmedSubscribers(): SubscriberRow[] {
-  const output = execFileSync(
-    'npx',
-    [
-      'wrangler',
-      'd1',
-      'execute',
-      'nuage-athletics',
-      '--remote',
-      '--json',
-      '--command',
-      "SELECT id, email, locale, token FROM subscribers WHERE status = 'confirmed'",
-    ],
-    { encoding: 'utf-8', maxBuffer: 1024 * 1024 * 32 }
+function fetchConfirmedSubscribers(remote: boolean): SubscriberRow[] {
+  return queryD1<SubscriberRow>(
+    "SELECT id, email, locale, token FROM subscribers WHERE status = 'confirmed'",
+    { remote }
   )
-  const parsed = JSON.parse(output) as { results: SubscriberRow[] }[]
-  return parsed[0]?.results ?? []
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -122,7 +121,7 @@ function sleep(ms: number) {
 }
 
 async function main() {
-  const { file, dryRun, limit } = parseArgs(process.argv.slice(2))
+  const { file, dryRun, limit, remote } = parseArgs(process.argv.slice(2))
   const apiKey = process.env.RESEND_API_KEY
 
   if (!dryRun && !apiKey) {
@@ -134,8 +133,8 @@ async function main() {
 
   const broadcast = parseBroadcastMarkdown(readFileSync(file, 'utf-8'))
 
-  console.log('Fetching confirmed subscribers from the remote database...')
-  let subscribers = fetchConfirmedSubscribers()
+  console.log(`Fetching confirmed subscribers from the ${remote ? 'remote' : 'local'} database...`)
+  let subscribers = fetchConfirmedSubscribers(remote)
   if (limit) subscribers = subscribers.slice(0, limit)
   console.log(`${subscribers.length} confirmed subscriber(s) to send to.`)
 
@@ -149,11 +148,17 @@ async function main() {
     const unsubUrl = `${SITE_URL}/api/unsubscribe?token=${row.token}`
     const html = renderEmailShell({
       locale,
+      siteUrl: SITE_URL,
       heading: broadcast.subject[locale],
       bodyHtml: broadcast.bodyHtml[locale],
       unsubUrl,
     })
-    return { to: row.email, subject: broadcast.subject[locale], html, unsubUrl }
+    const text = renderEmailText({
+      heading: broadcast.subject[locale],
+      bodyText: broadcast.bodyText[locale],
+      unsubUrl,
+    })
+    return { to: row.email, subject: broadcast.subject[locale], html, text, unsubUrl }
   })
 
   if (dryRun) {
@@ -184,6 +189,7 @@ async function main() {
           to: [m.to],
           subject: m.subject,
           html: m.html,
+          text: m.text,
           headers: { 'List-Unsubscribe': `<${m.unsubUrl}>` },
         }))
       ),

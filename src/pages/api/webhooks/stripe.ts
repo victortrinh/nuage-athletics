@@ -9,7 +9,7 @@ export const prerender = false
  * Stripe retries on any non-2xx response, so a transient DB error here
  * should surface as a 500 (please retry), not swallow the event.
  */
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, url }) => {
   if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
     return new Response('not configured', { status: 500 })
   }
@@ -60,6 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
       apiKey: env.RESEND_API_KEY,
       to: event.email,
       locale: event.locale,
+      siteUrl: env.PUBLIC_SITE_URL ?? url.origin,
       amountTotal: event.total.amount,
       currency: event.total.currency,
     })
