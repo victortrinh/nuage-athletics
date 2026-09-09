@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { ROUTES } from '../src/i18n/utils'
+import { E2E_PREVIEW_PASSWORD } from '../playwright.config'
 
 /**
  * SignupForm.tsx's consent checkbox used to be a native
@@ -53,7 +54,9 @@ test('consent checkbox stays visually distinct checked vs unchecked in forced-co
  * (fit) — see the forced-colors: additions in radio-group.tsx.
  */
 test('fit radio stays visually distinct selected vs unselected in forced-colors', async ({ page }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+  // The fit picker only renders once there's something to buy — see the
+  // note in ProductView.astro — so this exercises it under preview.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   // The background/data-selected styling lives on the wrapping <label>
   // (radio-group.tsx), not on the radio role's own element — RAC renders

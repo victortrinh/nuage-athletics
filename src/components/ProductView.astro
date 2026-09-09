@@ -126,35 +126,48 @@ const jsonLd = {
       )
     }
 
-    <p class="mt-6 text-base leading-relaxed text-mute">{product.description}</p>
+    {/*
+      Description, fit/size pickers and the spec table are all product
+      *detail* — reachable only once there is something to buy. Pre-drop
+      this column is the carousel, the name, and the announcement above and
+      nothing else, matching the reference: no copy to read, no size to
+      plan around, nothing that makes the page feel further along than it
+      is. `commerceEnabled` already carries the founder-preview exception
+      (src/lib/commerce/index.ts), so a founder previewing the buy flow sees
+      all of it exactly as it will ship.
+    */}
+    {
+      commerceEnabled && (
+        <>
+          <p class="mt-6 text-base leading-relaxed text-mute">{product.description}</p>
 
-    <div class="mt-10">
-      <ProductActions
-        client:load
-        {locale}
-        {d}
-        productId={product.id}
-        variants={product.variants}
-        fits={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
-        initialFit={DEFAULT_FIT}
-        {commerceEnabled}
-      />
-    </div>
-
-    <h2 class="mt-14 border-t border-line pt-8 text-[11px] uppercase tracking-label text-mute">
-      {d.productDetails}
-    </h2>
-    <dl class="mt-5">
-      {
-        editorial.specs.map((spec) => (
-          <div class="flex justify-between gap-6 border-b border-line py-3 text-sm">
-            <dt class="text-mute">{spec.label}</dt>
-            <dd class="text-right">{spec.value}</dd>
+          <div class="mt-10">
+            <ProductActions
+              client:load
+              {locale}
+              {d}
+              productId={product.id}
+              variants={product.variants}
+              fits={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
+              initialFit={DEFAULT_FIT}
+            />
           </div>
-        ))
-      }
-    </dl>
 
-    {commerceEnabled && <CpaDisclosure {locale} productName={product.name} />}
+          <h2 class="mt-14 border-t border-line pt-8 text-[11px] uppercase tracking-label text-mute">
+            {d.productDetails}
+          </h2>
+          <dl class="mt-5">
+            {editorial.specs.map((spec) => (
+              <div class="flex justify-between gap-6 border-b border-line py-3 text-sm">
+                <dt class="text-mute">{spec.label}</dt>
+                <dd class="text-right">{spec.value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <CpaDisclosure {locale} productName={product.name} />
+        </>
+      )
+    }
   </div>
 </article>
