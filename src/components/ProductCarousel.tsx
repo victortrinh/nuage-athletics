@@ -27,12 +27,13 @@ const DRAG_INTENT_PX = 8
  * which is why this remains a genuine React component rather than static
  * markup — it simply hydrates as part of its parent's root now.
  *
- * All 8 photos (both fits × 4 views) are always in the DOM — only opacity
- * and aria-hidden change on a fit switch, never `display`, so a lazy image
- * stays fetchable and toggling fit never stalls on a fresh network request.
- * See the loading-priority effect below for how the other 7 get warmed up.
+ * All 4 photos (both fits × 2 views — front and back; no worn shots, see
+ * catalogue.ts) are always in the DOM — only opacity and aria-hidden change
+ * on a fit switch, never `display`, so a lazy image stays fetchable and
+ * toggling fit never stalls on a fresh network request. See the
+ * loading-priority effect below for how the other 3 get warmed up.
  *
- * Within a fit the 4 photos sit on a translated flex track rather than a
+ * Within a fit the 2 photos sit on a translated flex track rather than a
  * crossfade stack, because a swipe has to show the next photo following the
  * finger — a fade has nothing to drag. The two fits are still two stacked
  * tracks that crossfade, so the DOM invariant above is unchanged.
@@ -177,7 +178,7 @@ export default function ProductCarousel({ d, fit, fits, initialFit }: Props) {
         the "real buttons" requirement) and needs a whole new ui/tabs.tsx
         primitive. Not a landmark region either — Base.astro's <main> is
         already the page's landmark. No per-slide slide roles: only one of
-        the 8 images is ever exposed (the rest are aria-hidden), so a role
+        the 4 images is ever exposed (the rest are aria-hidden), so a role
         that exists to navigate among visible slides has nothing to do here.
 
         The group wraps the frame AND the pagination row, not just the

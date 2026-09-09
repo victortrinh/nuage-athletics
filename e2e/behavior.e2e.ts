@@ -433,7 +433,7 @@ test('carousel exposes exactly one image at a time, pages with the numbered pagi
 
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   await expect(carousel).toHaveAttribute('aria-roledescription', 'carousel')
-  // axe can't make this assertion — it has no notion of "only one of 8
+  // axe can't make this assertion — it has no notion of "only one of 4
   // images should be in the accessibility tree at a time". This is the one
   // check that catches a broken aria-hidden toggle.
   await expect(carousel.getByRole('img')).toHaveCount(1)
@@ -444,15 +444,16 @@ test('carousel exposes exactly one image at a time, pages with the numbered pagi
   const status = page.locator('[role="status"].sr-only').first()
   await expect(status).toHaveText('')
 
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
-  await expect(pageButtons).toHaveCount(4)
+  // Front and back only — no worn shots (see catalogue.ts).
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
+  await expect(pageButtons).toHaveCount(2)
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
-  await pageButtons.nth(2).click()
-  await expect(pageButtons.nth(2)).toHaveAttribute('aria-current', 'true')
+  await pageButtons.nth(1).click()
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
   await expect(pageButtons.nth(0)).not.toHaveAttribute('aria-current', 'true')
   await expect(carousel.getByRole('img')).toHaveCount(1)
-  await expect(status).toHaveText('Classique — Image 3 de 4')
+  await expect(status).toHaveText('Classique — Image 2 de 2')
 })
 
 test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
@@ -461,7 +462,7 @@ test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
   // Arrow keys work from focus anywhere in the group (see onKeyDown in
   // ProductCarousel.tsx), pagination and prev/next arrows included.
   const carousel = page.getByRole('group', { name: 'Images du produit' })
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
 
   await pageButtons.nth(0).click()
   await pageButtons.nth(0).focus()
@@ -474,9 +475,10 @@ test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
   // Wraps rather than stopping at the boundary — there's no disabled state
-  // to strand focus on.
+  // to strand focus on. Only two images, so wrapping left from index 0
+  // lands on the last one, index 1.
   await page.keyboard.press('ArrowLeft')
-  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
   await expect(carousel.getByRole('img')).toHaveCount(1)
 })
 
@@ -486,7 +488,7 @@ test('carousel prev/next arrows page and wrap', async ({ page }) => {
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   const prev = page.getByRole('button', { name: 'Image précédente' })
   const next = page.getByRole('button', { name: 'Image suivante' })
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
 
   await next.click()
   await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
@@ -494,9 +496,10 @@ test('carousel prev/next arrows page and wrap', async ({ page }) => {
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
   // Wraps in both directions, so neither arrow ever needs a disabled state
-  // that would strand focus on it.
+  // that would strand focus on it. Only two images, so wrapping back from
+  // index 0 lands on index 1.
   await prev.click()
-  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
   await next.click()
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
@@ -530,7 +533,7 @@ test('carousel advances on a horizontal drag and clamps at the ends', async ({ p
   await page.goto(ROUTES.home['fr-CA'])
 
   const carousel = page.getByRole('group', { name: 'Images du produit' })
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
   const status = page.locator('[role="status"].sr-only').first()
 
   // Dragging right at the first image has nowhere to go — unlike the arrows,
@@ -540,7 +543,7 @@ test('carousel advances on a horizontal drag and clamps at the ends', async ({ p
 
   await swipe(page, -200)
   await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
-  await expect(status).toHaveText('Classique — Image 2 de 4')
+  await expect(status).toHaveText('Classique — Image 2 de 2')
 
   // Short of the threshold, the track springs back and nothing changes.
   await swipe(page, -20)
@@ -567,7 +570,7 @@ test('controls report a pointer cursor', async ({ page }) => {
     locator.evaluate((el) => getComputedStyle(el).cursor)
 
   expect(await cursorOf(page.getByRole('button', { name: 'Image suivante' }))).toBe('pointer')
-  expect(await cursorOf(page.getByRole('button', { name: 'Image 2 de 4' }))).toBe('pointer')
+  expect(await cursorOf(page.getByRole('button', { name: 'Image 2 de 2' }))).toBe('pointer')
   // The <label> RAC renders for a Radio isn't reachable from a global
   // selector — radio-group.tsx sets cursor-pointer itself.
   expect(

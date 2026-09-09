@@ -82,7 +82,7 @@ test('current pagination button stays visually distinct from the others in force
 }) => {
   await page.goto(ROUTES.home['fr-CA'])
 
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
   const current = await pageButtons.nth(0).evaluate((el) => getComputedStyle(el).backgroundColor)
   const other = await pageButtons.nth(1).evaluate((el) => getComputedStyle(el).backgroundColor)
   expect(current).not.toBe(other)
