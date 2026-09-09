@@ -1,5 +1,5 @@
 import type { Locale } from '../i18n/config'
-import type { Product, ProductVariant } from './commerce/types'
+import type { Money, Product, ProductVariant } from './commerce/types'
 
 /**
  * The catalogue, deliberately free of any commerce backend.
@@ -50,7 +50,7 @@ const FIT_NAMES: Record<Locale, Record<FitId, string>> = {
  * Fit × size = 12 variants, fit-major. `label` composes the fit and size name
  * (e.g. "Crop · M") and is what ends up on the Stripe line item and receipt —
  * see `stripe.ts`, which reads `variant.label` directly and needed no changes
- * for this. `options` carries the same two facts as ids, for `ProductActions`
+ * for this. `options` carries the same two facts as ids, for `ProductStage`
  * to resolve a variant from a (fit, size) selection without re-deriving the
  * id scheme in a second file.
  */
@@ -248,4 +248,17 @@ export function editorialFor(id: string, locale: Locale): ProductEditorial {
   const editorial = EDITORIAL[locale][id]
   if (!editorial) throw new Error(`no editorial content for ${id} in ${locale}`)
   return editorial
+}
+
+/**
+ * Same formatting `sendOrderConfirmationEmail` (src/lib/email.ts) already
+ * does for a receipt — locale-aware via `Intl.NumberFormat`'s own currency
+ * symbol/spacing rules (e.g. "65,00 $" vs "$65.00"), rather than a hand-built
+ * string. Called server-side only (ProductView.astro), and only behind
+ * `commerceEnabled` — see non-negotiable 5.5 in CLAUDE.md.
+ */
+export function formatPrice(price: Money, locale: Locale): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: price.currency }).format(
+    price.amount / 100
+  )
 }

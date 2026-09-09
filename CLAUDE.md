@@ -114,22 +114,20 @@ of us to see the real buy flow on the real site before it opens.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
 - The product's **fit** (`FitId` in `src/lib/catalogue.ts`) is a purchasable
   axis alongside size, not just a photo toggle — 12 variants, fit × size.
-  `ProductCarousel.tsx` (the image carousel) and `ProductActions.tsx` (the
-  buy panel) are separate islands in different grid columns, so they can't
-  share React state through props or context; they share the selected fit
-  through `src/lib/fit-store.ts`, a small module-level store keyed by
-  `productId`. It's a deliberate exception to "no hidden coupling between
-  components" — the alternative was one island covering the whole product
-  body, which would hydrate the heading, description and spec list for no
-  interactive reason, the exact thing the "default to zero JS" rule above
-  rules out. Because of that coupling, `ProductCarousel` and `ProductActions`
-  must carry the *same* `client:*` directive. `fit-store.ts`'s
-  `useSyncExternalStore` gives each island `initialFit` as its server
-  snapshot — if one hydrated later than the other, picking a fit in the
-  already-hydrated island before the late one attaches would make that late
-  island mount showing the old fit and then visibly snap to the real
-  selection. Both stay `client:load` today for exactly this reason; if that
-  ever changes, it changes for both at once.
+  `ProductStage.tsx` is the one island for the whole interactive product
+  body: carousel, fit picker, and the fixed-height buy band (name, price,
+  sizes, information) that the redesign put all of that inside. It used to
+  be two islands — `ProductCarousel.tsx` and `ProductActions.tsx`, in
+  separate grid columns, sharing the selected fit through a module-level
+  store (`src/lib/fit-store.ts`) because they had no common parent to lift
+  state into. That store is gone. The reason it existed — "the alternative
+  was one island covering the whole product body, which would hydrate the
+  heading, description and spec list for no interactive reason" — stopped
+  holding the moment those became part of the band itself: they roll and
+  toggle now, so hydrating them is the point, not a cost. `ProductCarousel`
+  is still its own component for the sake of its self-contained drag/
+  keyboard/pagination logic, but it's a plain child of `ProductStage`, not
+  a second island — `fit` and its setter come down as props.
 - **The sky is allowed to stop; it is never allowed to leave a white page.**
   `sky/engine.ts` walks a degrade ladder and eventually gives up (hiding the
   canvas, dropping the GL context, recording `na-sky-gaveup`), and three rules
@@ -162,7 +160,7 @@ every island to full HTML before any hydration runs, so the crawlable content �
 headings, descriptions, the spec list, `Seo.astro`'s JSON-LD, `ProductView.astro`'s
 `<noscript>` image grid — is in the first response regardless of what hydrates
 afterward, and React only appears on two of sixteen routes in the first place
-(`SignupForm`, `ProductActions`, `ProductCarousel`). What RAC buys — roving-
+(`SignupForm`, `ProductStage`). What RAC buys — roving-
 tabindex radiogroups, forced-colors indicators, live-region announcements, focus
 restoration — is pinned by ~30 assertions in `e2e/`; hand-rolling the same
 behaviour in vanilla JS to save the bundle weight would trade a tested layer for
@@ -197,8 +195,9 @@ does), opens a real if narrow window where a fast click on the now-visible
 control lands before React's own handlers attach — `e2e/behavior.e2e.ts`'s
 `openSignupPrompt()` waits for the island to drop its `ssr` attribute (Astro's
 own hydration-complete signal) before interacting, for exactly this reason.
-`ProductCarousel` and `ProductActions` don't get this treatment — see the
-`fit-store.ts` note above.
+`ProductStage` doesn't get this treatment — it's the first thing in the
+document on every route that renders it, so there's no hidden ancestor to
+defer behind; it stays `client:load`.
 
 - **Variant tables (`*-variants.ts`) are plain `.ts`, zero React/RAC imports.**
   `.astro` files (`GateScreen.astro`, `Base.astro`) import `buttonVariants`,

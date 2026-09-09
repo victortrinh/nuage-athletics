@@ -8,11 +8,11 @@ import { cn } from './cn'
 
 /**
  * Hand-written against react-aria-components@1.21.0 — see button.tsx for
- * why. Replaces the size-selector chips in ProductActions.tsx, which put
- * aria-pressed on five mutually-exclusive <button>s — valid ARIA, but the
- * wrong widget for "pick exactly one": no arrow-key roving, no
- * role="radiogroup". This is the one primitive on this branch that RAC
- * genuinely earns its weight for.
+ * why. Replaces the size-selector chips originally in ProductActions.tsx
+ * (now ProductStage.tsx), which put aria-pressed on five mutually-exclusive
+ * <button>s — valid ARIA, but the wrong widget for "pick exactly one": no
+ * arrow-key roving, no role="radiogroup". This is the one primitive on this
+ * branch that RAC genuinely earns its weight for.
  *
  * Note the resulting behaviour change: the old buttons could be deselected
  * by clicking the active one again (`setVariantId(id === v.id ? '' : v.id)`

@@ -18,18 +18,23 @@ import type { Locale } from './config.ts'
  *   - Anything that names a control or is read by a screen reader —
  *     emailLabel, productSizeLabel, productFitLabel,
  *     productGalleryLabel, productImagePosition, productImagePrev,
- *     productImageNext, skipToContent, switchTo, navMenu, navMenuClose,
+ *     productImageNext, productChooseSize, productCloseSizes,
+ *     skipToContent, switchTo, navMenu, navMenuClose,
  *     navLabel, navFooterLabel, promptClose.
  *     A weather word in an accessible name is a broken accessible name.
  *   - Errors that tell you how to fix the thing — errorEmail, errorConsent,
- *     productSelectSizeError, errorEmailSend. Cute is hostile when someone
- *     is stuck. Errors that are only "wait and retry"
- *     (errorGeneric, errorRate) carry the voice instead.
- *   - submitting, successTitle: progress and success are announced through a
- *     live region, where being understood on the first hearing beats charm.
+ *     errorEmailSend. Cute is hostile when someone is stuck. Errors that are
+ *     only "wait and retry" (errorGeneric, errorRate) carry the voice
+ *     instead. (There used to be a "choose a size" error here too —
+ *     productSelectSizeError — but the buy band's two-tap design, tapping a
+ *     size only ever reveals a confirm step, makes it unreachable, so it
+ *     was removed rather than left to rot. See ProductStage.tsx.)
+ *   - submitting, successTitle, productAdding: progress and success are
+ *     announced through a live region, where being understood on the first
+ *     hearing beats charm.
  *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
  *     mailUnsub, mailSubject/mailHeading/mailCta, orderCancelled*, privacy,
- *     terms, rights, productOutOfStock, productBuy.
+ *     terms, rights, productOutOfStock, productBuySize.
  *   - dropAnnounceAvailability most of the rest: it is the only place the site
  *     tells a shopper when they can buy, on a page anyone can now reach. A
  *     stated availability date is a representation, so it says a real date
@@ -103,12 +108,16 @@ export type Dict = {
   productGalleryLabel: string
   productSizeLabel: string
   productOutOfStock: string
-  productBuy: string
-  productSelectSizeError: string
   productFitLabel: string
   productImagePosition: string
   productImagePrev: string
   productImageNext: string
+  // product buy band (ProductStage.tsx) — the fixed-height "select size /
+  // buy / adding" roller under the carousel
+  productChooseSize: string
+  productBuySize: string
+  productAdding: string
+  productCloseSizes: string
   orderConfirmedTitle: string
   orderConfirmedBody: string
   orderCancelledTitle: string
@@ -172,12 +181,14 @@ export const UI: Record<Locale, Dict> = {
     productGalleryLabel: 'Images du produit',
     productSizeLabel: 'Taille',
     productOutOfStock: 'Épuisé',
-    productBuy: 'Acheter',
-    productSelectSizeError: 'Choisissez une taille.',
     productFitLabel: 'Coupe',
     productImagePosition: 'Image {n} de {total}',
     productImagePrev: 'Image précédente',
     productImageNext: 'Image suivante',
+    productChooseSize: 'Choisir une taille',
+    productBuySize: 'Acheter · {size}',
+    productAdding: 'Ajout…',
+    productCloseSizes: 'Fermer la sélection de taille',
     orderConfirmedTitle: 'Commande confirmée',
     orderConfirmedBody:
       'Merci. Un courriel de confirmation est en route.',
@@ -237,12 +248,14 @@ export const UI: Record<Locale, Dict> = {
     productGalleryLabel: 'Product images',
     productSizeLabel: 'Size',
     productOutOfStock: 'Out of stock',
-    productBuy: 'Buy now',
-    productSelectSizeError: 'Choose a size.',
     productFitLabel: 'Fit',
     productImagePosition: 'Image {n} of {total}',
     productImagePrev: 'Previous image',
     productImageNext: 'Next image',
+    productChooseSize: 'Choose a size',
+    productBuySize: 'Buy · {size}',
+    productAdding: 'Adding…',
+    productCloseSizes: 'Close size selection',
     orderConfirmedTitle: 'Order confirmed',
     orderConfirmedBody: 'Thanks. A confirmation email is on its way.',
     orderCancelledTitle: 'Order cancelled',

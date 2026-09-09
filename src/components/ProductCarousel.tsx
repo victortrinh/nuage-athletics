@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { FitId, ProductFit } from '../lib/catalogue'
-import { useFit } from '../lib/fit-store'
 import { fmt, type Dict } from '../i18n/ui'
 import { cn } from './ui/cn'
 
 interface Props {
   d: Dict
-  productId: string
+  fit: FitId
   fits: ProductFit[]
   initialFit: FitId
 }
@@ -17,10 +16,16 @@ interface Props {
 const DRAG_INTENT_PX = 8
 
 /**
- * The product image carousel. Zero-JS was the default (see
- * ProductGallery.astro, which this replaces) but paging through photos and
- * reacting to a fit picked in the separate buy-panel island both genuinely
- * need interaction, so this earns its hydration.
+ * The product image carousel — a presentational child of ProductStage
+ * (which owns `fit`) rather than an island of its own. It used to hydrate
+ * independently and share the selected fit with a separate buy-panel island
+ * through `src/lib/fit-store.ts`; both islands merged into one
+ * (ProductStage.tsx) once the redesign put price, sizes and the spec list
+ * inside the same interactive band as the carousel — see CLAUDE.md and the
+ * removed fit-store.ts for the reasoning that no longer applied. Paging
+ * through photos and reacting to `fit` still both need real interaction,
+ * which is why this remains a genuine React component rather than static
+ * markup — it simply hydrates as part of its parent's root now.
  *
  * All 8 photos (both fits × 4 views) are always in the DOM — only opacity
  * and aria-hidden change on a fit switch, never `display`, so a lazy image
@@ -32,8 +37,7 @@ const DRAG_INTENT_PX = 8
  * finger — a fade has nothing to drag. The two fits are still two stacked
  * tracks that crossfade, so the DOM invariant above is unchanged.
  */
-export default function ProductCarousel({ d, productId, fits, initialFit }: Props) {
-  const [fit, setFit] = useFit(productId, initialFit)
+export default function ProductCarousel({ d, fit, fits, initialFit }: Props) {
   const [index, setIndex] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const [warm, setWarm] = useState(false)
@@ -69,9 +73,9 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
     setAnnouncement(`${nextFit.label} — ${position}`)
   }
 
-  // Announces a fit switched from the buy panel (ProductActions) — but not
-  // on mount, and not on navigation within one fit, which announces itself
-  // in goTo below.
+  // Announces a fit switched from the fit picker (rendered by the parent,
+  // ProductStage) — but not on mount, and not on navigation within one fit,
+  // which announces itself in goTo below.
   useEffect(() => {
     if (!mounted.current) {
       mounted.current = true
@@ -192,22 +196,22 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
           change: the spacer below reserves the height, the stage lies on
           top of it at the column's full width, and every photo is fitted
           inside with object-contain. Paging or switching fit therefore
-          never moves the pagination row, the fit label or the buy panel —
+          never moves the pagination row, the fit label or the band below —
           on mobile especially, where the carousel is the first thing in
           the document flow and a reflow here shifts the whole page.
 
-          The spacer keeps the old 4/5-at-26rem shape, which is the tallest
-          the gallery gets (the worn shots) at the largest height that
-          still leaves the pagination row and buy panel above the fold on
-          an ordinary laptop. Below 26rem the cap stops biting and it
-          tracks the viewport, as before.
+          The spacer keeps the 4/5-at-26rem shape, which is the tallest the
+          gallery gets (the worn shots) at the largest height that still
+          leaves the pagination row and band above the fold on an ordinary
+          laptop. Below 26rem the cap stops biting and it tracks the
+          viewport, as before.
 
           The stage is deliberately wider than that cap: front and back are
           flat-lay shots at roughly 2:1, so a 26rem-wide frame left them
-          barely 200px tall in a 520px box. Spanning the whole grid column
-          (~39rem) gives those two half again as much size, while the worn
-          shots — bounded by the reserved height, not the width — come out
-          exactly as they did before.
+          barely 200px tall in a 520px box. Spanning the whole centred
+          column (max-w-[34rem], set by ProductView.astro) gives those two
+          a little more room, while the worn shots — bounded by the reserved
+          height, not the width — come out exactly as they did before.
         */}
         <div className="relative w-full">
           <div aria-hidden="true" className="mx-auto aspect-[4/5] w-full max-w-[26rem]" />
