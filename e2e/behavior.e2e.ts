@@ -1,12 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { ROUTES } from '../src/i18n/utils'
+import { E2E_PREVIEW_PASSWORD, NUDGE_DISMISSED } from '../playwright.config'
 import { LOCALES } from '../src/i18n/config'
 
 /**
  * SignupForm now lives only inside the bottom-anchored SignupPrompt
- * (SignupPrompt.astro), which every route in SHOWS_SIGNUP_PROMPT renders —
- * the gate screen included. It starts `hidden` and its own script reveals
+ * (SignupPrompt.astro), which every route in SHOWS_SIGNUP_PROMPT renders.
+ * It starts `hidden` and its own script reveals
  * it for real, ~6s after load (no test-only shortcut — see the file's own
  * comment on why waiting for it is preferable to faking the timer), so
  * every test below needs to wait that out before it can interact.
@@ -19,22 +20,28 @@ import { LOCALES } from '../src/i18n/config'
  * but the (still-unhydrated) `consent` state never sees it. Astro drops the
  * island's `ssr` attribute the moment hydration finishes, so waiting for
  * that closes the window before any test interacts.
+ *
+ * Scoped to #signup-prompt: these tests used to run on the pre-launch gate
+ * screen, which carried one island and nothing else. The home page carries
+ * three (ProductCarousel, ProductActions, SignupForm), so an unscoped
+ * `astro-island:not([ssr])` is a strict-mode violation — and matching
+ * whichever island hydrated first would wait on the wrong one.
  */
 async function openSignupPrompt(page: Page) {
   await expect(page.locator('#signup-prompt')).toBeVisible({ timeout: 8_000 })
   await expect(page.getByRole('checkbox')).toBeVisible()
-  await page.locator('astro-island:not([ssr])').waitFor({ state: 'attached' })
+  await page.locator('#signup-prompt astro-island:not([ssr])').waitFor({ state: 'attached' })
 }
 
 /**
  * The CASL consent checkbox must never be pre-checked or inferred
  * (CLAUDE.md non-negotiable #3) — before this test, nothing automated
- * verified that. The gate screen always renders a SignupForm regardless of
- * lock state.
+ * verified that. The home page is in SHOWS_SIGNUP_PROMPT, so the form is
+ * always there to check.
  */
 for (const locale of LOCALES) {
   test(`consent checkbox is unchecked on load (${locale})`, async ({ page }) => {
-    await page.goto(ROUTES.gate[locale])
+    await page.goto(ROUTES.home[locale])
     await openSignupPrompt(page)
     const consent = page.getByRole('checkbox')
     await expect(consent).not.toBeChecked()
@@ -52,7 +59,7 @@ test('skip link is the first focus stop and targets #content', async ({ page }) 
 test('consent checkbox toggles by keyboard, and a bad email wires aria-invalid', async ({
   page,
 }) => {
-  await page.goto(ROUTES.gate['fr-CA'])
+  await page.goto(ROUTES.home['fr-CA'])
   await openSignupPrompt(page)
 
   const consent = page.getByRole('checkbox')
@@ -71,7 +78,7 @@ test('consent checkbox toggles by keyboard, and a bad email wires aria-invalid',
 })
 
 test('focus moves into the success panel, and the live region announces it', async ({ page }) => {
-  await page.goto(ROUTES.gate['fr-CA'])
+  await page.goto(ROUTES.home['fr-CA'])
 
   // The real endpoint always returns email_failed without RESEND_API_KEY
   // configured (by design — see README). Stub the response to exercise the
@@ -87,7 +94,11 @@ test('focus moves into the success panel, and the live region announces it', asy
   await page.getByRole('button', { name: /m.inscrire/i }).click({ force: true })
 
   await expect(page.locator('p[tabindex="-1"]')).toBeFocused()
-  await expect(page.locator('[role="status"].sr-only')).toHaveText('Vérifiez vos courriels')
+  // Scoped to the prompt: ProductCarousel has a live region of its own on this
+  // page, which the gate screen this test used to run on did not.
+  await expect(page.locator('#signup-prompt [role="status"].sr-only')).toHaveText(
+    'Vérifiez vos courriels'
+  )
 })
 
 /**
@@ -100,7 +111,7 @@ test('focus moves into the success panel, and the live region announces it', asy
  * test noticing.
  */
 test('a hydrated submit resolves in place, without navigating', async ({ page }) => {
-  await page.goto(ROUTES.gate['fr-CA'])
+  await page.goto(ROUTES.home['fr-CA'])
 
   await page.route('**/api/subscribe', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
@@ -113,7 +124,7 @@ test('a hydrated submit resolves in place, without navigating', async ({ page })
   await page.getByRole('button', { name: /m.inscrire/i }).click({ force: true })
 
   await expect(page.locator('p[tabindex="-1"]')).toHaveText('Vérifiez vos courriels')
-  await expect(page).toHaveURL(new RegExp(`${ROUTES.gate['fr-CA']}$`))
+  await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 })
 
 /**
@@ -134,10 +145,10 @@ test.describe('signup form works before hydration (no JS)', () => {
     // configured (see README) — stub the redirect it would issue on success,
     // the same shape /api/subscribe itself produces for a form-encoded POST.
     await page.route('**/api/subscribe', (route) =>
-      route.fulfill({ status: 303, headers: { Location: `${ROUTES.gate['fr-CA']}?sent=1` } })
+      route.fulfill({ status: 303, headers: { Location: `${ROUTES.home['fr-CA']}?sent=1` } })
     )
 
-    await page.goto(ROUTES.gate['fr-CA'])
+    await page.goto(ROUTES.home['fr-CA'])
     await expect(page.getByRole('checkbox')).toBeVisible()
 
     await page.getByRole('checkbox').focus()
@@ -145,7 +156,7 @@ test.describe('signup form works before hydration (no JS)', () => {
     await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
     await page.getByRole('button', { name: /m.inscrire/i }).click()
 
-    await expect(page).toHaveURL(new RegExp(`${ROUTES.gate['fr-CA']}\\?sent=1$`))
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}\\?sent=1$`))
     // No hydration ever ran, so there's no live region here — just the
     // static success markup the server rendered from initialSuccess.
     await expect(page.locator('p[tabindex="-1"]')).toHaveText('Vérifiez vos courriels')
@@ -154,13 +165,13 @@ test.describe('signup form works before hydration (no JS)', () => {
   test('submitting with consent unchecked bounces back with the French error, prompt forced open', async ({
     page,
   }) => {
-    await page.goto(ROUTES.gate['fr-CA'])
+    await page.goto(ROUTES.home['fr-CA'])
     await expect(page.getByRole('checkbox')).toBeVisible()
 
     await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
     await page.getByRole('button', { name: /m.inscrire/i }).click()
 
-    await expect(page).toHaveURL(new RegExp(`${ROUTES.gate['fr-CA']}\\?se=consent_required$`))
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}\\?se=consent_required$`))
     await expect(page.getByRole('alert')).toHaveText('Vous devez accepter de recevoir nos courriels.')
   })
 })
@@ -490,4 +501,53 @@ test('nav drawer panel does not slide under prefers-reduced-motion', async ({ pa
 
   const panel = page.locator('#nav-drawer-panel')
   await expect(panel).toHaveCSS('translate', 'none')
+})
+
+/**
+ * Founder preview, end to end against the real Worker.
+ *
+ * The buy flow has to be testable on the live site before the drop opens it to
+ * everyone, and the price it reveals is the thing CLAUDE.md non-negotiable 5.5
+ * is about — so this asserts both halves: that the public gets the drop
+ * announcement and no buy button, and that a founder gets the buy button and a
+ * response no shared cache is allowed to keep.
+ *
+ * Its own browser context, because the cookie must not leak into any other
+ * test's view of the site.
+ */
+test.describe('founder preview', () => {
+  test('the public sees the drop announcement and no buy button', async ({ page }) => {
+    await page.goto(ROUTES.home['fr-CA'])
+    await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Acheter' })).toHaveCount(0)
+  })
+
+  test('the cookie reveals the buy flow, and the response is never cached', async ({
+    browser,
+  }) => {
+    // A fresh context does not inherit `use.storageState`, so the locale nudge
+    // has to be dismissed here too.
+    const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
+    const page = await context.newPage()
+
+    const response = await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+    // The secret is stripped on the way back, so it can't linger in history
+    // or leak through Referer.
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
+    expect(response?.headers()['cache-control']).toBe('private, no-store')
+
+    await expect(page.getByRole('button', { name: 'Acheter' })).toBeVisible()
+    await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toHaveCount(0)
+
+    // And back out again, without clearing cookies by hand.
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=`)
+    await expect(page.getByRole('button', { name: 'Acheter' })).toHaveCount(0)
+
+    await context.close()
+  })
+
+  test('a wrong secret is refused', async ({ page }) => {
+    const response = await page.goto(`${ROUTES.home['fr-CA']}?preview=not-the-password`)
+    expect(response?.status()).toBe(404)
+  })
 })

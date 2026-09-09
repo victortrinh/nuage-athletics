@@ -15,7 +15,7 @@ test.use({ contextOptions: { forcedColors: 'active', reducedMotion: 'reduce' } }
 test('consent checkbox stays visually distinct checked vs unchecked in forced-colors', async ({
   page,
 }) => {
-  await page.goto(ROUTES.gate['fr-CA'])
+  await page.goto(ROUTES.home['fr-CA'])
   // SignupForm now lives only inside the bottom-anchored SignupPrompt
   // (SignupPrompt.astro), which reveals itself for real ~6s after load —
   // see the matching helper/comment in behavior.e2e.ts. Waiting for the
@@ -24,7 +24,7 @@ test('consent checkbox stays visually distinct checked vs unchecked in forced-co
   // hydration's onChange is listening is a silent no-op, not a failure —
   // which is exactly the kind of thing that reads as "flaky" without this.
   await expect(page.locator('#signup-prompt')).toBeVisible({ timeout: 8_000 })
-  await page.locator('astro-island:not([ssr])').waitFor({ state: 'attached' })
+  await page.locator('#signup-prompt astro-island:not([ssr])').waitFor({ state: 'attached' })
 
   const indicator = page.locator('div.size-4')
   const unchecked = await indicator.evaluate((el) => getComputedStyle(el).backgroundColor)

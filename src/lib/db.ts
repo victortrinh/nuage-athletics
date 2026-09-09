@@ -38,7 +38,7 @@ const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
  * Sharing one bucket would let someone failing the gate burn a real
  * visitor's ability to subscribe, and vice versa.
  */
-export type AttemptScope = 'signup' | 'gate'
+export type AttemptScope = 'signup' | 'preview'
 
 /**
  * A table name cannot be a bound parameter, so the scope resolves through this
@@ -47,8 +47,11 @@ export type AttemptScope = 'signup' | 'gate'
 const ATTEMPTS: Record<AttemptScope, { table: string; max: number }> = {
   signup: { table: 'signup_attempts', max: 5 },
   // Tighter: this one guards a password, and a wrong password is not a typo
-  // a visitor needs eight tries to recover from.
-  gate: { table: 'gate_attempts', max: 8 },
+  // a visitor needs eight tries to recover from. The table keeps the name it
+  // was created with — this scope guarded the pre-launch gate before it
+  // guarded founder preview, and renaming it would be a migration that buys
+  // nothing but a tidier name for rows that expire anyway.
+  preview: { table: 'gate_attempts', max: 8 },
 }
 
 export async function isRateLimited(

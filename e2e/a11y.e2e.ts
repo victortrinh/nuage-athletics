@@ -3,9 +3,8 @@ import AxeBuilder from '@axe-core/playwright'
 import { ROUTES } from '../src/i18n/utils'
 import { LOCALES } from '../src/i18n/config'
 
-// Every ROUTES entry × both locales — 16 URLs, including /acces and
-// /en/access (ROUTES.gate), which pass through the lock regardless of
-// storageState (see isGatePath in src/lib/gate.ts).
+// Every ROUTES entry × both locales — 14 URLs. All of them are public now
+// that the pre-launch gate is gone, so the scan needs no authentication.
 const paths = LOCALES.flatMap((locale) =>
   (Object.keys(ROUTES) as (keyof typeof ROUTES)[]).map((id) => ROUTES[id][locale])
 )
@@ -47,7 +46,7 @@ async function neutralizeUnresolvableBackgrounds(page: Page) {
 // documented safe in global.css.
 //
 // axe's generated CSS selector for this node isn't stable — it comes back
-// as "span" on the gate pages but ".items-start > span" on the home page,
+// as "span" on some pages but ".items-start > span" on others,
 // depending on what else is on the page — so match on the node's rendered
 // markup instead: this is the only "partially obscuring" incomplete result
 // whose html is exactly `<span class="text-mute">`, which is specific
@@ -68,8 +67,8 @@ function isKnownSafeConsentLabelOverlap(node: {
  * <details> (none currently on the site, kept generic in case one returns)
  * and SignupPrompt.astro's `#signup-prompt`, which starts `hidden` and only
  * becomes visible ~6s after load via its own script — forcing it open here
- * is the same idea as GateScreen.astro's old expandDisclosures() call, just
- * for an element that isn't a native disclosure.
+ * is the same idea as a disclosure's expand, just for an element that isn't
+ * a native one.
  */
 async function openHiddenContent(page: Page) {
   await page.evaluate(() => {

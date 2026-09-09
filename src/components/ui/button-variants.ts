@@ -8,9 +8,9 @@ import { cva, type VariantProps } from 'class-variance-authority'
  * and the underlined text-only toggle (the sky pause/resume control).
  *
  * Plain .ts, no React/RAC import — this file is imported directly by
- * .astro files (GateScreen.astro, Base.astro) so their submit/toggle
- * buttons share the exact same class table as the React islands without
- * ever pulling react-aria-components into the Astro server graph.
+ * .astro files (Base.astro) so their submit/toggle buttons share the exact
+ * same class table as the React islands without ever pulling
+ * react-aria-components into the Astro server graph.
  *
  * `press` (global.css) rather than `transition-colors`: it eases the same
  * colour properties and adds the 1px sink under the pointer that every

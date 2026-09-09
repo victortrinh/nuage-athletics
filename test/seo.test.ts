@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { isGatePath } from '../src/lib/gate'
 import { LOCALES } from '../src/i18n/config'
 import { INDEXABLE, INDEXABLE_PATHS, ROUTES, type RouteId } from '../src/i18n/utils'
 
@@ -9,13 +8,16 @@ import { INDEXABLE, INDEXABLE_PATHS, ROUTES, type RouteId } from '../src/i18n/ut
  * two ways that table can still be wrong in a way tsc can't see.
  */
 describe('indexable routes', () => {
-  it('never publishes a path the middleware refuses to serve', () => {
-    // src/middleware.ts answers a gate path with 401 while the site is
-    // locked and 404 once it isn't. Both were in the sitemap before this
-    // table existed, and the 404 is the one that would have shipped.
+  it('never publishes a path no route serves', () => {
+    // The sitemap used to advertise the pre-launch gate screens, which the
+    // middleware answered with a 404 the moment the site opened. The gate is
+    // gone, but the failure it stood for — publishing a URL nothing renders —
+    // is the one worth keeping a guard on.
+    const served = new Set(
+      (Object.keys(ROUTES) as RouteId[]).flatMap((id) => LOCALES.map((l) => ROUTES[id][l]))
+    )
     for (const path of INDEXABLE_PATHS) {
-      expect(isGatePath(path), `${path} is a gate screen`).toBe(false)
-      expect(isGatePath(path.replace(/\/$/, '')), `${path} is a gate screen`).toBe(false)
+      expect(served.has(path), `${path} is not a route`).toBe(true)
     }
   })
 

@@ -16,20 +16,18 @@ declare namespace Cloudflare {
 
     // Secrets — wrangler secret put <NAME>
     RESEND_API_KEY?: string
-    // The pre-launch gate's password. A secret, never a [vars] entry — a
+    // The founder-preview password. A secret, never a [vars] entry — a
     // password committed to wrangler.toml is a password in the git history.
-    SITE_PASSWORD?: string
+    PREVIEW_PASSWORD?: string
     STRIPE_SECRET_KEY?: string
     STRIPE_WEBHOOK_SECRET?: string
 
     // [vars] in wrangler.toml
     PUBLIC_SITE_URL?: string
-    // "true" to expose /produit/*, /en/product/* and /api/checkout. Everything
-    // else returns 404 while this is unset — see src/lib/commerce/index.ts.
+    // "true" to show prices and the buy flow to everyone. While it is unset
+    // only a visitor carrying the preview cookie sees them, and /api/checkout
+    // returns 404 for everyone else — see src/lib/commerce/index.ts.
     COMMERCE_ENABLED?: string
-    // "true" to put the whole site behind the password gate. Has no effect
-    // unless SITE_PASSWORD is also set — see src/lib/gate.ts.
-    SITE_LOCKED?: string
   }
 }
 
