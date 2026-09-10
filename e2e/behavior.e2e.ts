@@ -426,7 +426,7 @@ test('every band control meets a 44×44 minimum target size', async ({ page }) =
   expect(closeBox.height).toBeGreaterThanOrEqual(44)
 })
 
-test('carousel exposes exactly one image at a time, pages with the numbered pagination, and announces the change', async ({
+test('carousel exposes exactly one image at a time, pages with the markers, and announces the change', async ({
   page,
 }) => {
   await page.goto(ROUTES.home['fr-CA'])
@@ -505,6 +505,32 @@ test('carousel prev/next arrows page and wrap', async ({ page }) => {
 
   // The arrows are chrome, not slides: still exactly one image exposed.
   await expect(carousel.getByRole('img')).toHaveCount(1)
+})
+
+/**
+ * The prev/next arrows flank the photo from `md:` up and are `hidden`
+ * below it — a phone has the swipe and the markers, and two more controls
+ * crowding a small frame buys nothing. What this pins is that hiding them
+ * doesn't take paging with it: the arrow *keys* are handled on the group,
+ * not on those buttons, so they keep working at a phone width where the
+ * buttons themselves are gone.
+ */
+test('carousel arrows are desktop-only, and arrow keys still page without them', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const next = page.getByRole('button', { name: 'Image suivante' })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
+  await expect(next).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 800 })
+  await expect(next).toBeHidden()
+
+  // Still pageable from the keyboard at that width.
+  await pageButtons.nth(0).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
 })
 
 /**

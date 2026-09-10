@@ -26,9 +26,23 @@ export function RadioGroup({ className, ...props }: RadioGroupProps) {
   return <AriaRadioGroup className={className} {...props} />
 }
 
-export interface RadioProps extends AriaRadioProps {}
+export interface RadioProps extends AriaRadioProps {
+  /**
+   * Tighter padding and type, for a secondary picker that shouldn't carry
+   * the same weight as the primary one on the same page — the product
+   * page's fit tabs against its size grid (ProductStage.tsx).
+   *
+   * A prop rather than something the caller passes through `className`:
+   * `cn()` is clsx only (no tailwind-merge, see cn.ts), so a `py-2` from a
+   * caller and the `py-3` below would both land in the class attribute and
+   * the winner would be whichever Tailwind happens to emit later — decided
+   * by the framework's sort order, not by this file. Branching inside the
+   * one `cn()` call keeps exactly one padding utility in play.
+   */
+  compact?: boolean
+}
 
-export function Radio({ className, ...props }: RadioProps) {
+export function Radio({ className, compact, ...props }: RadioProps) {
   return (
     <AriaRadio
       className={(renderProps) =>
@@ -36,7 +50,8 @@ export function Radio({ className, ...props }: RadioProps) {
           // cursor-pointer stays local: the global rule in global.css
           // covers button/summary, and cannot know that this particular
           // <label> is the control itself.
-          'press cursor-pointer bg-paper px-3 py-3 text-xs uppercase tracking-label',
+          'press cursor-pointer bg-paper uppercase tracking-label',
+          compact ? 'px-2 py-2 text-[10px]' : 'px-3 py-3 text-xs',
           'hover:bg-ink hover:text-paper',
           'data-[selected]:bg-ink data-[selected]:text-paper',
           // In forced-colors mode bg-ink/text-paper are both flattened to

@@ -73,18 +73,23 @@ test('fit radio stays visually distinct selected vs unselected in forced-colors'
 })
 
 /**
- * Same failure mode, different widget: the carousel's numbered pagination
- * marks the current slide with bg-ink alone (ProductCarousel.tsx) unless
- * the forced-colors: Highlight/HighlightText pair also applies.
+ * Same failure mode, different widget: the carousel's pagination marks the
+ * current slide with bg-ink alone (ProductCarousel.tsx) unless the
+ * forced-colors Highlight/GrayText pair also applies.
+ *
+ * Reads the marker `<span>`, not the button: since the numbered pagination
+ * became dots, the button is only the tap target and carries no background
+ * of its own — comparing the buttons would compare two transparents and
+ * pass no matter how the markers themselves were coloured.
  */
-test('current pagination button stays visually distinct from the others in forced-colors', async ({
+test('current pagination marker stays visually distinct from the others in forced-colors', async ({
   page,
 }) => {
   await page.goto(ROUTES.home['fr-CA'])
 
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
-  const current = await pageButtons.nth(0).evaluate((el) => getComputedStyle(el).backgroundColor)
-  const other = await pageButtons.nth(1).evaluate((el) => getComputedStyle(el).backgroundColor)
+  const markers = page.getByRole('button', { name: /^Image \d de 2$/ }).locator('span')
+  const current = await markers.nth(0).evaluate((el) => getComputedStyle(el).backgroundColor)
+  const other = await markers.nth(1).evaluate((el) => getComputedStyle(el).backgroundColor)
   expect(current).not.toBe(other)
 })
 

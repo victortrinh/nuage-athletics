@@ -207,26 +207,29 @@ export default function ProductStage(props: Props) {
           fit={fit}
           fits={fits}
           initialFit={initialFit}
-          belowFrameRem={{ base: 22.5, sm: 20.5 }}
+          belowFrameRem={{ base: 20, sm: 17 }}
         />
 
-        <div className="mt-6">
-          <p id={`fit-label-${uid}`} className="text-center text-[11px] uppercase tracking-label text-mute">
-            {d.productFitLabel}
-          </p>
-          <RadioGroup
-            aria-labelledby={`fit-label-${uid}`}
-            value={fit}
-            onChange={(value) => setFit(value as FitId)}
-            className="mx-auto mt-3 grid max-w-[16rem] grid-cols-2 gap-px bg-line"
-          >
-            {fitOptions.map((f) => (
-              <Radio key={f.id} value={f.id}>
-                {f.label}
-              </Radio>
-            ))}
-          </RadioGroup>
-        </div>
+        {/*
+          No visible "Coupe" heading above these: the two tabs say
+          "Classique" and "Crop", which is the same information twice on a
+          page whose whole point is that nothing is there unasked. The
+          accessible name moves to `aria-label` rather than disappearing —
+          a radiogroup with no name is a different (and worse) thing than
+          one whose name isn't drawn on screen.
+        */}
+        <RadioGroup
+          aria-label={d.productFitLabel}
+          value={fit}
+          onChange={(value) => setFit(value as FitId)}
+          className="mx-auto mt-5 grid max-w-[13rem] grid-cols-2 gap-px bg-line"
+        >
+          {fitOptions.map((f) => (
+            <Radio key={f.id} value={f.id} compact>
+              {f.label}
+            </Radio>
+          ))}
+        </RadioGroup>
 
         {/*
           The band. Every slot below is the same fixed height in every
@@ -235,8 +238,22 @@ export default function ProductStage(props: Props) {
           branch than another.
         */}
         <div className="mx-auto mt-10 flex w-full max-w-[20rem] flex-col items-center">
-          <Slot index={slotAIndex} className="h-9 w-full">
-            <h1 className="wordmark truncate text-2xl leading-none sm:text-3xl">{productName}</h1>
+          <Slot index={slotAIndex} className="h-7 w-full">
+            {/*
+              Mono/uppercase at the band's own size, not the `wordmark`
+              display face: the reference sets the product name in exactly
+              the same treatment as the price under it, and at 2xl/3xl in
+              an 800-weight display face this was the loudest thing on a
+              page whose loudest thing should be the photograph.
+
+              It also fixes a real bug rather than only a weight: at
+              `leading-none` the line box is the em box, so descenders fell
+              outside it and the slot's `overflow-y-clip` (product/Slot.tsx)
+              took the tail off the "g" in "Longues". Normal leading gives
+              the line box room for them, and uppercase has none to clip in
+              the first place.
+            */}
+            <h1 className="font-mono text-xs uppercase tracking-label">{productName}</h1>
             {/* Not a control — the band is already open by the time this
                 branch can show (index 1 only happens once `open` is true);
                 opening it happens from slot C's `+`, below. */}

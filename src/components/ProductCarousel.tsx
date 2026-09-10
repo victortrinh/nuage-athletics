@@ -194,17 +194,19 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
     <div>
       {/*
         role="group" + aria-roledescription, not a tablist: a tablist would
-        collapse the numbered pagination into one tab stop (contradicting
+        collapse the pagination markers into one tab stop (contradicting
         the "real buttons" requirement) and needs a whole new ui/tabs.tsx
         primitive. Not a landmark region either — Base.astro's <main> is
         already the page's landmark. No per-slide slide roles: only one of
         the 4 images is ever exposed (the rest are aria-hidden), so a role
         that exists to navigate among visible slides has nothing to do here.
 
-        The group wraps the frame AND the pagination row, not just the
-        frame: onKeyDown relies on React's bubbling, which follows the DOM
-        tree, so a pagination button has to be a descendant of this div for
-        an arrow key pressed on it to ever reach the handler below.
+        The group wraps the frame AND the marker row, not just the frame:
+        onKeyDown relies on React's bubbling, which follows the DOM tree,
+        so a marker button has to be a descendant of this div for an arrow
+        key pressed on it to ever reach the handler below. The prev/next
+        arrows live inside the frame now (see below) — still descendants,
+        so that still holds for them too.
       */}
       <div
         role="group"
@@ -297,12 +299,15 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
             className="relative shrink-0 aspect-[2/1] max-w-[min(56rem,calc(100vw-3rem))] [--chrome-h:var(--chrome-base)] sm:[--chrome-h:var(--chrome-sm)]"
             style={
               {
-                // 11.25rem: header (4rem) + this frame's own pagination row
-                // and fit caption below it, at every breakpoint — the part
-                // of "everything but the frame" that's fixed regardless of
-                // which caller renders below `belowFrameRem`.
-                '--chrome-base': `${belowFrameRem.base + 11.25}rem`,
-                '--chrome-sm': `${belowFrameRem.sm + 11.25}rem`,
+                // 9.25rem: header (4rem) + article padding (3rem) + this
+                // frame's own marker row and the gap above it (2.25rem), at
+                // every breakpoint — the part of "everything but the frame"
+                // that's fixed regardless of which caller renders below
+                // `belowFrameRem`. Re-measure it if the marker row changes
+                // size; it dropped from 11.25 when the numbered pagination
+                // became markers and the fit caption under them went away.
+                '--chrome-base': `${belowFrameRem.base + 9.25}rem`,
+                '--chrome-sm': `${belowFrameRem.sm + 9.25}rem`,
                 // No numeric ceiling here — the className's max-w is the
                 // only cap, and it's deliberately wider than the column
                 // (above), so a tall window lets the photo grow toward the
@@ -387,19 +392,60 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
                 )
               })}
             </div>
+
+            {/*
+              The arrows flank the photo rather than sitting in a row under
+              it, matching the reference. They're inside the frame (which is
+              the breakout-width box) and pinned to its edges, so they land
+              in the photo's own margins — every shot is object-contain on a
+              wide flat-lay, so there's background there, never garment.
+
+              Siblings of the stage, not children: pointer events on an
+              arrow never reach the stage's drag handlers this way, so a
+              click on one can't also be read as the start of a swipe.
+
+              `hidden md:flex` — on a phone the swipe and the markers below
+              already cover this, and two more controls crowding a small
+              frame buys nothing. Hiding them takes them out of the
+              accessibility tree along with the layout, which is the honest
+              outcome: on that viewport they genuinely aren't there, and
+              nothing is left announcing a control that can't be reached.
+              Arrow keys still page the carousel at every width — that
+              handler is on the group, not on these buttons.
+            */}
+            <button
+              type="button"
+              aria-label={d.productImagePrev}
+              onClick={() => goTo(index - 1)}
+              className="group press absolute left-0 top-1/2 z-10 hidden size-11 -translate-y-1/2 items-center justify-center text-mute hover:text-ink md:flex"
+            >
+              <Chevron dir="left" />
+            </button>
+            <button
+              type="button"
+              aria-label={d.productImageNext}
+              onClick={() => goTo(index + 1)}
+              className="group press absolute right-0 top-1/2 z-10 hidden size-11 -translate-y-1/2 items-center justify-center text-mute hover:text-ink md:flex"
+            >
+              <Chevron dir="right" />
+            </button>
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-center gap-1">
-          <button
-            type="button"
-            aria-label={d.productImagePrev}
-            onClick={() => goTo(index - 1)}
-            className="group press mr-2 flex size-8 items-center justify-center border border-line text-mute hover:border-ink hover:text-ink"
-          >
-            <Chevron dir="left" />
-          </button>
+        {/*
+          Markers, not numbers — the reference's own device, and with two
+          photos per fit a numbered row was reading as more machinery than
+          the thing deserves. Square, not round: `rounded-full` is exactly
+          what CLAUDE.md's no-radii rule (and check-guards.sh) rules out,
+          and a circle drawn some other way to dodge the grep would be the
+          same regression the Chevron's square caps below exist to avoid.
 
+          The visible mark is 6px; the button around it is 24px so the tap
+          target isn't. The accessible name is unchanged from the numbered
+          version ("Image 1 de 2") — a marker with no name is the usual way
+          this pattern gets shipped broken.
+        */}
+        <div className="mt-3 flex items-center justify-center gap-1">
           {activeFit.gallery.map((_, i) => (
             <button
               key={i}
@@ -411,28 +457,26 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
               aria-label={fmt(d.productImagePosition, { n: i + 1, total })}
               aria-current={i === index ? 'true' : undefined}
               onClick={() => goTo(i)}
-              className={cn(
-                'press size-8 border text-xs tabular-nums',
-                i === index
-                  ? 'border-ink bg-ink text-paper forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]'
-                  : 'border-line text-mute hover:border-ink hover:text-ink'
-              )}
+              className="press group flex size-6 items-center justify-center"
             >
-              {i + 1}
+              {/* `bg-mute`, not `bg-line`, for the inactive marker: the
+                  hairline colour is meant for rules against paper and
+                  effectively disappears at 6px over the sky's own texture.
+                  Mute is 5:1 on paper, so both states clear the 3:1 that
+                  non-text UI wants on their own, and they're still plainly
+                  different from each other (mid grey against near-black). */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'block size-1.5',
+                  i === index
+                    ? 'bg-ink forced-colors:bg-[Highlight]'
+                    : 'bg-mute group-hover:bg-ink forced-colors:bg-[GrayText]'
+                )}
+              />
             </button>
           ))}
-
-          <button
-            type="button"
-            aria-label={d.productImageNext}
-            onClick={() => goTo(index + 1)}
-            className="group press ml-2 flex size-8 items-center justify-center border border-line text-mute hover:border-ink hover:text-ink"
-          >
-            <Chevron dir="right" />
-          </button>
         </div>
-
-        <p className="mt-2 text-center text-[10px] uppercase tracking-label text-mute">{activeFit.label}</p>
       </div>
 
       {/* Mirrors SignupForm's live region: exists empty from the start, set
