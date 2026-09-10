@@ -84,7 +84,7 @@ describe('getLiveProduct', () => {
   it('still reaches the store when the domain was pasted as a URL', async () => {
     const calls = stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku))))
 
-    const product = await getLiveProduct(
+    const { product } = await getLiveProduct(
       { ...ENV, SHOPIFY_STORE_DOMAIN: `https://${ENV.SHOPIFY_STORE_DOMAIN}/` },
       SLUG,
       'fr-CA'
@@ -97,8 +97,9 @@ describe('getLiveProduct', () => {
   it('prices the catalogue product from Shopify, joined by SKU', async () => {
     stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku, '72.50'))))
 
-    const product = await getLiveProduct(ENV, SLUG, 'fr-CA')
+    const { product, reason } = await getLiveProduct(ENV, SLUG, 'fr-CA')
 
+    expect(reason).toBe('ok')
     expect(product?.price).toEqual({ amount: 7250, currency: 'CAD' })
     // Copy still comes from the catalogue; only the numbers are Shopify's.
     expect(product?.name).toBe('Manches longues 01')
@@ -112,7 +113,7 @@ describe('getLiveProduct', () => {
       storefrontResponse(SKUS.map((sku) => variantNode(sku, '65.00', sku !== soldOut)))
     )
 
-    const product = await getLiveProduct(ENV, SLUG, 'fr-CA')
+    const { product } = await getLiveProduct(ENV, SLUG, 'fr-CA')
 
     expect(product?.variants.find((v) => v.sku === soldOut)?.inStock).toBe(false)
     expect(product?.variants.filter((v) => !v.inStock)).toHaveLength(1)
@@ -122,7 +123,7 @@ describe('getLiveProduct', () => {
     const [first, ...rest] = SKUS
     stubStorefront(() => storefrontResponse(rest.map((sku) => variantNode(sku))))
 
-    const product = await getLiveProduct(ENV, SLUG, 'fr-CA')
+    const { product } = await getLiveProduct(ENV, SLUG, 'fr-CA')
 
     expect(product?.variants.find((v) => v.sku === first)?.inStock).toBe(false)
     expect(product?.price.amount).toBe(6500)
@@ -131,16 +132,23 @@ describe('getLiveProduct', () => {
   it('returns null when the store is not configured, without calling anything', async () => {
     const calls = stubStorefront(() => storefrontResponse([]))
 
-    expect(await getLiveProduct({}, SLUG, 'fr-CA')).toBeNull()
-    expect(await getLiveProduct({ SHOPIFY_STORE_DOMAIN: ENV.SHOPIFY_STORE_DOMAIN }, SLUG, 'fr-CA'))
-      .toBeNull()
+    expect(await getLiveProduct({}, SLUG, 'fr-CA')).toEqual({
+      product: null,
+      reason: 'not-configured',
+    })
+    expect(
+      await getLiveProduct({ SHOPIFY_STORE_DOMAIN: ENV.SHOPIFY_STORE_DOMAIN }, SLUG, 'fr-CA')
+    ).toEqual({ product: null, reason: 'not-configured' })
     expect(calls).toHaveLength(0)
   })
 
   it('fails open when the Storefront API errors', async () => {
     stubStorefront(() => new Response('upstream is having a day', { status: 503 }))
 
-    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toBeNull()
+    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
+      product: null,
+      reason: 'unreachable',
+    })
   })
 
   it('fails open on a GraphQL error answered with 200', async () => {
@@ -152,19 +160,30 @@ describe('getLiveProduct', () => {
         })
     )
 
-    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toBeNull()
+    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
+      product: null,
+      reason: 'unreachable',
+    })
   })
 
-  it('fails open when nothing in the store joins to this product', async () => {
+  it('separates a store that answered without this product from one that did not answer', async () => {
     stubStorefront(() => storefrontResponse([variantNode('SOME-OTHER-SKU')]))
 
-    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toBeNull()
+    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
+      product: null,
+      reason: 'no-match',
+    })
   })
 
   it('fails open on a price the site cannot honour: wrong currency', async () => {
     stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku, '65.00', true, 'USD'))))
 
-    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toBeNull()
+    // Unreadable prices are dropped on the way in, so from here this looks
+    // like a store that doesn't carry the product.
+    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
+      product: null,
+      reason: 'no-match',
+    })
   })
 
   it('fails open rather than quote one variant at another variant’s price', async () => {
@@ -172,7 +191,10 @@ describe('getLiveProduct', () => {
       storefrontResponse(SKUS.map((sku, i) => variantNode(sku, i === 0 ? '80.00' : '65.00')))
     )
 
-    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toBeNull()
+    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
+      product: null,
+      reason: 'unreachable',
+    })
   })
 
   it('reads once per cache window, and once for a burst of concurrent renders', async () => {
@@ -185,7 +207,7 @@ describe('getLiveProduct', () => {
     ])
     await getLiveProduct(ENV, SLUG, 'fr-CA')
 
-    expect(burst.every((p) => p?.price.amount === 6500)).toBe(true)
+    expect(burst.every((r) => r.product?.price.amount === 6500)).toBe(true)
     expect(calls).toHaveLength(1)
   })
 
@@ -195,8 +217,8 @@ describe('getLiveProduct', () => {
       () => storefrontResponse(SKUS.map((sku) => variantNode(sku)))
     )
 
-    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toBeNull()
-    expect((await getLiveProduct(ENV, SLUG, 'fr-CA'))?.price.amount).toBe(6500)
+    expect((await getLiveProduct(ENV, SLUG, 'fr-CA')).product).toBeNull()
+    expect((await getLiveProduct(ENV, SLUG, 'fr-CA')).product?.price.amount).toBe(6500)
     expect(calls).toHaveLength(2)
   })
 

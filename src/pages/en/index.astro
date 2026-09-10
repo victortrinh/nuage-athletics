@@ -18,7 +18,15 @@ const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
 // price; the Shopify read says there is one to see. Both have to hold, and the
 // read is skipped entirely when the first doesn't — nobody browsing the
 // pre-drop page should cost a Storefront call.
-const live = canBuy ? await getLiveProduct(env, featuredProduct(locale).slug, locale) : null
+const storefront = canBuy ? await getLiveProduct(env, featuredProduct(locale).slug, locale) : null
+const live = storefront?.product ?? null
+// Commerce was on for this request and there is still no price. That renders
+// as the ordinary pre-drop page by design (5.5), which leaves nothing on
+// screen to tell "not wired up" from "not open yet" — so the reason rides on
+// a header instead. It names a category, never a credential, and it changes
+// nothing about the page: whoever can see this render sees exactly what
+// launch day looks like, header or no header.
+if (storefront && !live) Astro.response.headers.set('X-Storefront', storefront.reason)
 ---
 
 <Base

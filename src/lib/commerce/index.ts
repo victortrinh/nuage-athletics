@@ -15,39 +15,61 @@ interface StorefrontEnv {
  * The product as it is actually for sale right now — catalogue copy with
  * Shopify's price and per-variant availability joined onto it — or null.
  *
- * Null is the whole failure mode, and it is deliberately the *only* one. A
- * Storefront outage, an unconfigured store, a SKU that doesn't join: each
- * returns null, the page renders the state it already has for "there is
+ * A null product is the whole failure mode, and it is deliberately the *only*
+ * one. A Storefront outage, an unconfigured store, a SKU that doesn't join:
+ * each returns null, the page renders the state it already has for "there is
  * nothing to buy yet" (no price, no buy band — see ProductView.astro), and
  * nobody is shown a number that might be wrong. The alternatives are a stale
  * price and a 500, and both are worse than a page that quietly declines to
  * sell for a minute.
  *
+ * `reason` exists because that design has one cost: from the outside, a store
+ * that was never wired up is indistinguishable from a drop that hasn't opened.
+ * It changes nothing about the render — the pages put it on a response header
+ * (`X-Storefront`) so someone who can already see the page can see why there
+ * is no price on it, without the page itself differing from launch day.
+ *
  * Pages call this rather than reaching for `./shopify` themselves, so the
  * provider stays swappable from this file alone (CLAUDE.md non-negotiable 5).
  */
+export type StorefrontReason =
+  /** A price came back. */
+  | 'ok'
+  /** `SHOPIFY_STORE_DOMAIN` or `SHOPIFY_STOREFRONT_TOKEN` is unset. */
+  | 'not-configured'
+  /** The call threw, answered non-2xx, or came back with GraphQL errors. */
+  | 'unreachable'
+  /** The store answered, and none of this product's SKUs were in it. */
+  | 'no-match'
+
+export interface LiveProduct {
+  product: Product | null
+  reason: StorefrontReason
+}
+
 export async function getLiveProduct(
   env: StorefrontEnv,
   slug: string,
   locale: Locale
-): Promise<Product | null> {
+): Promise<LiveProduct> {
   const domain = env.SHOPIFY_STORE_DOMAIN
   const token = env.SHOPIFY_STOREFRONT_TOKEN
   if (!domain || !token) {
-    // Said out loud for the same reason the no-join case below is: an
-    // unconfigured store renders exactly like a pre-drop page, so without
+    // Said out loud for the same reason the no-join case in ./shopify.ts is:
+    // an unconfigured store renders exactly like a pre-drop page, so without
     // this the only symptom is a buy band that never appears.
     console.error(
       `storefront: not configured (${!domain ? 'SHOPIFY_STORE_DOMAIN' : 'SHOPIFY_STOREFRONT_TOKEN'} unset) — no price will render`
     )
-    return null
+    return { product: null, reason: 'not-configured' }
   }
 
   try {
-    return await createShopifyStorefront({ domain, token }).getProduct(slug, locale)
+    const product = await createShopifyStorefront({ domain, token }).getProduct(slug, locale)
+    return { product, reason: product ? 'ok' : 'no-match' }
   } catch (err) {
     console.error('storefront read failed', err)
-    return null
+    return { product: null, reason: 'unreachable' }
   }
 }
 
@@ -68,8 +90,8 @@ export function getCommerce(
   // The line item is priced from the same `getLiveProduct` read the page
   // rendered from, so "the price you saw is the price you pay" holds by
   // construction rather than by two files agreeing on a constant.
-  return createStripeAdapter(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET, (slug, locale) =>
-    getLiveProduct(env, slug, locale)
+  return createStripeAdapter(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET, async (slug, locale) =>
+    (await getLiveProduct(env, slug, locale)).product
   )
 }
 

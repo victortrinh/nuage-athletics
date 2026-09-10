@@ -64,6 +64,14 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    that aren't published to the token's sales channel from a SKU that doesn't
    match. Reach for it before assuming the site is broken.
 
+   In a browser the same question is answered by two response headers, which
+   is all the render will tell you: `Cache-Control: private, no-store` means
+   the preview cookie is live (5.6 — nothing else in the codebase sets it),
+   and `X-Storefront: not-configured | unreachable | no-match` appears only
+   when commerce was on for that request and no price came back. The header
+   names a category, never a credential, and the *render* stays identical to
+   launch day — which is what keeps this from widening preview.
+
 5.6 **Preview is per-visitor, so a preview render must never be cached.**
    `commerceEnabled()` (`src/lib/commerce/index.ts`) answers yes either because
    `COMMERCE_ENABLED` is on for everyone or because this one visitor carries the

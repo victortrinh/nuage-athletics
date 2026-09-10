@@ -738,7 +738,11 @@ test.describe('founder preview', () => {
   }) => {
     const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
     const page = await context.newPage()
-    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+    const response = await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    // The diagnostic header is the failure signal only — a render with a
+    // price must not carry one, or it stops meaning anything.
+    expect(response?.headers()['x-storefront']).toBeUndefined()
 
     // fr-CA formatting of the stub's amount ("65,00 $"), built the same way
     // formatPrice does rather than hardcoded, so a currency-formatting change
