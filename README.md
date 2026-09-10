@@ -54,8 +54,8 @@ there is or isn't a price: it catches a refused token, products not published
 to the token's sales channel, and SKUs that don't match, all of which otherwise
 render as an ordinary pre-drop page. In a browser, the response headers say the
 same thing: `Cache-Control: private, no-store` means the preview cookie is live,
-and `X-Storefront: not-configured | unreachable | no-match` appears only when
-commerce was on and no price came back.
+and `X-Storefront: no-domain | no-token | unreachable | no-match` appears only
+when commerce was on and no price came back.
 
 ## Deploy
 

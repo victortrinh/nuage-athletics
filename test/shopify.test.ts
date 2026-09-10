@@ -132,13 +132,18 @@ describe('getLiveProduct', () => {
   it('returns null when the store is not configured, without calling anything', async () => {
     const calls = stubStorefront(() => storefrontResponse([]))
 
+    // Which one is missing is the answer, not that something is: the two
+    // have different causes and different fixes.
     expect(await getLiveProduct({}, SLUG, 'fr-CA')).toEqual({
       product: null,
-      reason: 'not-configured',
+      reason: 'no-domain',
     })
     expect(
       await getLiveProduct({ SHOPIFY_STORE_DOMAIN: ENV.SHOPIFY_STORE_DOMAIN }, SLUG, 'fr-CA')
-    ).toEqual({ product: null, reason: 'not-configured' })
+    ).toEqual({ product: null, reason: 'no-token' })
+    expect(
+      await getLiveProduct({ SHOPIFY_STOREFRONT_TOKEN: ENV.SHOPIFY_STOREFRONT_TOKEN }, SLUG, 'fr-CA')
+    ).toEqual({ product: null, reason: 'no-domain' })
     expect(calls).toHaveLength(0)
   })
 

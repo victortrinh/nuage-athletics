@@ -28,6 +28,7 @@ interface StorefrontEnv {
  * It changes nothing about the render — the pages put it on a response header
  * (`X-Storefront`) so someone who can already see the page can see why there
  * is no price on it, without the page itself differing from launch day.
+ * `npx wrangler secret list` answers the two `no-*` cases from the CLI.
  *
  * Pages call this rather than reaching for `./shopify` themselves, so the
  * provider stays swappable from this file alone (CLAUDE.md non-negotiable 5).
@@ -35,8 +36,10 @@ interface StorefrontEnv {
 export type StorefrontReason =
   /** A price came back. */
   | 'ok'
-  /** `SHOPIFY_STORE_DOMAIN` or `SHOPIFY_STOREFRONT_TOKEN` is unset. */
-  | 'not-configured'
+  /** `SHOPIFY_STORE_DOMAIN` is unset on the Worker serving this request. */
+  | 'no-domain'
+  /** `SHOPIFY_STOREFRONT_TOKEN` is unset on the Worker serving this request. */
+  | 'no-token'
   /** The call threw, answered non-2xx, or came back with GraphQL errors. */
   | 'unreachable'
   /** The store answered, and none of this product's SKUs were in it. */
@@ -58,10 +61,15 @@ export async function getLiveProduct(
     // Said out loud for the same reason the no-join case in ./shopify.ts is:
     // an unconfigured store renders exactly like a pre-drop page, so without
     // this the only symptom is a buy band that never appears.
-    console.error(
-      `storefront: not configured (${!domain ? 'SHOPIFY_STORE_DOMAIN' : 'SHOPIFY_STOREFRONT_TOKEN'} unset) — no price will render`
-    )
-    return { product: null, reason: 'not-configured' }
+    //
+    // Which of the two is missing is worth a distinct answer rather than one
+    // "not configured": the two have different causes. A missing token is
+    // usually a name that doesn't match what was set; a missing domain is
+    // usually a secret that landed on a different Worker, or a version
+    // uploaded before it was added.
+    const missing = !domain ? 'SHOPIFY_STORE_DOMAIN' : 'SHOPIFY_STOREFRONT_TOKEN'
+    console.error(`storefront: ${missing} is unset — no price will render`)
+    return { product: null, reason: !domain ? 'no-domain' : 'no-token' }
   }
 
   try {

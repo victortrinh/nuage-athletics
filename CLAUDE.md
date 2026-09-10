@@ -67,8 +67,10 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    In a browser the same question is answered by two response headers, which
    is all the render will tell you: `Cache-Control: private, no-store` means
    the preview cookie is live (5.6 — nothing else in the codebase sets it),
-   and `X-Storefront: not-configured | unreachable | no-match` appears only
-   when commerce was on for that request and no price came back. The header
+   and `X-Storefront: no-domain | no-token | unreachable | no-match` appears
+   only when commerce was on for that request and no price came back — the
+   first two name the binding the serving Worker is missing, which
+   `npx wrangler secret list` confirms. The header
    names a category, never a credential, and the *render* stays identical to
    launch day — which is what keeps this from widening preview.
 
