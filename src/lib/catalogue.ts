@@ -1,5 +1,5 @@
 import type { Locale } from '../i18n/config'
-import type { Product, ProductVariant } from './commerce/types'
+import type { Money, Product, ProductVariant } from './commerce/types'
 
 /**
  * The catalogue, deliberately free of any commerce backend.
@@ -26,7 +26,7 @@ export const SLUGS: Record<string, Record<Locale, string>> = {
  */
 const PLACEHOLDER_PRICE_CENTS = 6500
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL'] as const
+const SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'] as const
 
 /** The two garment fits. Ids only — display names live in FIT_NAMES below. */
 export type FitId = 'classic' | 'crop'
@@ -47,10 +47,10 @@ const FIT_NAMES: Record<Locale, Record<FitId, string>> = {
 }
 
 /**
- * Fit × size = 12 variants, fit-major. `label` composes the fit and size name
+ * Fit × size = 14 variants, fit-major. `label` composes the fit and size name
  * (e.g. "Crop · M") and is what ends up on the Stripe line item and receipt —
  * see `stripe.ts`, which reads `variant.label` directly and needed no changes
- * for this. `options` carries the same two facts as ids, for `ProductActions`
+ * for this. `options` carries the same two facts as ids, for `ProductStage`
  * to resolve a variant from a (fit, size) selection without re-deriving the
  * id scheme in a second file.
  */
@@ -66,9 +66,16 @@ function variants(productId: string, skuBase: string, locale: Locale): ProductVa
   )
 }
 
-/** View order within a fit's gallery, per the product page's spec: front, back, worn front, worn back. */
-type ViewId = 'front' | 'back' | 'front-worn' | 'back-worn'
-const VIEWS = ['front', 'back', 'front-worn', 'back-worn'] as const satisfies readonly ViewId[]
+/**
+ * View order within a fit's gallery: front, back. Used to carry the worn
+ * shots too (front-worn/back-worn) — dropped from the gallery as a
+ * deliberate edit, not an oversight, so a future photography update
+ * doesn't quietly resurrect them by re-adding the ids here without
+ * re-reading this note. The source files are still under public/img if
+ * they're wanted again.
+ */
+type ViewId = 'front' | 'back'
+const VIEWS = ['front', 'back'] as const satisfies readonly ViewId[]
 
 interface ImageAsset {
   src: string
@@ -81,14 +88,10 @@ const IMAGES: Record<FitId, Record<ViewId, ImageAsset>> = {
   classic: {
     front: { src: '/img/ls-01-classic-front.webp', width: 1280, height: 615 },
     back: { src: '/img/ls-01-classic-back.webp', width: 1280, height: 620 },
-    'front-worn': { src: '/img/ls-01-classic-front-worn.webp', width: 801, height: 1560 },
-    'back-worn': { src: '/img/ls-01-classic-back-worn.webp', width: 826, height: 1560 },
   },
   crop: {
     front: { src: '/img/ls-01-crop-front.webp', width: 1280, height: 601 },
     back: { src: '/img/ls-01-crop-back.webp', width: 1280, height: 492 },
-    'front-worn': { src: '/img/ls-01-crop-front-worn.webp', width: 844, height: 1560 },
-    'back-worn': { src: '/img/ls-01-crop-back-worn.webp', width: 849, height: 1560 },
   },
 }
 
@@ -102,28 +105,20 @@ const ALT: Record<Locale, Record<FitId, Record<ViewId, string>>> = {
     classic: {
       front: 'Manches longues 01, coupe classique, vue de face, à plat',
       back: 'Manches longues 01, coupe classique, vue de dos, à plat',
-      'front-worn': 'Manches longues 01, coupe classique, porté, vue de face',
-      'back-worn': 'Manches longues 01, coupe classique, porté, vue de dos',
     },
     crop: {
       front: 'Manches longues 01, coupe crop, vue de face, à plat',
       back: 'Manches longues 01, coupe crop, vue de dos, à plat',
-      'front-worn': 'Manches longues 01, coupe crop, porté, vue de face',
-      'back-worn': 'Manches longues 01, coupe crop, porté, vue de dos',
     },
   },
   'en-CA': {
     classic: {
       front: 'Long Sleeve 01, classic fit, front, laid flat',
       back: 'Long Sleeve 01, classic fit, back, laid flat',
-      'front-worn': 'Long Sleeve 01, classic fit, worn, front view',
-      'back-worn': 'Long Sleeve 01, classic fit, worn, back view',
     },
     crop: {
       front: 'Long Sleeve 01, cropped fit, front, laid flat',
       back: 'Long Sleeve 01, cropped fit, back, laid flat',
-      'front-worn': 'Long Sleeve 01, cropped fit, worn, front view',
-      'back-worn': 'Long Sleeve 01, cropped fit, worn, back view',
     },
   },
 }
@@ -203,7 +198,7 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
       specs: [
         { label: 'Composition', value: '50 % laine mérinos, 50 % modal' },
         { label: 'Coupes', value: 'Classique ou crop' },
-        { label: 'Tailles', value: 'XS – 2XL' },
+        { label: 'Tailles', value: 'XXS – XXL' },
         { label: 'Entretien', value: 'Lavage à froid, séchage à plat' },
         // Two facts, two rows, on purpose: this brand is designed in Quebec
         // and manufactured in China, and folding that into one "Origine" row
@@ -222,7 +217,7 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
       specs: [
         { label: 'Composition', value: '50% merino wool, 50% modal' },
         { label: 'Fits', value: 'Classic or cropped' },
-        { label: 'Sizes', value: 'XS – 2XL' },
+        { label: 'Sizes', value: 'XXS – XXL' },
         { label: 'Care', value: 'Cold wash, dry flat' },
         { label: 'Design', value: 'Quebec, Canada' },
         { label: 'Made in', value: 'China' },
@@ -248,4 +243,17 @@ export function editorialFor(id: string, locale: Locale): ProductEditorial {
   const editorial = EDITORIAL[locale][id]
   if (!editorial) throw new Error(`no editorial content for ${id} in ${locale}`)
   return editorial
+}
+
+/**
+ * Same formatting `sendOrderConfirmationEmail` (src/lib/email.ts) already
+ * does for a receipt — locale-aware via `Intl.NumberFormat`'s own currency
+ * symbol/spacing rules (e.g. "65,00 $" vs "$65.00"), rather than a hand-built
+ * string. Called server-side only (ProductView.astro), and only behind
+ * `commerceEnabled` — see non-negotiable 5.5 in CLAUDE.md.
+ */
+export function formatPrice(price: Money, locale: Locale): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: price.currency }).format(
+    price.amount / 100
+  )
 }

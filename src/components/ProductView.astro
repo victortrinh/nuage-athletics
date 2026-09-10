@@ -1,11 +1,10 @@
 ---
-import ProductCarousel from './ProductCarousel.tsx'
-import ProductActions from './ProductActions.tsx'
+import ProductStage from './ProductStage.tsx'
 import CpaDisclosure from './CpaDisclosure.astro'
 import { fmt, t } from '../i18n/ui'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { organizationId } from '../lib/brand'
-import { editorialFor, featuredProduct, DEFAULT_FIT } from '../lib/catalogue'
+import { editorialFor, featuredProduct, formatPrice, DEFAULT_FIT } from '../lib/catalogue'
 
 interface Props {
   locale: Locale
@@ -70,104 +69,167 @@ const jsonLd = {
 
 <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-<article class="grid gap-10 py-8 lg:grid-cols-[1fr_24rem] lg:gap-16 lg:py-12">
-  <div>
-    <ProductCarousel
-      client:load
-      {d}
-      productId={product.id}
-      fits={editorial.fits}
-      initialFit={DEFAULT_FIT}
-    />
-    {/* Images are content, not chrome — the carousel needs JS to page
-        through them, but every photo still has to reach a no-JS visitor. */}
-    <noscript>
-      <div class="mt-3 grid grid-cols-2 gap-3">
-        {
-          editorial.fits.flatMap((fit) =>
-            fit.gallery.map((image) => (
-              <img
-                src={image.src}
-                width={image.width}
-                height={image.height}
-                alt={image.alt}
-                loading="lazy"
-                decoding="async"
-                class="w-full object-contain"
-              />
-            ))
-          )
-        }
-      </div>
-    </noscript>
-  </div>
+{/*
+  A single centred column at every breakpoint — no sticky right-hand buy
+  panel any more. The old two-column grid put the carousel and the buy
+  panel in separate flows that could drift out of sync (a tall spec list
+  pushing the panel below the fold on a short viewport, say); this design
+  has exactly one flow, and the fixed-height band inside ProductStage is
+  what keeps *that* from reflowing as its own state changes.
+*/}
+<article class="mx-auto max-w-[34rem] py-8 lg:py-12">
+  {
+    !commerceEnabled ? (
+      <>
+        {/* Pre-drop: carousel, the plain product-name heading, and the
+            announcement — nothing else. Once commerce is on, this same
+            heading moves inside ProductStage's band (slot A's collapsed
+            state) so it can roll away when the band opens; it stays a
+            static heading here because there is no band to roll it into. */}
+        <ProductStage
+          client:load
+          {locale}
+          d={d}
+          productId={product.id}
+          productName={product.name}
+          fits={editorial.fits}
+          initialFit={DEFAULT_FIT}
+          commerceEnabled={false}
+        />
+        {/* Images are content, not chrome — the carousel needs JS to page
+            through them, but every photo still has to reach a no-JS
+            visitor. */}
+        <noscript>
+          <div class="mt-3 grid grid-cols-2 gap-3">
+            {editorial.fits.flatMap((fit) =>
+              fit.gallery.map((image) => (
+                <img
+                  src={image.src}
+                  width={image.width}
+                  height={image.height}
+                  alt={image.alt}
+                  loading="lazy"
+                  decoding="async"
+                  class="w-full object-contain"
+                />
+              ))
+            )}
+          </div>
+        </noscript>
 
-  <div class="lg:sticky lg:top-[calc(var(--header-h)+2rem)] lg:self-start">
-    <h1 class="wordmark text-3xl leading-none sm:text-4xl">{product.name}</h1>
+        <h1 class="wordmark mt-6 text-center text-3xl leading-none sm:text-4xl">{product.name}</h1>
 
-    {/*
-      The drop announcement — what a visitor gets instead of a buy panel, and
-      what replaced the pre-launch password screen as the answer to "what is
-      this site for right now".
+        {/*
+          The drop announcement — what a visitor gets instead of a buy band,
+          and what replaced the pre-launch password screen as the answer to
+          "what is this site for right now".
 
-      It is the availability statement, so the old bordered "coming soon" badge
-      went with it: a badge saying the drop is ahead sitting above a line
-      naming the season is the same sentence twice. Monospace, uppercase and
-      tracked out, set apart from the editorial copy below — this is a notice,
-      not prose, and it should read as one at a glance.
-    */}
-    {
-      !commerceEnabled && (
-        <p class="mt-6 font-mono text-xs uppercase leading-loose tracking-label">
+          It is the availability statement, so the old bordered "coming
+          soon" badge went with it: a badge saying the drop is ahead sitting
+          above a line naming the season is the same sentence twice.
+          Monospace, uppercase and tracked out, set apart from the editorial
+          copy below — this is a notice, not prose, and it should read as
+          one at a glance.
+        */}
+        <p class="mt-6 text-center font-mono text-xs uppercase leading-loose tracking-label">
           {fmt(d.dropAnnounceProduct, { product: product.name })}
           <br />
           {d.dropAnnounceAvailability}
         </p>
-      )
-    }
+      </>
+    ) : (
+      <>
+        {/*
+          Description, fit/size pickers and the spec table are all product
+          *detail* — reachable only once there is something to buy, exactly
+          as before this redesign. `commerceEnabled` already carries the
+          founder-preview exception (src/lib/commerce/index.ts), so a
+          founder previewing the buy flow sees all of it exactly as it will
+          ship — the price included, which is why `price`/`variants`/
+          `specs` are only ever computed and passed down inside this branch.
+          See the props-serialization note in ProductStage.tsx: those values
+          become part of the island's server-rendered `astro-island` props
+          attribute, so keeping them out of the `!commerceEnabled` branch
+          entirely (not just out of what renders) is what non-negotiable 5.5
+          actually requires.
+        */}
+        {/*
+          Reserves a full screen regardless of how tall the carousel's own
+          frame ends up (ProductCarousel.tsx caps it short of this once the
+          photo hits its width) — the CPA disclosure right after this block
+          must never peek into view unscrolled, and a min-height is what
+          guarantees that independent of the frame's actual size, rather
+          than relying on the frame happening to fill the space.
+          Not a bare `min-h-dvh`: the sticky header sits above this article,
+          not inside it, and the article's own `py-8 lg:py-12` sits outside
+          this box, so the reservation is the screen minus both. Getting the
+          padding wrong doesn't show up while the content is top-aligned —
+          the box just runs past the fold and nobody notices — but it lands
+          the moment the content is centred inside it, as lopsided air:
+          everything shifts down by half the overhang.
 
-    {/*
-      Description, fit/size pickers and the spec table are all product
-      *detail* — reachable only once there is something to buy. Pre-drop
-      this column is the carousel, the name, and the announcement above and
-      nothing else, matching the reference: no copy to read, no size to
-      plan around, nothing that makes the page feel further along than it
-      is. `commerceEnabled` already carries the founder-preview exception
-      (src/lib/commerce/index.ts), so a founder previewing the buy flow sees
-      all of it exactly as it will ship.
-    */}
-    {
-      commerceEnabled && (
-        <>
-          <p class="mt-6 text-base leading-relaxed text-mute">{product.description}</p>
+          `justify-center` is what puts whatever's left over *around* the
+          photo rather than all of it under the band: the reference sets the
+          product with air above and below it, not pinned to the top of the
+          screen with the slack pooled at the bottom. It can't strand
+          anything off-screen the way centred flex content usually can —
+          min-height is a floor, not a cap, so on a window too short for the
+          content the box simply grows past it, there is no free space to
+          distribute, and this lays out exactly as it would without the
+          class.
+        */}
+        <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col justify-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
+          <ProductStage
+            client:load
+            {locale}
+            d={d}
+            productId={product.id}
+            productName={product.name}
+            fits={editorial.fits}
+            initialFit={DEFAULT_FIT}
+            commerceEnabled={true}
+            fitOptions={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
+            variants={product.variants}
+            price={formatPrice(product.price, locale)}
+            description={product.description}
+            specs={editorial.specs}
+          />
+          <noscript>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              {editorial.fits.flatMap((fit) =>
+                fit.gallery.map((image) => (
+                  <img
+                    src={image.src}
+                    width={image.width}
+                    height={image.height}
+                    alt={image.alt}
+                    loading="lazy"
+                    decoding="async"
+                    class="w-full object-contain"
+                  />
+                ))
+              )}
+            </div>
+            {/* The information panel inside the band is JS-only (it's an
+                `inert`-by-default branch of a Slot, toggled by React state —
+                see product/Slot.tsx), so a no-JS visitor needs its own plain
+                copy — same pattern as the image grid above. */}
+            <div class="mt-6 text-center">
+              <p class="text-base leading-relaxed text-mute">{product.description}</p>
+              <dl class="mt-5">
+                {editorial.specs.map((spec) => (
+                  <div class="flex justify-between gap-6 border-b border-line py-3 text-sm">
+                    <dt class="text-mute">{spec.label}</dt>
+                    <dd class="text-right">{spec.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </noscript>
+        </div>
 
-          <div class="mt-10">
-            <ProductActions
-              client:load
-              {locale}
-              {d}
-              productId={product.id}
-              variants={product.variants}
-              fits={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
-              initialFit={DEFAULT_FIT}
-            />
-          </div>
-
-          <h2 class="mt-14 border-t border-line pt-8 text-[11px] uppercase tracking-label text-mute">
-            {d.productDetails}
-          </h2>
-          <dl class="mt-5">
-            {editorial.specs.map((spec) => (
-              <div class="flex justify-between gap-6 border-b border-line py-3 text-sm">
-                <dt class="text-mute">{spec.label}</dt>
-                <dd class="text-right">{spec.value}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <CpaDisclosure {locale} productName={product.name} />
-        </>
-      )
-    }
-  </div>
+        <CpaDisclosure {locale} productName={product.name} />
+      </>
+    )
+  }
 </article>

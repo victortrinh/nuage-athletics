@@ -1,14 +1,33 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react'
 import type { FitId, ProductFit } from '../lib/catalogue'
-import { useFit } from '../lib/fit-store'
 import { fmt, type Dict } from '../i18n/ui'
 import { cn } from './ui/cn'
 
 interface Props {
   d: Dict
-  productId: string
+  fit: FitId
   fits: ProductFit[]
   initialFit: FitId
+  /**
+   * Everything in the column *below* the frame — pagination row, fit
+   * caption, and whatever the caller puts after this component (the fit
+   * picker and buy band, or just the drop announcement) — hand-measured in
+   * rem at the base and `sm:` breakpoints. See the frame-sizing comment
+   * below for what this drives. The two callers (ProductStage.tsx) pass
+   * very different values: the full band is a lot more chrome than a
+   * one-line announcement, and reusing one constant for both either
+   * shrinks the pre-launch photo for no reason or risks the band falling
+   * off a short screen post-launch — see e2e/mobile-layout.e2e.ts's sticky
+   * header test, which is what caught the first version reusing one value.
+   */
+  belowFrameRem: { base: number; sm: number }
 }
 
 /** Distance (px) a pointer must travel horizontally before the gesture counts
@@ -17,23 +36,29 @@ interface Props {
 const DRAG_INTENT_PX = 8
 
 /**
- * The product image carousel. Zero-JS was the default (see
- * ProductGallery.astro, which this replaces) but paging through photos and
- * reacting to a fit picked in the separate buy-panel island both genuinely
- * need interaction, so this earns its hydration.
+ * The product image carousel — a presentational child of ProductStage
+ * (which owns `fit`) rather than an island of its own. It used to hydrate
+ * independently and share the selected fit with a separate buy-panel island
+ * through `src/lib/fit-store.ts`; both islands merged into one
+ * (ProductStage.tsx) once the redesign put price, sizes and the spec list
+ * inside the same interactive band as the carousel — see CLAUDE.md and the
+ * removed fit-store.ts for the reasoning that no longer applied. Paging
+ * through photos and reacting to `fit` still both need real interaction,
+ * which is why this remains a genuine React component rather than static
+ * markup — it simply hydrates as part of its parent's root now.
  *
- * All 8 photos (both fits × 4 views) are always in the DOM — only opacity
- * and aria-hidden change on a fit switch, never `display`, so a lazy image
- * stays fetchable and toggling fit never stalls on a fresh network request.
- * See the loading-priority effect below for how the other 7 get warmed up.
+ * All 4 photos (both fits × 2 views — front and back; no worn shots, see
+ * catalogue.ts) are always in the DOM — only opacity and aria-hidden change
+ * on a fit switch, never `display`, so a lazy image stays fetchable and
+ * toggling fit never stalls on a fresh network request. See the
+ * loading-priority effect below for how the other 3 get warmed up.
  *
- * Within a fit the 4 photos sit on a translated flex track rather than a
+ * Within a fit the 2 photos sit on a translated flex track rather than a
  * crossfade stack, because a swipe has to show the next photo following the
  * finger — a fade has nothing to drag. The two fits are still two stacked
  * tracks that crossfade, so the DOM invariant above is unchanged.
  */
-export default function ProductCarousel({ d, productId, fits, initialFit }: Props) {
-  const [fit, setFit] = useFit(productId, initialFit)
+export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRem }: Props) {
   const [index, setIndex] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const [warm, setWarm] = useState(false)
@@ -69,9 +94,9 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
     setAnnouncement(`${nextFit.label} — ${position}`)
   }
 
-  // Announces a fit switched from the buy panel (ProductActions) — but not
-  // on mount, and not on navigation within one fit, which announces itself
-  // in goTo below.
+  // Announces a fit switched from the fit picker (rendered by the parent,
+  // ProductStage) — but not on mount, and not on navigation within one fit,
+  // which announces itself in goTo below.
   useEffect(() => {
     if (!mounted.current) {
       mounted.current = true
@@ -169,17 +194,19 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
     <div>
       {/*
         role="group" + aria-roledescription, not a tablist: a tablist would
-        collapse the numbered pagination into one tab stop (contradicting
+        collapse the pagination markers into one tab stop (contradicting
         the "real buttons" requirement) and needs a whole new ui/tabs.tsx
         primitive. Not a landmark region either — Base.astro's <main> is
         already the page's landmark. No per-slide slide roles: only one of
-        the 8 images is ever exposed (the rest are aria-hidden), so a role
+        the 4 images is ever exposed (the rest are aria-hidden), so a role
         that exists to navigate among visible slides has nothing to do here.
 
-        The group wraps the frame AND the pagination row, not just the
-        frame: onKeyDown relies on React's bubbling, which follows the DOM
-        tree, so a pagination button has to be a descendant of this div for
-        an arrow key pressed on it to ever reach the handler below.
+        The group wraps the frame AND the marker row, not just the frame:
+        onKeyDown relies on React's bubbling, which follows the DOM tree,
+        so a marker button has to be a descendant of this div for an arrow
+        key pressed on it to ever reach the handler below. The prev/next
+        arrows live inside the frame now (see below) — still descendants,
+        so that still holds for them too.
       */}
       <div
         role="group"
@@ -189,115 +216,236 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
       >
         {/*
           The frame is one fixed box, sized by nothing the visitor can
-          change: the spacer below reserves the height, the stage lies on
-          top of it at the column's full width, and every photo is fitted
-          inside with object-contain. Paging or switching fit therefore
-          never moves the pagination row, the fit label or the buy panel —
-          on mobile especially, where the carousel is the first thing in
-          the document flow and a reflow here shifts the whole page.
+          change — paging or switching fit never moves the pagination row,
+          the fit label or the band below. It used to be sized by width
+          alone (a spacer reserving a 4:5 shape, capped at 26rem); now that
+          the worn shots are gone (catalogue.ts) and every photo is a
+          landscape flat-lay (~2:1–2.6:1), that tall a frame was mostly
+          empty letterboxing, and — the actual reason this changed — a
+          width-only cap does nothing to stop the frame from pushing the
+          band below the fold on a short browser window, the one thing
+          yeezy.com's own reference is careful never to let happen.
 
-          The spacer keeps the old 4/5-at-26rem shape, which is the tallest
-          the gallery gets (the worn shots) at the largest height that
-          still leaves the pagination row and buy panel above the fold on
-          an ordinary laptop. Below 26rem the cap stops biting and it
-          tracks the viewport, as before.
+          So the frame is sized by *height* first: `--chrome-h` is
+          everything else in the column — the fixed 11.25rem of header,
+          article padding, and this frame's own pagination row and fit
+          caption, plus `belowFrameRem` (the caller's own fit picker and
+          band, or just the drop announcement — see the prop) — measured
+          at each breakpoint, and the frame's height is whatever's left of
+          100dvh after that, floored (so it never vanishes on a genuinely
+          tiny window; scrolling is the fallback past that point, not a
+          broken layout). `aspect-[2/1]` turns that height into a width
+          automatically — this is a real `<div>`, not an `<img>`, so
+          nothing here needs the old two-div spacer/stage split: this one
+          box IS the reserved size, and the stage below fills it exactly
+          via inset-0.
 
-          The stage is deliberately wider than that cap: front and back are
-          flat-lay shots at roughly 2:1, so a 26rem-wide frame left them
-          barely 200px tall in a 520px box. Spanning the whole grid column
-          (~39rem) gives those two half again as much size, while the worn
-          shots — bounded by the reserved height, not the width — come out
-          exactly as they did before.
+          `max-w-[min(56rem,calc(100vw-3rem))]`, not `max-w-full`: the fit
+          picker and band below live in ProductView.astro's 34rem article
+          column, and capping the photo at that same 34rem badly
+          undersells the height-fit above it — a 2:1 photo can't get past
+          ~17rem tall at a 34rem width no matter how much vertical room a
+          tall window actually has, which is exactly the dead space this
+          was meant to close. Letting the frame break out wider than the
+          column it sits in — same idea the pre-height-fit version of this
+          component used to apply to the *stage* alone, extended to the
+          whole frame now that stage and frame are one box — means width
+          stops binding well before a realistic window's height does, so
+          the photo actually uses the room `100dvh - chrome` computes
+          instead of stalling at the text column's width. `mx-auto`
+          still centers it correctly even wider than its own containing
+          block, via negative margins, same mechanism as any breakout.
+          `calc(100vw-3rem)` is the real floor on a narrow phone, where
+          56rem never binds and the column's own width would have; 56rem
+          is deliberately less than `main`'s 80rem ceiling (Base.astro) —
+          wide enough to fill real vertical headroom, not so wide a single
+          garment photo reads as mostly empty background.
+
+          Growing the photo like this is safe specifically because nothing
+          below it needs protecting from a tall window: ProductView.astro's
+          wrapper (commerce-enabled branch) separately reserves a full
+          `100dvh - header` regardless of how tall the photo ends up, so the
+          CPA disclosure after it never peeks into the first screenful
+          either way — the photo filling more of that reserved space is
+          pure upside, not a tradeoff against that guarantee.
+
+          `--chrome-*` are deliberately hand-measured constants passed down
+          as props, not a `ResizeObserver` computing them live — they need
+          updating if the band, fit picker or announcement's own height
+          ever changes (all already fixed-height or one line by design, so
+          that's a rare, deliberate edit, not a moving target this
+          component should be watching for). Two CSS custom properties
+          rather than one: `sm:[--chrome-h:var(--chrome-sm)]` is a static
+          class Tailwind can see at build time; the numbers behind
+          `--chrome-base`/`--chrome-sm` are the only part that's dynamic,
+          set via `style` below, which Tailwind's class scanner never needs
+          to look at.
         */}
-        <div className="relative w-full">
-          <div aria-hidden="true" className="mx-auto aspect-[4/5] w-full max-w-[26rem]" />
-          {/*
-            touch-pan-y, not touch-none: a vertical flick that happens to
-            start on the photo has to scroll the page — on mobile the
-            carousel is most of the first screen, so swallowing vertical
-            gestures here would strand the visitor.
-          */}
+        {/*
+          flex + justify-center, not mx-auto, on the frame below: `margin:
+          auto` only centers a box *narrower* than its containing block —
+          CSS resolves both auto margins to 0 (left-aligning, not
+          centering) the moment the box is wider, which is exactly the
+          breakout case above. Flexbox's justify-content doesn't have that
+          edge case; it centers an overflowing item the same way as a
+          normal one, symmetrically past the container's own edges — as
+          long as the item doesn't shrink back down to fit first, which a
+          flex child does by default; `shrink-0` on the frame below is
+          what keeps it at its full computed width instead of being
+          compressed to the flex container's own (narrower) box.
+        */}
+        <div className="flex justify-center">
           <div
-            ref={stageRef}
-            // A swipe that nothing announces is a swipe nobody on a desktop
-            // ever finds: the grab cursor is the only affordance the drag
-            // has there, and it is driven by the same `dragging` state the
-            // track is, not by :active, so it holds for the whole gesture —
-            // pointer capture included — and lets go exactly when the
-            // gesture does.
-            className={cn(
-              'absolute inset-0 touch-pan-y select-none overflow-hidden',
-              dragging ? 'cursor-grabbing' : 'cursor-grab'
-            )}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerEnd}
-            onPointerCancel={onPointerEnd}
+            className="relative shrink-0 aspect-[2/1] max-w-[min(56rem,calc(100vw-3rem))] [--chrome-h:var(--chrome-base)] sm:[--chrome-h:var(--chrome-sm)]"
+            style={
+              {
+                // 9.25rem: header (4rem) + article padding (3rem) + this
+                // frame's own marker row and the gap above it (2.25rem), at
+                // every breakpoint — the part of "everything but the frame"
+                // that's fixed regardless of which caller renders below
+                // `belowFrameRem`. Re-measure it if the marker row changes
+                // size; it dropped from 11.25 when the numbered pagination
+                // became markers and the fit caption under them went away.
+                '--chrome-base': `${belowFrameRem.base + 9.25}rem`,
+                '--chrome-sm': `${belowFrameRem.sm + 9.25}rem`,
+                // No numeric ceiling here — the className's max-w is the
+                // only cap, and it's deliberately wider than the column
+                // (above), so a tall window lets the photo grow toward the
+                // room `100dvh - chrome` actually leaves, instead of
+                // stalling at the text column's width well short of that.
+                width: 'max(10rem, calc((100dvh - var(--chrome-h)) * 2))',
+              } as CSSProperties
+            }
           >
-            {fits.map((f) => {
-              const isActiveFit = f.id === fit
-              return (
-                <div
-                  key={f.id}
-                  className={cn(
-                    'absolute inset-0 transition-opacity duration-150 motion-reduce:transition-none',
-                    isActiveFit ? 'opacity-100' : 'pointer-events-none opacity-0'
-                  )}
-                >
+            {/*
+              touch-pan-y, not touch-none: a vertical flick that happens to
+              start on the photo has to scroll the page — on mobile the
+              carousel is most of the first screen, so swallowing vertical
+              gestures here would strand the visitor.
+            */}
+            <div
+              ref={stageRef}
+              // A swipe that nothing announces is a swipe nobody on a desktop
+              // ever finds: the grab cursor is the only affordance the drag
+              // has there, and it is driven by the same `dragging` state the
+              // track is, not by :active, so it holds for the whole gesture —
+              // pointer capture included — and lets go exactly when the
+              // gesture does.
+              className={cn(
+                'absolute inset-0 touch-pan-y select-none overflow-hidden',
+                dragging ? 'cursor-grabbing' : 'cursor-grab'
+              )}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerEnd}
+              onPointerCancel={onPointerEnd}
+            >
+              {fits.map((f) => {
+                const isActiveFit = f.id === fit
+                return (
                   <div
+                    key={f.id}
                     className={cn(
-                      'flex h-full w-full',
-                      dragging ? 'transition-none' : 'transition-transform duration-300 ease-out motion-reduce:transition-none'
+                      'absolute inset-0 transition-opacity duration-150 motion-reduce:transition-none',
+                      isActiveFit ? 'opacity-100' : 'pointer-events-none opacity-0'
                     )}
-                    style={{
-                      transform: `translate3d(calc(${index * -100}% + ${isActiveFit ? dragDx : 0}px), 0, 0)`,
-                    }}
                   >
-                    {f.gallery.map((image, i) => {
-                      const isActive = isActiveFit && i === index
-                      // The one image blocking first paint. Everything else
-                      // starts lazy and is flipped to eager once `warm` (see
-                      // effect above).
-                      const isInitial = f.id === initialFit && i === 0
-                      return (
-                        <img
-                          key={`${f.id}-${i}`}
-                          src={image.src}
-                          width={image.width}
-                          height={image.height}
-                          alt={image.alt}
-                          // Driven by the selection, never by what a drag
-                          // happens to have slid into view: exactly one of
-                          // the 8 is in the accessibility tree at any moment.
-                          aria-hidden={isActive ? undefined : true}
-                          loading={isInitial || warm ? 'eager' : 'lazy'}
-                          fetchPriority={isInitial ? 'high' : 'low'}
-                          decoding="async"
-                          // Without this a mouse drag on the photo starts a
-                          // native image drag and the swipe dies on the
-                          // first pixel.
-                          draggable={false}
-                          className="h-full w-full shrink-0 object-contain"
-                        />
-                      )
-                    })}
+                    <div
+                      className={cn(
+                        'flex h-full w-full',
+                        dragging ? 'transition-none' : 'transition-transform duration-300 ease-out motion-reduce:transition-none'
+                      )}
+                      style={{
+                        transform: `translate3d(calc(${index * -100}% + ${isActiveFit ? dragDx : 0}px), 0, 0)`,
+                      }}
+                    >
+                      {f.gallery.map((image, i) => {
+                        const isActive = isActiveFit && i === index
+                        // The one image blocking first paint. Everything else
+                        // starts lazy and is flipped to eager once `warm` (see
+                        // effect above).
+                        const isInitial = f.id === initialFit && i === 0
+                        return (
+                          <img
+                            key={`${f.id}-${i}`}
+                            src={image.src}
+                            width={image.width}
+                            height={image.height}
+                            alt={image.alt}
+                            // Driven by the selection, never by what a drag
+                            // happens to have slid into view: exactly one of
+                            // the 4 is in the accessibility tree at any moment.
+                            aria-hidden={isActive ? undefined : true}
+                            loading={isInitial || warm ? 'eager' : 'lazy'}
+                            fetchPriority={isInitial ? 'high' : 'low'}
+                            decoding="async"
+                            // Without this a mouse drag on the photo starts a
+                            // native image drag and the swipe dies on the
+                            // first pixel.
+                            draggable={false}
+                            className="h-full w-full shrink-0 object-contain"
+                          />
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
+
+            {/*
+              The arrows flank the photo rather than sitting in a row under
+              it, matching the reference. They're inside the frame (which is
+              the breakout-width box) and pinned to its edges, so they land
+              in the photo's own margins — every shot is object-contain on a
+              wide flat-lay, so there's background there, never garment.
+
+              Siblings of the stage, not children: pointer events on an
+              arrow never reach the stage's drag handlers this way, so a
+              click on one can't also be read as the start of a swipe.
+
+              `hidden md:flex` — on a phone the swipe and the markers below
+              already cover this, and two more controls crowding a small
+              frame buys nothing. Hiding them takes them out of the
+              accessibility tree along with the layout, which is the honest
+              outcome: on that viewport they genuinely aren't there, and
+              nothing is left announcing a control that can't be reached.
+              Arrow keys still page the carousel at every width — that
+              handler is on the group, not on these buttons.
+            */}
+            <button
+              type="button"
+              aria-label={d.productImagePrev}
+              onClick={() => goTo(index - 1)}
+              className="group press absolute left-0 top-1/2 z-10 hidden size-11 -translate-y-1/2 items-center justify-center text-mute hover:text-ink md:flex"
+            >
+              <Chevron dir="left" />
+            </button>
+            <button
+              type="button"
+              aria-label={d.productImageNext}
+              onClick={() => goTo(index + 1)}
+              className="group press absolute right-0 top-1/2 z-10 hidden size-11 -translate-y-1/2 items-center justify-center text-mute hover:text-ink md:flex"
+            >
+              <Chevron dir="right" />
+            </button>
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-center gap-1">
-          <button
-            type="button"
-            aria-label={d.productImagePrev}
-            onClick={() => goTo(index - 1)}
-            className="group press mr-2 flex size-8 items-center justify-center border border-line text-mute hover:border-ink hover:text-ink"
-          >
-            <Chevron dir="left" />
-          </button>
+        {/*
+          Markers, not numbers — the reference's own device, and with two
+          photos per fit a numbered row was reading as more machinery than
+          the thing deserves. Square, not round: `rounded-full` is exactly
+          what CLAUDE.md's no-radii rule (and check-guards.sh) rules out,
+          and a circle drawn some other way to dodge the grep would be the
+          same regression the Chevron's square caps below exist to avoid.
 
+          The visible mark is 6px; the button around it is 24px so the tap
+          target isn't. The accessible name is unchanged from the numbered
+          version ("Image 1 de 2") — a marker with no name is the usual way
+          this pattern gets shipped broken.
+        */}
+        <div className="mt-3 flex items-center justify-center gap-1">
           {activeFit.gallery.map((_, i) => (
             <button
               key={i}
@@ -309,28 +457,26 @@ export default function ProductCarousel({ d, productId, fits, initialFit }: Prop
               aria-label={fmt(d.productImagePosition, { n: i + 1, total })}
               aria-current={i === index ? 'true' : undefined}
               onClick={() => goTo(i)}
-              className={cn(
-                'press size-8 border text-xs tabular-nums',
-                i === index
-                  ? 'border-ink bg-ink text-paper forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]'
-                  : 'border-line text-mute hover:border-ink hover:text-ink'
-              )}
+              className="press group flex size-6 items-center justify-center"
             >
-              {i + 1}
+              {/* `bg-mute`, not `bg-line`, for the inactive marker: the
+                  hairline colour is meant for rules against paper and
+                  effectively disappears at 6px over the sky's own texture.
+                  Mute is 5:1 on paper, so both states clear the 3:1 that
+                  non-text UI wants on their own, and they're still plainly
+                  different from each other (mid grey against near-black). */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'block size-1.5',
+                  i === index
+                    ? 'bg-ink forced-colors:bg-[Highlight]'
+                    : 'bg-mute group-hover:bg-ink forced-colors:bg-[GrayText]'
+                )}
+              />
             </button>
           ))}
-
-          <button
-            type="button"
-            aria-label={d.productImageNext}
-            onClick={() => goTo(index + 1)}
-            className="group press ml-2 flex size-8 items-center justify-center border border-line text-mute hover:border-ink hover:text-ink"
-          >
-            <Chevron dir="right" />
-          </button>
         </div>
-
-        <p className="mt-2 text-center text-[10px] uppercase tracking-label text-mute">{activeFit.label}</p>
       </div>
 
       {/* Mirrors SignupForm's live region: exists empty from the start, set

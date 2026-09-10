@@ -3,7 +3,7 @@
 # file with its gzip size and fails if the total crosses BUDGET_BYTES.
 #
 # This isn't a per-page delivery model — a visitor to /conditions never loads
-# ProductActions.js, and engine.js (the Sky WebGL background) is a lazy
+# ProductStage.js, and engine.js (the Sky WebGL background) is a lazy
 # dynamic import most visits never trigger at all — it's a cheap total
 # surface-area number instead, sized to catch what actually moves it: a new
 # dependency, an upgraded one, or an island that stopped being lazy. See

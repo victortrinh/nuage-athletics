@@ -27,6 +27,19 @@ export const buttonVariants = cva('press', {
       // "this is a control" signal: it undims, and picks up the same accent
       // the header's other two links use.
       quiet: 'opacity-70 hover:text-accent-ink hover:opacity-100',
+      /**
+       * The confirm tap and the "information" disclosure inside the
+       * product page's band (ProductStage.tsx) — plain uppercase text, no
+       * border or fill. A bordered block here would fight the band's own
+       * device: every other piece of text in it is a roller branch (see
+       * product/Slot.tsx), and a box drawn around one of those branches
+       * would read as a different kind of control breaking a rhythm the
+       * rest of the row is built from. Kept distinct from `quiet` (which
+       * exists for an icon-only toggle and dims by default) — this starts
+       * at full opacity, since it doubles as the band's readable label text
+       * until the moment it becomes interactive.
+       */
+      text: 'text-center uppercase tracking-label hover:opacity-70 disabled:opacity-40 disabled:pointer-events-none',
     },
   },
   defaultVariants: {

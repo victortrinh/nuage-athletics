@@ -23,9 +23,9 @@ import { LOCALES } from '../src/i18n/config'
  *
  * Scoped to #signup-prompt: these tests used to run on the pre-launch gate
  * screen, which carried one island and nothing else. The home page carries
- * three (ProductCarousel, ProductActions, SignupForm), so an unscoped
- * `astro-island:not([ssr])` is a strict-mode violation — and matching
- * whichever island hydrated first would wait on the wrong one.
+ * two (ProductStage, SignupForm), so an unscoped `astro-island:not([ssr])`
+ * is a strict-mode violation — and matching whichever island hydrated first
+ * would wait on the wrong one.
  */
 async function openSignupPrompt(page: Page) {
   await expect(page.locator('#signup-prompt')).toBeVisible({ timeout: 8_000 })
@@ -176,14 +176,27 @@ test.describe('signup form works before hydration (no JS)', () => {
   })
 })
 
+/**
+ * Opens the buy band the way a pointer user does — the "+" trigger — and
+ * waits for the size radiogroup to actually take focus, which is the
+ * band's own signal (ProductStage.tsx's focus-management effect) that the
+ * open transition has settled. Every test below that needs the band open
+ * calls this first, mirroring `openSignupPrompt` above.
+ */
+async function openBand(page: Page) {
+  await page.getByRole('button', { name: 'Choisir une taille', exact: true }).click()
+  await expect(page.getByRole('radiogroup', { name: 'Taille' }).getByRole('radio').first()).toBeFocused()
+}
+
 test('size selector is a real radiogroup with roving-tabindex arrow navigation', async ({
   page,
 }) => {
-  // The picker only renders once there's something to buy — see the note in
+  // The band only renders once there's something to buy — see the note in
   // ProductView.astro — so this exercises it the way a founder would.
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+  await openBand(page)
 
-  // Scoped to "Taille" — the fit selector (ProductActions.tsx) is a second
+  // Scoped to "Taille" — the fit selector (ProductStage.tsx) is a second
   // radiogroup on this page since the fit/carousel work, so a bare
   // getByRole('radiogroup') is a Playwright strict-mode violation now.
   const group = page.getByRole('radiogroup', { name: 'Taille' })
@@ -193,7 +206,8 @@ test('size selector is a real radiogroup with roving-tabindex arrow navigation',
   const count = await radios.count()
   expect(count).toBeGreaterThan(1)
 
-  await radios.first().focus()
+  // openBand already focused and left the first radio unchecked — arrow
+  // navigation from there is the thing under test.
   await expect(radios.first()).not.toBeChecked()
 
   await page.keyboard.press('ArrowRight')
@@ -205,7 +219,9 @@ test('size selector is a real radiogroup with roving-tabindex arrow navigation',
 test('fit selector is a radiogroup, defaults to Classique, and switching fit updates the carousel', async ({
   page,
 }) => {
-  // Preview, same reason as the size-selector test above.
+  // Preview, same reason as the size-selector test above. Unlike the size
+  // radiogroup, the fit picker sits under the carousel rather than inside
+  // the band, so it's visible without opening anything.
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const fitGroup = page.getByRole('radiogroup', { name: 'Coupe' })
@@ -227,6 +243,7 @@ test('fit selector is a radiogroup, defaults to Classique, and switching fit upd
 
   // Switching size after fit keeps the size selected — the value={size}
   // binding (not value={variantId}) is what makes this survive a fit change.
+  await openBand(page)
   const sizeGroup = page.getByRole('radiogroup', { name: 'Taille' })
   await sizeGroup.locator('label').nth(2).click()
   const thirdSize = sizeGroup.getByRole('radio').nth(2)
@@ -235,33 +252,248 @@ test('fit selector is a radiogroup, defaults to Classique, and switching fit upd
   await expect(thirdSize).toBeChecked()
 })
 
-test('carousel exposes exactly one image at a time, pages with the numbered pagination, and announces the change', async ({
+/**
+ * The whole point of the fixed-height band (see CLAUDE.md's product page
+ * note): none of these four states may change the band's own height or
+ * move the carousel above it by so much as a pixel. axe has no notion of
+ * "this box stays the same size" — this is the direct test of the brief.
+ */
+test('the buy band never changes height, and the carousel never moves, across any of its states', async ({
+  page,
+}) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+  const band = page.getByRole('button', { name: 'Choisir une taille', exact: true }).locator(
+    'xpath=ancestor::div[contains(@class, "max-w-[20rem]")]'
+  )
+  const img = page.getByRole('group', { name: 'Images du produit' }).getByRole('img')
+
+  // The gap between the image and the band, not either one's raw viewport
+  // position — clicking a control further down the page (Détails, say) can
+  // auto-scroll the viewport, which would shift both boxes by the same
+  // amount and read as a false failure if compared to an absolute position
+  // from before the scroll. The gap between them is scroll-invariant and is
+  // the thing that actually must not change.
+  async function measure() {
+    const [bandBox, imgBox] = await Promise.all([band.boundingBox(), img.boundingBox()])
+    return { height: bandBox!.height, gap: bandBox!.y - (imgBox!.y + imgBox!.height) }
+  }
+
+  const collapsed = await measure()
+
+  await openBand(page)
+  const open = await measure()
+
+  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').nth(2).click()
+  const confirming = await measure()
+
+  await page.getByRole('button', { name: 'Détails' }).click()
+  const info = await measure()
+
+  for (const state of [open, confirming, info]) {
+    expect(state.height).toBe(collapsed.height)
+    expect(state.gap).toBe(collapsed.gap)
+  }
+})
+
+test('a mis-tap on a size can never fire a purchase — selecting one only reveals a confirm control', async ({
+  page,
+}) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+  await openBand(page)
+
+  // No plain "Acheter" button exists before a size is chosen — only the
+  // instructional roller text, which is not a button at all.
+  await expect(page.getByRole('button', { name: /^Acheter/ })).toHaveCount(0)
+
+  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+
+  // Selecting the radio itself must not have submitted anything — track
+  // every request from here on and confirm none of them ever reaches
+  // /api/checkout, rather than racing a single waitForRequest against a
+  // timeout (which throws, rather than resolving empty, on its own timeout).
+  const checkoutRequests: string[] = []
+  page.on('request', (req) => {
+    if (req.url().includes('/api/checkout')) checkoutRequests.push(req.url())
+  })
+
+  const confirm = page.getByRole('button', { name: 'Acheter · M', exact: true })
+  await expect(confirm).toBeVisible()
+  await page.waitForTimeout(500)
+  expect(checkoutRequests).toHaveLength(0)
+})
+
+test('the "+" toggles aria-expanded, and closing returns focus to it without losing the chosen size', async ({
+  page,
+}) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+  const trigger = page.getByRole('button', { name: 'Choisir une taille', exact: true })
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  await openBand(page)
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+
+  // Exact match: 'L' is also a substring of 'XL' and 'XXL', unlike 'M'
+  // above, so a plain hasText filter here is ambiguous.
+  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: /^L$/ }).click()
+
+  const close = page.getByRole('button', { name: 'Fermer la sélection de taille' })
+  await close.click()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  await expect(trigger).toBeFocused()
+
+  // Reopening still shows L selected — closing the band doesn't clear it.
+  // exact: true — 'L' is also a substring match for the 'XL' and 'XXL'
+  // radios' accessible names.
+  await trigger.click()
+  await expect(
+    page.getByRole('radiogroup', { name: 'Taille' }).getByRole('radio', { name: 'L', exact: true })
+  ).toBeChecked()
+})
+
+/**
+ * The sizes fly in from a converged position via a `--tx` offset per size
+ * (ProductStage.tsx), and that offset has to land back at 0 once the band
+ * is open — it's a starting position, not a permanent displacement. It
+ * shipped as a permanent one, every size sitting up to 2.25rem off its own
+ * grid cell, and nothing caught it: the markup and the accessible names are
+ * identical either way, so only geometry can see it. Asserted as "one row,
+ * in order, inside the group" rather than against exact offsets, which
+ * would just be restating the CSS.
+ */
+test('the size row settles into its grid once open, one row, none of it overhanging', async ({
+  page,
+}) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+  await openBand(page)
+
+  const group = page.getByRole('radiogroup', { name: 'Taille' })
+  const boxes = await group.locator('label').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect()
+      return { left: r.left, right: r.right, top: Math.round(r.top) }
+    })
+  )
+  const groupBox = (await group.boundingBox())!
+
+  expect(boxes).toHaveLength(7)
+  // One row: every size shares a top edge.
+  expect(new Set(boxes.map((b) => b.top)).size).toBe(1)
+  // In order, and sitting on the group's own box give or take a few px.
+  // The tolerance is symmetric and deliberately loose: "XXS" and "XXL" are
+  // both wider than one-seventh of the row, so the two outer cells
+  // legitimately overhang by a hair. What this is guarding against is the
+  // fly-out offset failing to settle, which throws each size up to 2.25rem
+  // (36px) off — an order of magnitude past this.
+  const slack = 8
+  for (let i = 1; i < boxes.length; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].left)
+  expect(boxes[0].left).toBeGreaterThanOrEqual(groupBox.x - slack)
+  expect(boxes[6].right).toBeLessThanOrEqual(groupBox.x + groupBox.width + slack)
+})
+
+test('"Détails" discloses the description and spec list in place of the size grid', async ({
+  page,
+}) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+  await openBand(page)
+
+  const details = page.getByRole('button', { name: 'Détails' })
+  await expect(details).toHaveAttribute('aria-expanded', 'false')
+  await details.click()
+  await expect(details).toHaveAttribute('aria-expanded', 'true')
+
+  await expect(page.getByText('Composition')).toBeVisible()
+
+  // The size grid's *branch* of the slot goes `inert`, not the radiogroup
+  // itself going display:none — its box is still in the DOM (product/Slot.tsx
+  // needs that to keep the fixed height), just translated out of the clipped
+  // box and unreachable, which is what `inert` (rather than Playwright's
+  // toBeVisible, which doesn't reason about a transformed/clipped ancestor)
+  // actually verifies here.
+  const sizeGroupBranchInert = await page
+    .getByRole('radiogroup', { name: 'Taille' })
+    .evaluate((el) => (el.closest('[inert]') !== null ? true : false))
+  expect(sizeGroupBranchInert).toBe(true)
+})
+
+/**
+ * The whole open → pick a size → confirm → information path, driven from
+ * the keyboard alone. Each of these controls is either a native <button>
+ * or a RAC RadioGroup, which is what buys the roving tabindex and Enter/
+ * Space activation below for free — this is what proves it actually holds
+ * end to end, not control by control.
+ */
+test('the whole band is operable from the keyboard alone', async ({ page }) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+  const trigger = page.getByRole('button', { name: 'Choisir une taille', exact: true })
+  await trigger.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('radiogroup', { name: 'Taille' }).getByRole('radio').first()).toBeFocused()
+
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('ArrowRight')
+  const confirm = page.getByRole('button', { name: /^Acheter/ })
+  await expect(confirm).toBeVisible()
+
+  await page.getByRole('button', { name: 'Détails' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByText('Composition')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Fermer la sélection de taille' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  await expect(trigger).toBeFocused()
+})
+
+/**
+ * Everything new in the band clears the 44×44 CSS-pixel target size — the
+ * carousel's own pagination (size-8 = 32px) predates this redesign and
+ * keeps its existing tests, so it's deliberately excluded here rather than
+ * silently included and left passing on a smaller box.
+ */
+test('every band control meets a 44×44 minimum target size', async ({ page }) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+  const trigger = page.getByRole('button', { name: 'Choisir une taille', exact: true })
+  const triggerBox = (await trigger.boundingBox())!
+  expect(triggerBox.width).toBeGreaterThanOrEqual(44)
+  expect(triggerBox.height).toBeGreaterThanOrEqual(44)
+
+  await openBand(page)
+  const closeBox = (await page.getByRole('button', { name: 'Fermer la sélection de taille' }).boundingBox())!
+  expect(closeBox.width).toBeGreaterThanOrEqual(44)
+  expect(closeBox.height).toBeGreaterThanOrEqual(44)
+})
+
+test('carousel exposes exactly one image at a time, pages with the markers, and announces the change', async ({
   page,
 }) => {
   await page.goto(ROUTES.home['fr-CA'])
 
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   await expect(carousel).toHaveAttribute('aria-roledescription', 'carousel')
-  // axe can't make this assertion — it has no notion of "only one of 8
+  // axe can't make this assertion — it has no notion of "only one of 4
   // images should be in the accessibility tree at a time". This is the one
   // check that catches a broken aria-hidden toggle.
   await expect(carousel.getByRole('img')).toHaveCount(1)
 
   // Two sr-only status regions exist on this page while commerce is off —
-  // this one (the carousel's) and SignupForm's inside ProductActions. The
-  // carousel column is first in document order.
+  // this one (the carousel's) and SignupForm's own. The carousel is first
+  // in document order.
   const status = page.locator('[role="status"].sr-only').first()
   await expect(status).toHaveText('')
 
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
-  await expect(pageButtons).toHaveCount(4)
+  // Front and back only — no worn shots (see catalogue.ts).
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
+  await expect(pageButtons).toHaveCount(2)
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
-  await pageButtons.nth(2).click()
-  await expect(pageButtons.nth(2)).toHaveAttribute('aria-current', 'true')
+  await pageButtons.nth(1).click()
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
   await expect(pageButtons.nth(0)).not.toHaveAttribute('aria-current', 'true')
   await expect(carousel.getByRole('img')).toHaveCount(1)
-  await expect(status).toHaveText('Classique — Image 3 de 4')
+  await expect(status).toHaveText('Classique — Image 2 de 2')
 })
 
 test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
@@ -270,7 +502,7 @@ test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
   // Arrow keys work from focus anywhere in the group (see onKeyDown in
   // ProductCarousel.tsx), pagination and prev/next arrows included.
   const carousel = page.getByRole('group', { name: 'Images du produit' })
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
 
   await pageButtons.nth(0).click()
   await pageButtons.nth(0).focus()
@@ -283,9 +515,10 @@ test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
   // Wraps rather than stopping at the boundary — there's no disabled state
-  // to strand focus on.
+  // to strand focus on. Only two images, so wrapping left from index 0
+  // lands on the last one, index 1.
   await page.keyboard.press('ArrowLeft')
-  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
   await expect(carousel.getByRole('img')).toHaveCount(1)
 })
 
@@ -295,7 +528,7 @@ test('carousel prev/next arrows page and wrap', async ({ page }) => {
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   const prev = page.getByRole('button', { name: 'Image précédente' })
   const next = page.getByRole('button', { name: 'Image suivante' })
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
 
   await next.click()
   await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
@@ -303,14 +536,41 @@ test('carousel prev/next arrows page and wrap', async ({ page }) => {
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
   // Wraps in both directions, so neither arrow ever needs a disabled state
-  // that would strand focus on it.
+  // that would strand focus on it. Only two images, so wrapping back from
+  // index 0 lands on index 1.
   await prev.click()
-  await expect(pageButtons.nth(3)).toHaveAttribute('aria-current', 'true')
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
   await next.click()
   await expect(pageButtons.nth(0)).toHaveAttribute('aria-current', 'true')
 
   // The arrows are chrome, not slides: still exactly one image exposed.
   await expect(carousel.getByRole('img')).toHaveCount(1)
+})
+
+/**
+ * The prev/next arrows flank the photo from `md:` up and are `hidden`
+ * below it — a phone has the swipe and the markers, and two more controls
+ * crowding a small frame buys nothing. What this pins is that hiding them
+ * doesn't take paging with it: the arrow *keys* are handled on the group,
+ * not on those buttons, so they keep working at a phone width where the
+ * buttons themselves are gone.
+ */
+test('carousel arrows are desktop-only, and arrow keys still page without them', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const next = page.getByRole('button', { name: 'Image suivante' })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
+  await expect(next).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 800 })
+  await expect(next).toBeHidden()
+
+  // Still pageable from the keyboard at that width.
+  await pageButtons.nth(0).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
 })
 
 /**
@@ -339,7 +599,7 @@ test('carousel advances on a horizontal drag and clamps at the ends', async ({ p
   await page.goto(ROUTES.home['fr-CA'])
 
   const carousel = page.getByRole('group', { name: 'Images du produit' })
-  const pageButtons = page.getByRole('button', { name: /^Image \d de 4$/ })
+  const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
   const status = page.locator('[role="status"].sr-only').first()
 
   // Dragging right at the first image has nowhere to go — unlike the arrows,
@@ -349,7 +609,7 @@ test('carousel advances on a horizontal drag and clamps at the ends', async ({ p
 
   await swipe(page, -200)
   await expect(pageButtons.nth(1)).toHaveAttribute('aria-current', 'true')
-  await expect(status).toHaveText('Classique — Image 2 de 4')
+  await expect(status).toHaveText('Classique — Image 2 de 2')
 
   // Short of the threshold, the track springs back and nothing changes.
   await swipe(page, -20)
@@ -376,7 +636,7 @@ test('controls report a pointer cursor', async ({ page }) => {
     locator.evaluate((el) => getComputedStyle(el).cursor)
 
   expect(await cursorOf(page.getByRole('button', { name: 'Image suivante' }))).toBe('pointer')
-  expect(await cursorOf(page.getByRole('button', { name: 'Image 2 de 4' }))).toBe('pointer')
+  expect(await cursorOf(page.getByRole('button', { name: 'Image 2 de 2' }))).toBe('pointer')
   // The <label> RAC renders for a Radio isn't reachable from a global
   // selector — radio-group.tsx sets cursor-pointer itself.
   expect(
@@ -514,17 +774,24 @@ test('nav drawer panel does not slide under prefers-reduced-motion', async ({ pa
  * The buy flow has to be testable on the live site before the drop opens it to
  * everyone, and the price it reveals is the thing CLAUDE.md non-negotiable 5.5
  * is about — so this asserts both halves: that the public gets the drop
- * announcement and no buy button, and that a founder gets the buy button and a
+ * announcement and no buy band, and that a founder gets the buy band and a
  * response no shared cache is allowed to keep.
+ *
+ * The band's "+" trigger (named "Choisir une taille") is the marker used
+ * here rather than an "Acheter" button — there is no plain "Acheter" button
+ * any more; the confirm control only exists, named "Acheter · <size>", once
+ * a size is picked (see ProductStage.tsx and the two-tap buy tests above).
+ * The "+" is the thing that's simply either there or not, exactly like the
+ * old always-present buy button was.
  *
  * Its own browser context, because the cookie must not leak into any other
  * test's view of the site.
  */
 test.describe('founder preview', () => {
-  test('the public sees the drop announcement and no buy button', async ({ page }) => {
+  test('the public sees the drop announcement and no buy band', async ({ page }) => {
     await page.goto(ROUTES.home['fr-CA'])
     await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Acheter' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Choisir une taille', exact: true })).toHaveCount(0)
   })
 
   test('the cookie reveals the buy flow, and the response is never cached', async ({
@@ -541,12 +808,12 @@ test.describe('founder preview', () => {
     await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
     expect(response?.headers()['cache-control']).toBe('private, no-store')
 
-    await expect(page.getByRole('button', { name: 'Acheter' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Choisir une taille', exact: true })).toBeVisible()
     await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toHaveCount(0)
 
     // And back out again, without clearing cookies by hand.
     await page.goto(`${ROUTES.home['fr-CA']}?preview=`)
-    await expect(page.getByRole('button', { name: 'Acheter' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Choisir une taille', exact: true })).toHaveCount(0)
 
     await context.close()
   })
