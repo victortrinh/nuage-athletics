@@ -38,13 +38,14 @@ export interface RadioProps extends AriaRadioProps {
    *   start: the two tabs are a grid of equal columns with labels of
    *   unequal length ("Classique" against "Crop"), so left-aligned text
    *   reads as two boxes whose contents don't line up with each other.
-   * - `tight` — default type and *vertical* padding, and no horizontal
-   *   padding of its own at all: it fills its grid cell instead, so seven
-   *   sizes whose labels run from "S" to "XXL" are seven identically
-   *   sized buttons rather than seven boxes the width of their own text.
-   *   For a row that has to fit across a phone: it's the primary control,
-   *   so shrinking the text or the 44px-tall tap target to buy the width
-   *   would be the wrong trade.
+   * - `tight` — default type and *vertical* padding; it fills its grid
+   *   cell instead of padding out to its own text, so seven sizes whose
+   *   labels run from "S" to "XXL" are seven identically sized buttons
+   *   rather than seven boxes the width of their own text. For a row that
+   *   has to fit across a phone: it's the primary control, so shrinking
+   *   the text or the 44px-tall tap target to buy the width would be the
+   *   wrong trade. It does carry 2px of its own left padding (`pl-0.5`) —
+   *   see the branch below.
    *
    * A prop rather than something the caller passes through `className`:
    * `cn()` is clsx only (no tailwind-merge, see cn.ts), so a `px-2` from a
@@ -75,10 +76,14 @@ export function Radio({ className, density, ...props }: RadioProps) {
           density === 'compact' && 'flex items-center justify-center px-2 py-2 text-center text-[10px]',
           // min-h-11 + centring rather than more `py-`: padding alone left
           // this at 40px, and it's the primary control on the page. `w-full`
-          // and no `px-`: the width comes from the grid cell, which is what
-          // makes every size the same size.
+          // and no `px-` beyond `pl-0.5`: the width comes from the grid cell,
+          // which is what makes every size the same size. `pl-0.5` is a 2px
+          // nudge, not a `px-0.5` pair — the label is still `justify-center`,
+          // so adding it to both sides would cancel out; this shifts the
+          // centred lettering 1px right instead of indenting it from a
+          // left edge.
           density === 'tight' &&
-            'flex min-h-11 w-full items-center justify-center py-3 text-xs',
+            'flex min-h-11 w-full items-center justify-center py-3 pl-0.5 text-xs',
           !density && 'px-3 py-3 text-xs',
           'hover:bg-ink hover:text-paper',
           'data-[selected]:bg-ink data-[selected]:text-paper',

@@ -35,6 +35,7 @@ const navLinks = [
   { href: route('home', locale), label: d.navHome },
   { href: route('privacy', locale), label: d.privacy },
   { href: route('terms', locale), label: d.terms },
+  { href: route('precontract', locale), label: d.precontract },
   { href: 'mailto:hello@nuageathletics.com', label: d.contact },
   { href: SOCIAL_PROFILES.instagram, label: d.instagram, external: true },
 ]
@@ -297,6 +298,9 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
           </a>
           <a href={route('terms', locale)} class="underline-sweep hover:text-accent-ink">
             {d.terms}
+          </a>
+          <a href={route('precontract', locale)} class="underline-sweep hover:text-accent-ink">
+            {d.precontract}
           </a>
           <a href="mailto:hello@nuageathletics.com" class="underline-sweep hover:text-accent-ink">
             {d.contact}

@@ -176,25 +176,13 @@ test.describe('signup form works before hydration (no JS)', () => {
   })
 })
 
-/**
- * Opens the buy band the way a pointer user does — the "+" trigger — and
- * waits for the size radiogroup to actually take focus, which is the
- * band's own signal (ProductStage.tsx's focus-management effect) that the
- * open transition has settled. Every test below that needs the band open
- * calls this first, mirroring `openSignupPrompt` above.
- */
-async function openBand(page: Page) {
-  await page.getByRole('button', { name: 'Choisir une taille', exact: true }).click()
-  await expect(page.getByRole('radiogroup', { name: 'Taille' }).getByRole('radio').first()).toBeFocused()
-}
-
 test('size selector is a real radiogroup with roving-tabindex arrow navigation', async ({
   page,
 }) => {
   // The band only renders once there's something to buy — see the note in
-  // ProductView.astro — so this exercises it the way a founder would.
+  // ProductView.astro — so this exercises it the way a founder would. Sizes
+  // render directly now (no "+" to open first — ProductStage.tsx).
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
-  await openBand(page)
 
   // Scoped to "Taille" — the fit selector (ProductStage.tsx) is a second
   // radiogroup on this page since the fit/carousel work, so a bare
@@ -206,10 +194,9 @@ test('size selector is a real radiogroup with roving-tabindex arrow navigation',
   const count = await radios.count()
   expect(count).toBeGreaterThan(1)
 
-  // openBand already focused and left the first radio unchecked — arrow
-  // navigation from there is the thing under test.
   await expect(radios.first()).not.toBeChecked()
 
+  await radios.first().focus()
   await page.keyboard.press('ArrowRight')
   await expect(radios.nth(1)).toBeChecked()
   await expect(radios.nth(1)).toBeFocused()
@@ -219,9 +206,7 @@ test('size selector is a real radiogroup with roving-tabindex arrow navigation',
 test('fit selector is a radiogroup, defaults to Classique, and switching fit updates the carousel', async ({
   page,
 }) => {
-  // Preview, same reason as the size-selector test above. Unlike the size
-  // radiogroup, the fit picker sits under the carousel rather than inside
-  // the band, so it's visible without opening anything.
+  // Preview, same reason as the size-selector test above.
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const fitGroup = page.getByRole('radiogroup', { name: 'Coupe' })
@@ -243,7 +228,6 @@ test('fit selector is a radiogroup, defaults to Classique, and switching fit upd
 
   // Switching size after fit keeps the size selected — the value={size}
   // binding (not value={variantId}) is what makes this survive a fit change.
-  await openBand(page)
   const sizeGroup = page.getByRole('radiogroup', { name: 'Taille' })
   await sizeGroup.locator('label').nth(2).click()
   const thirdSize = sizeGroup.getByRole('radio').nth(2)
@@ -254,59 +238,44 @@ test('fit selector is a radiogroup, defaults to Classique, and switching fit upd
 
 /**
  * The whole point of the fixed-height band (see CLAUDE.md's product page
- * note): none of these four states may change the band's own height or
- * move the carousel above it by so much as a pixel. axe has no notion of
- * "this box stays the same size" — this is the direct test of the brief.
+ * note): none of its states may change the band's own height or move the
+ * carousel above it by so much as a pixel. axe has no notion of "this box
+ * stays the same size" — this is the direct test of the brief.
  */
 test('the buy band never changes height, and the carousel never moves, across any of its states', async ({
   page,
 }) => {
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
-  const band = page.getByRole('button', { name: 'Choisir une taille', exact: true }).locator(
+  const band = page.getByRole('button', { name: 'Ajouter au panier', exact: true }).locator(
     'xpath=ancestor::div[contains(@class, "max-w-[20rem]")]'
   )
   const img = page.getByRole('group', { name: 'Images du produit' }).getByRole('img')
 
   // The gap between the image and the band, not either one's raw viewport
-  // position — clicking a control further down the page (Détails, say) can
-  // auto-scroll the viewport, which would shift both boxes by the same
-  // amount and read as a false failure if compared to an absolute position
-  // from before the scroll. The gap between them is scroll-invariant and is
-  // the thing that actually must not change.
+  // position — the band's own box is scroll-invariant relative to the
+  // image, which is what actually must not change.
   async function measure() {
     const [bandBox, imgBox] = await Promise.all([band.boundingBox(), img.boundingBox()])
     return { height: bandBox!.height, gap: bandBox!.y - (imgBox!.y + imgBox!.height) }
   }
 
-  const collapsed = await measure()
-
-  await openBand(page)
-  const open = await measure()
+  const idle = await measure()
 
   await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').nth(2).click()
-  const confirming = await measure()
+  const picked = await measure()
 
-  await page.getByRole('button', { name: 'Détails' }).click()
-  const info = await measure()
-
-  for (const state of [open, confirming, info]) {
-    expect(state.height).toBe(collapsed.height)
-    expect(state.gap).toBe(collapsed.gap)
-  }
+  expect(picked.height).toBe(idle.height)
+  expect(picked.gap).toBe(idle.gap)
 })
 
-test('a mis-tap on a size can never fire a purchase — selecting one only reveals a confirm control', async ({
+test('the add-to-cart button is disabled until a size is picked, and a mis-tap on a size can never fire a purchase', async ({
   page,
 }) => {
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
-  await openBand(page)
 
-  // No plain "Acheter" button exists before a size is chosen — only the
-  // instructional roller text, which is not a button at all.
-  await expect(page.getByRole('button', { name: /^Acheter/ })).toHaveCount(0)
-
-  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+  const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
+  await expect(button).toBeDisabled()
 
   // Selecting the radio itself must not have submitted anything — track
   // every request from here on and confirm none of them ever reaches
@@ -317,55 +286,19 @@ test('a mis-tap on a size can never fire a purchase — selecting one only revea
     if (req.url().includes('/api/checkout')) checkoutRequests.push(req.url())
   })
 
-  const confirm = page.getByRole('button', { name: 'Acheter · M', exact: true })
-  await expect(confirm).toBeVisible()
+  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+  await expect(button).toBeEnabled()
   await page.waitForTimeout(500)
   expect(checkoutRequests).toHaveLength(0)
 })
 
-test('the "+" toggles aria-expanded, and closing returns focus to it without losing the chosen size', async ({
-  page,
-}) => {
-  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
-
-  const trigger = page.getByRole('button', { name: 'Choisir une taille', exact: true })
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
-  await openBand(page)
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-
-  // Exact match: 'L' is also a substring of 'XL' and 'XXL', unlike 'M'
-  // above, so a plain hasText filter here is ambiguous.
-  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: /^L$/ }).click()
-
-  const close = page.getByRole('button', { name: 'Fermer la sélection de taille' })
-  await close.click()
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
-  await expect(trigger).toBeFocused()
-
-  // Reopening still shows L selected — closing the band doesn't clear it.
-  // exact: true — 'L' is also a substring match for the 'XL' and 'XXL'
-  // radios' accessible names.
-  await trigger.click()
-  await expect(
-    page.getByRole('radiogroup', { name: 'Taille' }).getByRole('radio', { name: 'L', exact: true })
-  ).toBeChecked()
-})
-
 /**
- * The sizes fly in from a converged position via a `--tx` offset per size
- * (ProductStage.tsx), and that offset has to land back at 0 once the band
- * is open — it's a starting position, not a permanent displacement. It
- * shipped as a permanent one, every size sitting up to 2.25rem off its own
- * grid cell, and nothing caught it: the markup and the accessible names are
- * identical either way, so only geometry can see it. Asserted as "one row,
- * in order, inside the group" rather than against exact offsets, which
- * would just be restating the CSS.
+ * Sizes and the product name are on screen from the first render now — no
+ * "+" to open, no fly-in to settle. Asserted as "one row, in order, inside
+ * the group" rather than against exact offsets.
  */
-test('the size row settles into its grid once open, one row, none of it overhanging', async ({
-  page,
-}) => {
+test('the size row is one row, in document order, none of it overhanging', async ({ page }) => {
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
-  await openBand(page)
 
   const group = page.getByRole('radiogroup', { name: 'Taille' })
   const boxes = await group.locator('label').evaluateAll((els) =>
@@ -380,90 +313,58 @@ test('the size row settles into its grid once open, one row, none of it overhang
   // One row: every size shares a top edge.
   expect(new Set(boxes.map((b) => b.top)).size).toBe(1)
   // In order, and sitting on the group's own box give or take a few px.
-  // The tolerance is symmetric and deliberately loose: "XXS" and "XXL" are
-  // both wider than one-seventh of the row, so the two outer cells
-  // legitimately overhang by a hair. What this is guarding against is the
-  // fly-out offset failing to settle, which throws each size up to 2.25rem
-  // (36px) off — an order of magnitude past this.
+  // "XXS" and "XXL" are both wider than one-seventh of the row, so the two
+  // outer cells legitimately overhang by a hair.
   const slack = 8
   for (let i = 1; i < boxes.length; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].left)
   expect(boxes[0].left).toBeGreaterThanOrEqual(groupBox.x - slack)
   expect(boxes[6].right).toBeLessThanOrEqual(groupBox.x + groupBox.width + slack)
 })
 
-test('"Détails" discloses the description and spec list in place of the size grid', async ({
-  page,
-}) => {
+/**
+ * Pick a size, then activate the add-to-cart button, driven from the
+ * keyboard alone — RAC's RadioGroup and a native <button> are what buy the
+ * roving tabindex and Enter/Space activation below for free.
+ */
+test('the band is operable from the keyboard alone', async ({ page }) => {
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
-  await openBand(page)
 
-  const details = page.getByRole('button', { name: 'Détails' })
-  await expect(details).toHaveAttribute('aria-expanded', 'false')
-  await details.click()
-  await expect(details).toHaveAttribute('aria-expanded', 'true')
+  const group = page.getByRole('radiogroup', { name: 'Taille' })
+  await group.getByRole('radio').first().focus()
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('ArrowRight')
 
-  await expect(page.getByText('Composition')).toBeVisible()
+  const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
+  await expect(button).toBeEnabled()
 
-  // The size grid's *branch* of the slot goes `inert`, not the radiogroup
-  // itself going display:none — its box is still in the DOM (product/Slot.tsx
-  // needs that to keep the fixed height), just translated out of the clipped
-  // box and unreachable, which is what `inert` (rather than Playwright's
-  // toBeVisible, which doesn't reason about a transformed/clipped ancestor)
-  // actually verifies here.
-  const sizeGroupBranchInert = await page
+  await button.focus()
+  await expect(button).toBeFocused()
+})
+
+/**
+ * The add-to-cart button and the size row both clear the 44×44 CSS-pixel
+ * target size — the carousel's own pagination (size-8 = 32px) predates this
+ * redesign and keeps its existing tests, so it's deliberately excluded
+ * here rather than silently included and left passing on a smaller box.
+ */
+test('the add-to-cart button and size radios meet a 44×44 minimum target size', async ({ page }) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+  const buttonBox = (await page
+    .getByRole('button', { name: 'Ajouter au panier', exact: true })
+    .boundingBox())!
+  expect(buttonBox.width).toBeGreaterThanOrEqual(44)
+  expect(buttonBox.height).toBeGreaterThanOrEqual(44)
+
+  // The styled hit target is the <label> — RAC's real <input> underneath it
+  // is visually hidden (CLAUDE.md), so measuring the radio role itself would
+  // measure that hidden input instead.
+  const sizeBox = (await page
     .getByRole('radiogroup', { name: 'Taille' })
-    .evaluate((el) => (el.closest('[inert]') !== null ? true : false))
-  expect(sizeGroupBranchInert).toBe(true)
-})
-
-/**
- * The whole open → pick a size → confirm → information path, driven from
- * the keyboard alone. Each of these controls is either a native <button>
- * or a RAC RadioGroup, which is what buys the roving tabindex and Enter/
- * Space activation below for free — this is what proves it actually holds
- * end to end, not control by control.
- */
-test('the whole band is operable from the keyboard alone', async ({ page }) => {
-  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
-
-  const trigger = page.getByRole('button', { name: 'Choisir une taille', exact: true })
-  await trigger.focus()
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('radiogroup', { name: 'Taille' }).getByRole('radio').first()).toBeFocused()
-
-  await page.keyboard.press('ArrowRight')
-  await page.keyboard.press('ArrowRight')
-  const confirm = page.getByRole('button', { name: /^Acheter/ })
-  await expect(confirm).toBeVisible()
-
-  await page.getByRole('button', { name: 'Détails' }).focus()
-  await page.keyboard.press('Enter')
-  await expect(page.getByText('Composition')).toBeVisible()
-
-  await page.getByRole('button', { name: 'Fermer la sélection de taille' }).focus()
-  await page.keyboard.press('Enter')
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
-  await expect(trigger).toBeFocused()
-})
-
-/**
- * Everything new in the band clears the 44×44 CSS-pixel target size — the
- * carousel's own pagination (size-8 = 32px) predates this redesign and
- * keeps its existing tests, so it's deliberately excluded here rather than
- * silently included and left passing on a smaller box.
- */
-test('every band control meets a 44×44 minimum target size', async ({ page }) => {
-  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
-
-  const trigger = page.getByRole('button', { name: 'Choisir une taille', exact: true })
-  const triggerBox = (await trigger.boundingBox())!
-  expect(triggerBox.width).toBeGreaterThanOrEqual(44)
-  expect(triggerBox.height).toBeGreaterThanOrEqual(44)
-
-  await openBand(page)
-  const closeBox = (await page.getByRole('button', { name: 'Fermer la sélection de taille' }).boundingBox())!
-  expect(closeBox.width).toBeGreaterThanOrEqual(44)
-  expect(closeBox.height).toBeGreaterThanOrEqual(44)
+    .locator('label')
+    .first()
+    .boundingBox())!
+  expect(sizeBox.height).toBeGreaterThanOrEqual(44)
 })
 
 test('carousel exposes exactly one image at a time, pages with the markers, and announces the change', async ({
@@ -719,12 +620,13 @@ test('nav drawer opens from its trigger, traps focus, and Escape returns focus t
   expect(stillInsideDialog).toBe(true)
 
   const links = dialog.getByRole('link')
-  await expect(links).toHaveCount(5)
+  await expect(links).toHaveCount(6)
   await expect(links.nth(0)).toHaveText('Accueil')
   await expect(links.nth(1)).toHaveText('Confidentialité')
   await expect(links.nth(2)).toHaveText('Conditions')
-  await expect(links.nth(3)).toHaveText('Contact')
-  await expect(links.nth(4)).toHaveText('Instagram')
+  await expect(links.nth(3)).toHaveText('Informations précontractuelles')
+  await expect(links.nth(4)).toHaveText('Contact')
+  await expect(links.nth(5)).toHaveText('Instagram')
 
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
@@ -777,12 +679,10 @@ test('nav drawer panel does not slide under prefers-reduced-motion', async ({ pa
  * announcement and no buy band, and that a founder gets the buy band and a
  * response no shared cache is allowed to keep.
  *
- * The band's "+" trigger (named "Choisir une taille") is the marker used
- * here rather than an "Acheter" button — there is no plain "Acheter" button
- * any more; the confirm control only exists, named "Acheter · <size>", once
- * a size is picked (see ProductStage.tsx and the two-tap buy tests above).
- * The "+" is the thing that's simply either there or not, exactly like the
- * old always-present buy button was.
+ * The add-to-cart button (named "Ajouter au panier") is the marker used
+ * here — it's the one control that's simply either there or not, on screen
+ * from the first render, exactly like the old always-present buy button was
+ * (see ProductStage.tsx and the buy tests above).
  *
  * Its own browser context, because the cookie must not leak into any other
  * test's view of the site.
@@ -791,7 +691,7 @@ test.describe('founder preview', () => {
   test('the public sees the drop announcement and no buy band', async ({ page }) => {
     await page.goto(ROUTES.home['fr-CA'])
     await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Choisir une taille', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toHaveCount(0)
   })
 
   test('the cookie reveals the buy flow, and the response is never cached', async ({
@@ -808,12 +708,12 @@ test.describe('founder preview', () => {
     await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
     expect(response?.headers()['cache-control']).toBe('private, no-store')
 
-    await expect(page.getByRole('button', { name: 'Choisir une taille', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toBeVisible()
     await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toHaveCount(0)
 
     // And back out again, without clearing cookies by hand.
     await page.goto(`${ROUTES.home['fr-CA']}?preview=`)
-    await expect(page.getByRole('button', { name: 'Choisir une taille', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toHaveCount(0)
 
     await context.close()
   })
@@ -866,4 +766,53 @@ test.describe('founder preview', () => {
       expect(publicView.marker).toEqual(previewView.marker)
     })
   }
+})
+
+/**
+ * The description and spec list used to be reachable only by tapping
+ * "Détails" inside the band; they now live below the fold, server-rendered
+ * and always open (ProductDetails.astro), gated on commerce the same way
+ * the price and picker are.
+ */
+test('product details render below the fold when commerce is on, and are absent pre-drop', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+  await expect(page.getByText('Composition')).toHaveCount(0)
+
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+  await expect(page.getByRole('heading', { name: 'Détails', level: 2 })).toBeVisible()
+  await expect(page.getByText('Composition')).toBeVisible()
+})
+
+/**
+ * The CPA pre-contract disclosure (CLAUDE.md's Non-negotiables) moved off
+ * the product page onto its own route — reachable from the footer, the nav
+ * drawer, and directly under the buy control, since that link is the last
+ * surface the site controls before checkout hands off to Stripe.
+ */
+test('the pre-contract information page is reachable from the footer, the nav drawer, and the buy band', async ({
+  page,
+}) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+  await expect(
+    page.locator('footer').getByRole('link', { name: 'Informations précontractuelles' })
+  ).toHaveAttribute('href', ROUTES.precontract['fr-CA'])
+
+  await page.getByRole('button', { name: 'Menu' }).click()
+  await expect(
+    page.getByRole('dialog').getByRole('link', { name: 'Informations précontractuelles' })
+  ).toHaveAttribute('href', ROUTES.precontract['fr-CA'])
+  await page.keyboard.press('Escape')
+
+  const bandLink = page
+    .getByRole('button', { name: 'Ajouter au panier', exact: true })
+    .locator('xpath=ancestor::div[contains(@class, "max-w-[20rem]")]')
+    .getByRole('link', { name: 'Informations précontractuelles' })
+  await expect(bandLink).toHaveAttribute('href', ROUTES.precontract['fr-CA'])
+
+  await bandLink.click()
+  await expect(page).toHaveURL(new RegExp(`${ROUTES.precontract['fr-CA']}$`))
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Informations précontractuelles')
 })

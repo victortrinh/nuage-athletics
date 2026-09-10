@@ -45,18 +45,25 @@ async function neutralizeUnresolvableBackgrounds(page: Page) {
 // contrast (text-mute #63696e on paper #fafafa, 5.33:1) is already
 // documented safe in global.css.
 //
-// axe's generated CSS selector for this node isn't stable — it comes back
-// as "span" on some pages but ".items-start > span" on others,
-// depending on what else is on the page — so match on the node's rendered
-// markup instead: this is the only "partially obscuring" incomplete result
-// whose html is exactly `<span class="text-mute">`, which is specific
-// enough that a genuinely new incomplete result elsewhere still fails.
+// The pre-contract page's "Right of withdrawal" / "Droit de résolution" row
+// (its longest <dd>, the one most likely to wrap) hits the same axe quirk
+// for the same reason — a <dt> immediately before it in the same <div> —
+// confirmed the same way: elementsFromPoint at the <dd>'s box shows only its
+// own ancestor chain, no actual overlapping element.
+//
+// axe's generated CSS selector for these nodes isn't stable — it comes back
+// as "span" on some pages but ".items-start > span" on others, depending on
+// what else is on the page — so match on the node's rendered markup instead:
+// these are the only two "partially obscuring" incomplete results whose html
+// starts with one of the two prefixes below, which is specific enough that a
+// genuinely new incomplete result elsewhere still fails.
 function isKnownSafeConsentLabelOverlap(node: {
   html: string
   any: { data?: { messageKey?: string } | null }[]
 }) {
   return (
-    node.html.startsWith('<span class="text-mute">') &&
+    (node.html.startsWith('<span class="text-mute">') ||
+      node.html.startsWith('<dd class="mt-1">')) &&
     node.any.some((a) => a.data?.messageKey === 'elmPartiallyObscuring')
   )
 }

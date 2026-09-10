@@ -115,27 +115,40 @@ of us to see the real buy flow on the real site before it opens.
 - The product's **fit** (`FitId` in `src/lib/catalogue.ts`) is a purchasable
   axis alongside size, not just a photo toggle — 12 variants, fit × size.
   `ProductStage.tsx` is the one island for the whole interactive product
-  body: carousel, fit picker, and the fixed-height buy band (name, price,
-  sizes, information) that the redesign put all of that inside. The size
-  row is seven identically sized, unboxed buttons — they stretch to fill
-  their own grid column and carry no background until one is selected
-  (`tight` density in `ui/radio-group.tsx`), so the row reads as lettering
-  rather than seven boxes the width of their own labels. The prev/next
-  carousel arrows sit *beside* the frame, not pinned inside its edges: a
-  2:1 flat-lay in a 2:1 frame leaves no margin for them to land in, so
-  inside they sat on the garment. The room for them is bought from the
-  frame's own width cap from `md:` up, which is where they render at all. It used to
-  be two islands — `ProductCarousel.tsx` and `ProductActions.tsx`, in
-  separate grid columns, sharing the selected fit through a module-level
-  store (`src/lib/fit-store.ts`) because they had no common parent to lift
-  state into. That store is gone. The reason it existed — "the alternative
-  was one island covering the whole product body, which would hydrate the
-  heading, description and spec list for no interactive reason" — stopped
-  holding the moment those became part of the band itself: they roll and
-  toggle now, so hydrating them is the point, not a cost. `ProductCarousel`
-  is still its own component for the sake of its self-contained drag/
-  keyboard/pagination logic, but it's a plain child of `ProductStage`, not
-  a second island — `fit` and its setter come down as props.
+  body: carousel, fit picker, and the buy band (name, price, sizes, the
+  add-to-cart button). Everything in the band is visible on arrival now —
+  no `+` to open it, no "Détails" toggle swapping the sizes for a
+  description panel. Only the price row and the button's own label
+  ("Ajouter au panier" / "Ajout…" / "Ajouté…") still roll
+  (`product/Slot.tsx`), so an error or the button's progress can't change
+  the band's height. The description and spec list moved out of the band
+  entirely, onto an always-open section below the fold
+  (`ProductDetails.astro`, still gated on `commerceEnabled`) — there's
+  nothing left to disclose into. The size row is seven identically sized,
+  unboxed buttons — they stretch to fill their own grid column and carry no
+  background until one is selected (`tight` density in
+  `ui/radio-group.tsx`), so the row reads as lettering rather than seven
+  boxes the width of their own labels. The prev/next carousel arrows sit
+  *beside* the frame, not pinned inside its edges: a 2:1 flat-lay in a 2:1
+  frame leaves no margin for them to land in, so inside they sat on the
+  garment. The room for them is bought from the frame's own width cap from
+  `md:` up, which is where they render at all. It used to be two islands —
+  `ProductCarousel.tsx` and `ProductActions.tsx`, in separate grid columns,
+  sharing the selected fit through a module-level store
+  (`src/lib/fit-store.ts`) because they had no common parent to lift state
+  into. That store is gone. `ProductCarousel` is still its own component
+  for the sake of its self-contained drag/keyboard/pagination logic, but
+  it's a plain child of `ProductStage`, not a second island — `fit` and its
+  setter come down as props.
+  The buy button still redirects straight to Stripe's hosted checkout, same
+  as before — there is no cart behind "Ajouter au panier" yet. That's a
+  known, deliberate gap in the label, not an oversight.
+  The Quebec CPA pre-contract disclosure that used to sit in a closed
+  `<details>` at the bottom of this page (`CpaDisclosure.astro`) is now its
+  own route (`precontract` in `ROUTES`), linked from the footer, the nav
+  drawer, and a line directly under the buy button — that last link matters
+  for CPA s. 54.4, which wants the disclosure presented before the distance
+  contract forms, and checkout jumps straight to Stripe from here.
 - **The sky is allowed to stop; it is never allowed to leave a white page.**
   `sky/engine.ts` walks a degrade ladder and eventually gives up (hiding the
   canvas, dropping the GL context, recording `na-sky-gaveup`), and three rules

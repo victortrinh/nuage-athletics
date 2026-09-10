@@ -1,0 +1,43 @@
+---
+// The shirt's description and spec list, server-rendered and always open —
+// this used to be reachable only by tapping "Détails" inside ProductStage's
+// buy band (a JS-only panel sharing a Slot with the size grid, with this
+// same content duplicated in plain HTML for a no-JS visitor in a <noscript>
+// block). Neither is true any more: the band shows its sizes directly, so
+// there's nothing left to disclose into, and this is the one copy — no
+// <noscript> twin needed because there's no JS-only panel to stand in for.
+//
+// Still commerce-gated exactly as the description and specs were before:
+// ProductView.astro only renders this inside the `commerceEnabled` branch.
+import type { Locale } from '../i18n/config.ts'
+import type { Dict } from '../i18n/ui.ts'
+
+interface Spec {
+  label: string
+  value: string
+}
+
+interface Props {
+  locale: Locale
+  d: Dict
+  description: string
+  specs: Spec[]
+}
+
+const { d, description, specs } = Astro.props
+---
+
+<div class="mt-16 border-t border-ink/15 pt-8 text-center">
+  <h2 class="text-lg font-semibold opacity-100">{d.productDetails}</h2>
+  <p class="mt-4 text-sm leading-relaxed text-mute">{description}</p>
+  <dl class="mt-5">
+    {
+      specs.map((spec) => (
+        <div class="flex justify-between gap-6 border-b border-line py-3 text-sm">
+          <dt class="text-mute">{spec.label}</dt>
+          <dd class="text-right">{spec.value}</dd>
+        </div>
+      ))
+    }
+  </dl>
+</div>

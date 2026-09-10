@@ -15,6 +15,10 @@ export const ROUTES = {
   home: { 'fr-CA': '/', 'en-CA': '/en/' },
   privacy: { 'fr-CA': '/confidentialite/', 'en-CA': '/en/privacy/' },
   terms: { 'fr-CA': '/conditions/', 'en-CA': '/en/terms/' },
+  precontract: {
+    'fr-CA': '/informations-precontractuelles/',
+    'en-CA': '/en/pre-contract-information/',
+  },
   confirmed: { 'fr-CA': '/inscription-confirmee/', 'en-CA': '/en/confirmed/' },
   unsubscribed: { 'fr-CA': '/desabonnement/', 'en-CA': '/en/unsubscribed/' },
   orderConfirmed: { 'fr-CA': '/commande-confirmee/', 'en-CA': '/en/order-confirmed/' },
@@ -52,6 +56,7 @@ export const INDEXABLE: Record<RouteId, boolean> = {
   // these when the reviewed text ships and the sitemap follows on its own.
   privacy: false,
   terms: false,
+  precontract: false,
   // Dead ends reached from an email link or a checkout return. Nothing on
   // them is worth ranking, and confirmed/unsubscribed leak an intent we have
   // no business publishing.
@@ -79,6 +84,7 @@ export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   home: true,
   privacy: true,
   terms: true,
+  precontract: true,
   confirmed: false,
   unsubscribed: false,
   orderConfirmed: false,

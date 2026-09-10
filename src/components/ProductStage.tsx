@@ -1,11 +1,10 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import { I18nProvider } from 'react-aria-components'
 import ProductCarousel from './ProductCarousel'
 import { Button } from './ui/button'
 import { RadioGroup, Radio } from './ui/radio-group'
 import { Slot } from './product/Slot'
-import { cn } from './ui/cn'
-import { fmt, type Dict } from '../i18n/ui'
+import { type Dict } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
 import type { FitId, ProductFit } from '../lib/catalogue'
 
@@ -19,11 +18,6 @@ interface Variant {
 interface FitOption {
   id: FitId
   label: string
-}
-
-interface Spec {
-  label: string
-  value: string
 }
 
 interface BaseProps {
@@ -56,16 +50,12 @@ type Props =
        *  island has no reason to know about `Intl.NumberFormat` or currency
        *  codes. */
       price: string
-      description: string
-      specs: Spec[]
+      /** Resolved server-side (`route('precontract', locale)` in
+       *  ProductView.astro) rather than imported here — `route()` and
+       *  `i18n/utils` stay server-side, same reason `price` arrives
+       *  pre-formatted rather than this island importing `formatPrice`. */
+      precontractHref: string
     })
-
-/** Rem offset applied to each size button before the band opens, so they
- *  converge toward the row's centre rather than just fading in place — the
- *  adapted version of Yeezy's --tx/--ty displacement (see CLAUDE.md and the
- *  PR this shipped from). Kept small: this is a flourish riding on top of
- *  the slot roll, not the primary motion. */
-const FLY_OUT_STEP_REM = 0.9
 
 /**
  * The column's non-frame chrome, per breakpoint — the pad above the carousel
@@ -77,7 +67,7 @@ const FLY_OUT_STEP_REM = 0.9
  * must not move the product — that's the whole point of previewing the real
  * page. Re-measure both halves together if the band's height changes.
  */
-const CHROME_REM = { base: 20.5, sm: 18.5 }
+const CHROME_REM = { base: 21.03125, sm: 19.03125 }
 
 /**
  * The product page's single interactive root — carousel, fit picker and the
@@ -88,61 +78,27 @@ const CHROME_REM = { base: 20.5, sm: 18.5 }
  * because lifting both into one island "would hydrate the heading,
  * description and spec list for no interactive reason" (CLAUDE.md's old
  * wording). That reasoning doesn't hold any more — this redesign puts the
- * heading, price, description and spec list *inside* the interactive band,
- * where they roll and toggle. See fit-store.ts's removal in the same
- * commit.
+ * heading and price *inside* the interactive band. See fit-store.ts's
+ * removal in the same commit.
  *
- * The band itself is four fixed-height "slots" (product/Slot.tsx) stacked
- * under the carousel and fit picker. Collapsed, slot A shows the product
- * name and slot C shows a single `+`. Opening it rolls slot A to "choose a
- * size" (or, once one's picked, "buy · <size>" — a real button, so a mis-tap
- * on a size never fires a purchase) and slot C's size grid flies in; a
- * second tap on the "information" toggle in slot D swaps slot C for the
- * description and spec list without moving anything else. None of these
- * transitions changes the band's total height, which is the whole point:
- * the carousel above it never moves.
+ * The band used to be collapsed behind a `+`, with the size grid flying in
+ * on tap and a second "Détails" toggle swapping it for the description and
+ * spec list. Both are gone: the name, the sizes and the one purchase
+ * control are all visible on arrival, and the description/spec list moved
+ * to its own always-open section below the fold (ProductDetails.astro) —
+ * nothing left here to disclose into. What's fixed-height now is only the
+ * price row (an error can replace it) and the button's own label (idle /
+ * "Ajout…" / "Ajouté…"), both `product/Slot.tsx` rollers so neither changes
+ * the band's total height.
  */
 export default function ProductStage(props: Props) {
   const { locale, d, productId, productName, fits, initialFit, commerceEnabled } = props
 
   const [fit, setFit] = useState<FitId>(initialFit)
-  const [open, setOpen] = useState(false)
-  const [showInfo, setShowInfo] = useState(false)
   const [size, setSize] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [added, setAdded] = useState(false)
   const [error, setError] = useState('')
-
-  const plusRef = useRef<HTMLButtonElement>(null)
-  const sizeGroupRef = useRef<HTMLDivElement>(null)
-  const openedOnce = useRef(false)
-
-  const uid = useId()
-  const sizeGroupId = `size-group-${uid}`
-  const infoPanelId = `info-panel-${uid}`
-
-  // Opening moves focus to the first size radio; closing returns it to the
-  // trigger — both only once the transition is user-driven, never on mount.
-  useEffect(() => {
-    if (!openedOnce.current) {
-      openedOnce.current = true
-      return
-    }
-    if (open) {
-      sizeGroupRef.current?.querySelector<HTMLElement>('input')?.focus()
-    } else {
-      plusRef.current?.focus()
-    }
-  }, [open])
-
-  function openBand() {
-    setOpen(true)
-    setShowInfo(false)
-  }
-
-  function closeBand() {
-    setOpen(false)
-    setShowInfo(false)
-  }
 
   function onSizeChange(value: string) {
     setSize(value)
@@ -152,9 +108,9 @@ export default function ProductStage(props: Props) {
   async function onBuy() {
     if (!commerceEnabled) return
     const variantId = props.variants.find((v) => v.options?.fit === fit && v.options?.size === size)?.id
-    // Unreachable in practice — slot A only renders this as a button once a
-    // size is picked — but the fetch below needs a variant id regardless of
-    // how it got here.
+    // Unreachable in practice — the button stays disabled until a size is
+    // picked — but the fetch below needs a variant id regardless of how it
+    // got here.
     if (!variantId) return
     setLoading(true)
     setError('')
@@ -166,6 +122,10 @@ export default function ProductStage(props: Props) {
       })
       const data = (await res.json()) as { ok: boolean; url?: string }
       if (data.ok && data.url) {
+        // "Ajouté…" is what shows for the moment before the redirect fires
+        // — there is no cart to land in, only Stripe's hosted checkout, so
+        // this confirms the tap rather than a state the visitor stays in.
+        setAdded(true)
         window.location.href = data.url
         return
       }
@@ -183,9 +143,9 @@ export default function ProductStage(props: Props) {
     // announcement are rendered by ProductView.astro itself, outside this
     // island, exactly as they were before this redesign; see the note
     // there on why that stays a plain server-rendered heading rather than
-    // moving into slot A. Same pad above the carousel and same CHROME_REM as
-    // the commerce branch below — the two renders are deliberately identical
-    // from the top of the page down through the marker row.
+    // moving into the band. Same pad above the carousel and same CHROME_REM
+    // as the commerce branch below — the two renders are deliberately
+    // identical from the top of the page down through the marker row.
     return (
       <div className="pt-10 sm:pt-2">
         <ProductCarousel d={d} fit={fit} fits={fits} initialFit={initialFit} chromeRem={CHROME_REM} />
@@ -193,15 +153,13 @@ export default function ProductStage(props: Props) {
     )
   }
 
-  const { fitOptions, variants, price, description, specs } = props
+  const { fitOptions, variants, price, precontractHref } = props
   const sizesForFit = variants.filter((v) => v.options?.fit === fit)
   const selectedVariant = variants.find((v) => v.options?.fit === fit && v.options?.size === size)
-  const center = (sizesForFit.length - 1) / 2
 
-  const slotAIndex = !open ? 0 : loading ? 3 : selectedVariant ? 2 : 1
-  const slotBIndex = error ? 1 : 0
-  const slotCIndex = !open ? 0 : showInfo ? 2 : 1
-  const slotDIndex = open ? 1 : 0
+  const priceSlotIndex = error ? 1 : 0
+  const actionSlotIndex = added ? 2 : loading ? 1 : 0
+  const sizeHintId = `size-hint-${productId}`
 
   return (
     <I18nProvider locale={locale}>
@@ -210,11 +168,10 @@ export default function ProductStage(props: Props) {
         ProductView.astro centres this whole block inside a reserved screenful
         (`justify-center`), so on a phone — where the frame is bound by width,
         not by the height budget below, and so leaves real slack — the leftover
-        room was splitting evenly and pooling under the collapsed band's `+`,
-        which has an empty slot D beneath it besides. Air added above the photo
-        and between it and the marker row (ProductCarousel's own `mt-10 sm:mt-6`)
-        comes out of that slack, so the band stops trailing a stretch of nothing.
-        Both numbers are part of the column's chrome, hence `chromeRem` below.
+        room was splitting evenly and pooling under the band. Air added above
+        the photo and between it and the marker row (ProductCarousel's own
+        `mt-10 sm:mt-6`) comes out of that slack. Both numbers are part of the
+        column's chrome, hence `chromeRem` below.
       */}
       <div className="pt-10 sm:pt-2">
         {/* CHROME_REM (above) is hand-measured from the pad above plus the fit
@@ -245,192 +202,94 @@ export default function ProductStage(props: Props) {
         </RadioGroup>
 
         {/*
-          The band. Every slot below is the same fixed height in every
-          state it can be in — that constancy is the feature, not a detail,
-          so resist adding a conditional that would make one taller in one
-          branch than another.
+          The band. The name is a static heading — always on screen, never a
+          roller — and the sizes render directly with no entrance animation:
+          both used to be reachable only once the (now-removed) `+` was
+          tapped. Only the price and the button's own label still roll:
+          an error can replace the price without moving anything else, and
+          the button's label announces its own progress.
         */}
         <div className="mx-auto mt-10 flex w-full max-w-[20rem] flex-col items-center">
-          <Slot index={slotAIndex} className="h-7 w-full">
-            {/*
-              Mono/uppercase at the band's own size, not the `wordmark`
-              display face: the reference sets the product name in exactly
-              the same treatment as the price under it, and at 2xl/3xl in
-              an 800-weight display face this was the loudest thing on a
-              page whose loudest thing should be the photograph.
+          {/*
+            Mono/uppercase at the band's own size, not the `wordmark` display
+            face: the reference sets the product name in exactly the same
+            treatment as the price under it, and at 2xl/3xl in an
+            800-weight display face this was the loudest thing on a page
+            whose loudest thing should be the photograph.
+          */}
+          <h1 className="flex h-7 w-full items-center justify-center font-mono text-xs uppercase tracking-label">
+            {productName}
+          </h1>
 
-              It also fixes a real bug rather than only a weight: at
-              `leading-none` the line box is the em box, so descenders fell
-              outside it and the slot's `overflow-y-clip` (product/Slot.tsx)
-              took the tail off the "g" in "Longues". Normal leading gives
-              the line box room for them, and uppercase has none to clip in
-              the first place.
-            */}
-            <h1 className="font-mono text-xs uppercase tracking-label">{productName}</h1>
-            {/* Not a control — the band is already open by the time this
-                branch can show (index 1 only happens once `open` is true);
-                opening it happens from slot C's `+`, below. */}
-            <p className="font-mono text-xs uppercase tracking-label text-mute">{d.productChooseSize}</p>
-            {/* A real button, not just rolled-in text: this is the one tap
-                that fires a purchase, so it has to be a distinct control a
-                mis-tap on a size can never reach — selecting a size only
-                gets you here, it doesn't submit anything by itself. */}
-            <Button
-              variant="text"
-              type="button"
-              onPress={onBuy}
-              isDisabled={loading}
-              className="font-mono text-xs"
-            >
-              {selectedVariant && fmt(d.productBuySize, { size: selectedVariant.options?.size ?? '' })}
-            </Button>
-            <span role="status" aria-live="polite" className="font-mono text-xs uppercase tracking-label text-mute">
-              {d.productAdding}
-            </span>
-          </Slot>
-
-          <Slot index={slotBIndex} className="mt-1 h-6 w-full">
+          <Slot index={priceSlotIndex} className="mt-1 h-6 w-full">
             <p className="font-mono text-xs text-mute">{price}</p>
             <p role="alert" className="font-mono text-xs text-danger">
               {error}
             </p>
           </Slot>
 
-          {/*
-            One height at every breakpoint now that the sizes are one row
-            everywhere (they used to wrap to two below `sm:`, so this slot
-            had to be 3rem taller there to hold them). Worth keeping
-            uniform beyond the tidiness: this slot is also what the
-            information panel renders into, and its height was the only
-            thing making the band's own height breakpoint-dependent — which
-            is the number ProductCarousel's `chromeRem` has to track.
-          */}
-          <Slot index={slotCIndex} className="mt-4 h-20 w-full">
-            <button
+          <RadioGroup
+            aria-label={d.productSizeLabel}
+            value={size}
+            onChange={onSizeChange}
+            // No `place-items-center`: the radios stretch to fill their own
+            // column instead, which is what makes "S" and "XXL" the
+            // same-sized button (see radio-group.tsx's `tight` density).
+            className="mt-4 grid w-full grid-cols-7 gap-x-0.5"
+          >
+            {sizesForFit.map((v) => (
+              <Radio key={v.id} value={v.options?.size ?? v.id} isDisabled={!v.inStock} density="tight">
+                {v.options?.size ?? v.label}
+                {!v.inStock && <span className="sr-only"> — {d.productOutOfStock}</span>}
+              </Radio>
+            ))}
+          </RadioGroup>
+
+          {/* Visually hidden — announced as the button's description while
+              no size is picked, same information the disabled state itself
+              can't convey to a screen reader. */}
+          <span id={sizeHintId} className="sr-only">
+            {d.productChooseSize}
+          </span>
+
+          <Slot index={actionSlotIndex} className="mt-4 h-11 w-full">
+            {/* The one tap that fires a purchase — disabled until a size is
+                picked, so a mis-tap on a size can never reach it by itself. */}
+            <Button
+              variant="solid"
               type="button"
-              aria-expanded={open}
-              aria-controls={sizeGroupId}
-              aria-label={d.productChooseSize}
-              onClick={openBand}
-              ref={plusRef}
-              className="press flex size-11 items-center justify-center"
+              onPress={onBuy}
+              isDisabled={!selectedVariant || loading}
+              aria-describedby={!selectedVariant ? sizeHintId : undefined}
+              // `solid`'s own padding falls just under the 44px minimum
+              // target size at this font size — min-h-11 (the Slot
+              // branch's own height) stretches the button to fill it
+              // rather than sitting centred inside it under that height.
+              className="min-h-11"
             >
-              <PlusMinus open={false} />
-            </button>
-
-            <div ref={sizeGroupRef} id={sizeGroupId} className="w-full">
-              <RadioGroup
-                aria-label={d.productSizeLabel}
-                value={size}
-                onChange={onSizeChange}
-                // No `place-items-center`: the radios stretch to fill their
-                // own column instead, which is what makes "S" and "XXL" the
-                // same-sized button (see radio-group.tsx's `tight` density).
-                className="grid grid-cols-7 gap-x-0.5"
-              >
-                {sizesForFit.map((v, i) => (
-                  <Radio
-                    key={v.id}
-                    value={v.options?.size ?? v.id}
-                    isDisabled={!v.inStock}
-                    density="tight"
-                    style={
-                      {
-                        // Settles at 0 once open — the offset is the
-                        // *starting* position the size flies in from, not a
-                        // permanent displacement. Leaving it applied in both
-                        // states (as this did until the sizes moved onto one
-                        // row and it showed up as the outer two overhanging
-                        // the band) means every size sits up to 2.25rem off
-                        // its own grid cell for as long as the band is open.
-                        '--tx': open ? '0rem' : `${(center - i) * -FLY_OUT_STEP_REM}rem`,
-                        transitionDelay: open ? `${i * 20}ms` : '0ms',
-                      } as CSSProperties
-                    }
-                    className={cn(
-                      'translate-x-[var(--tx)] motion-safe:transition-[transform,opacity] motion-safe:duration-300 motion-safe:ease-out',
-                      open ? 'scale-100 opacity-100' : 'pointer-events-none scale-75 opacity-0'
-                    )}
-                  >
-                    {v.options?.size ?? v.label}
-                    {!v.inStock && <span className="sr-only"> — {d.productOutOfStock}</span>}
-                  </Radio>
-                ))}
-              </RadioGroup>
-            </div>
-
-            {/* The information panel shares this slot with the size grid —
-                same device Yeezy uses — so opening it never moves the
-                carousel or the fit picker above. Long content (a French
-                spec label, a taller viewport font size) scrolls inside the
-                fixed box rather than growing it, which is what keeps the
-                band's total height genuinely constant across every state,
-                not just the common ones. */}
-            <div id={infoPanelId} className="max-h-full w-full overflow-y-auto px-1 text-center">
-              <p className="text-xs leading-relaxed text-mute">{description}</p>
-              <dl className="mt-3 space-y-1">
-                {specs.map((spec) => (
-                  <div key={spec.label} className="flex justify-between gap-4 text-left text-[10px] uppercase tracking-label text-mute">
-                    <dt>{spec.label}</dt>
-                    <dd className="text-ink">{spec.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+              {d.productAddToCart}
+            </Button>
+            <span role="status" aria-live="polite" className="font-mono text-xs uppercase tracking-label">
+              {d.productAdding}
+            </span>
+            <span role="status" aria-live="polite" className="font-mono text-xs uppercase tracking-label">
+              {d.productAdded}
+            </span>
           </Slot>
 
-          <Slot index={slotDIndex} className="mt-2 h-8 w-full">
-            <span aria-hidden="true" />
-            <div className="flex items-center justify-center gap-6">
-              <Button
-                variant="text"
-                type="button"
-                aria-expanded={showInfo}
-                aria-controls={infoPanelId}
-                onPress={() => setShowInfo((v) => !v)}
-                className="text-[11px]"
-              >
-                {d.productDetails}
-              </Button>
-              <button
-                type="button"
-                aria-label={d.productCloseSizes}
-                onClick={closeBand}
-                className="press flex size-11 items-center justify-center"
-              >
-                <PlusMinus open={true} />
-              </button>
-            </div>
-          </Slot>
+          {/* The CPA pre-contract disclosure link — Quebec's Consumer
+              Protection Act wants this presented before the distance
+              contract forms, and checkout jumps straight to Stripe's
+              hosted page from here, so this is the last surface the site
+              controls before that happens. */}
+          <a
+            href={precontractHref}
+            className="underline-sweep mt-2 text-[11px] uppercase tracking-label text-mute hover:text-accent-ink"
+          >
+            {d.precontract}
+          </a>
         </div>
       </div>
     </I18nProvider>
-  )
-}
-
-/**
- * Drawn, not typed: two crossed 1px `--color-line`-weight rules, the same
- * hairline device the rest of the layout is built from — this site has no
- * icon font and no lucide-react (CLAUDE.md). Rotating the whole mark 45°
- * turns the drawn `+` into an `×` with one `motion-safe:rotate-45`, no
- * second glyph to name or swap in. Two separate instances of this component
- * exist in the band (the big collapsed trigger in slot C, the small close
- * control in slot D) rather than one element that relocates across states —
- * relocating it would itself be a reflow, exactly what the band exists to
- * avoid — but both draw from this one definition, which is what keeps them
- * reading as the same control.
- */
-function PlusMinus({ open }: { open: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        'relative block size-3 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out',
-        open && 'motion-safe:rotate-45'
-      )}
-    >
-      <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-current" />
-      <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-current" />
-    </span>
   )
 }
