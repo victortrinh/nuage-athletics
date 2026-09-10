@@ -244,6 +244,20 @@ describe('getLiveProduct', () => {
     expect(calls).toHaveLength(2)
   })
 
+  it('sends a token that was pasted with a newline or quotes around it', async () => {
+    const calls = stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku))))
+
+    await getLiveProduct(
+      { ...ENV, SHOPIFY_STOREFRONT_TOKEN: `"${ENV.SHOPIFY_STOREFRONT_TOKEN}"\n` },
+      SLUG,
+      'fr-CA'
+    )
+
+    expect(calls[0].headers.get('X-Shopify-Storefront-Access-Token')).toBe(
+      ENV.SHOPIFY_STOREFRONT_TOKEN
+    )
+  })
+
   it('sends the token as a Storefront header, to the versioned GraphQL endpoint', async () => {
     const calls = stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku))))
 

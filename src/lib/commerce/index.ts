@@ -62,7 +62,13 @@ export async function getLiveProduct(
   locale: Locale
 ): Promise<LiveProduct> {
   const domain = env.SHOPIFY_STORE_DOMAIN
-  const token = env.SHOPIFY_STOREFRONT_TOKEN
+  // A secret is pasted by hand, and a paste picks things up: a trailing
+  // newline from `echo | wrangler secret put`, or the quotes someone put
+  // around it. Shopify answers a token with either on it exactly as it
+  // answers a wrong one — 401 — so this is one more thing that looks like a
+  // credential problem and isn't. (`normalizeDomain` does the same for the
+  // domain.)
+  const token = env.SHOPIFY_STOREFRONT_TOKEN?.trim().replace(/^(['"])(.*)\1$/, '$2')
   if (!domain || !token) {
     // Said out loud for the same reason the no-join case in ./shopify.ts is:
     // an unconfigured store renders exactly like a pre-drop page, so without
