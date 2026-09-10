@@ -225,7 +225,7 @@ export default function ProductStage(props: Props) {
           className="mx-auto mt-5 grid max-w-[13rem] grid-cols-2 gap-px bg-line"
         >
           {fitOptions.map((f) => (
-            <Radio key={f.id} value={f.id} compact>
+            <Radio key={f.id} value={f.id} density="compact">
               {f.label}
             </Radio>
           ))}
@@ -310,13 +310,14 @@ export default function ProductStage(props: Props) {
                 aria-label={d.productSizeLabel}
                 value={size}
                 onChange={onSizeChange}
-                className="grid grid-cols-6 place-items-center gap-x-1"
+                className="grid grid-cols-7 place-items-center gap-x-0.5"
               >
                 {sizesForFit.map((v, i) => (
                   <Radio
                     key={v.id}
                     value={v.options?.size ?? v.id}
                     isDisabled={!v.inStock}
+                    density="tight"
                     style={
                       {
                         // Settles at 0 once open — the offset is the

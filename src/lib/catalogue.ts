@@ -26,7 +26,7 @@ export const SLUGS: Record<string, Record<Locale, string>> = {
  */
 const PLACEHOLDER_PRICE_CENTS = 6500
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL'] as const
+const SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'] as const
 
 /** The two garment fits. Ids only — display names live in FIT_NAMES below. */
 export type FitId = 'classic' | 'crop'
@@ -47,7 +47,7 @@ const FIT_NAMES: Record<Locale, Record<FitId, string>> = {
 }
 
 /**
- * Fit × size = 12 variants, fit-major. `label` composes the fit and size name
+ * Fit × size = 14 variants, fit-major. `label` composes the fit and size name
  * (e.g. "Crop · M") and is what ends up on the Stripe line item and receipt —
  * see `stripe.ts`, which reads `variant.label` directly and needed no changes
  * for this. `options` carries the same two facts as ids, for `ProductStage`
@@ -198,7 +198,7 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
       specs: [
         { label: 'Composition', value: '50 % laine mérinos, 50 % modal' },
         { label: 'Coupes', value: 'Classique ou crop' },
-        { label: 'Tailles', value: 'XS – 2XL' },
+        { label: 'Tailles', value: 'XXS – XXL' },
         { label: 'Entretien', value: 'Lavage à froid, séchage à plat' },
         // Two facts, two rows, on purpose: this brand is designed in Quebec
         // and manufactured in China, and folding that into one "Origine" row
@@ -217,7 +217,7 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
       specs: [
         { label: 'Composition', value: '50% merino wool, 50% modal' },
         { label: 'Fits', value: 'Classic or cropped' },
-        { label: 'Sizes', value: 'XS – 2XL' },
+        { label: 'Sizes', value: 'XXS – XXL' },
         { label: 'Care', value: 'Cold wash, dry flat' },
         { label: 'Design', value: 'Quebec, Canada' },
         { label: 'Made in', value: 'China' },

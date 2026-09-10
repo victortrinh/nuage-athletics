@@ -333,7 +333,7 @@ test('the "+" toggles aria-expanded, and closing returns focus to it without los
   await openBand(page)
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
 
-  // Exact match: 'L' is also a substring of 'XL' and '2XL', unlike 'M'
+  // Exact match: 'L' is also a substring of 'XL' and 'XXL', unlike 'M'
   // above, so a plain hasText filter here is ambiguous.
   await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: /^L$/ }).click()
 
@@ -343,7 +343,7 @@ test('the "+" toggles aria-expanded, and closing returns focus to it without los
   await expect(trigger).toBeFocused()
 
   // Reopening still shows L selected — closing the band doesn't clear it.
-  // exact: true — 'L' is also a substring match for the 'XL' and '2XL'
+  // exact: true — 'L' is also a substring match for the 'XL' and 'XXL'
   // radios' accessible names.
   await trigger.click()
   await expect(
@@ -376,15 +376,19 @@ test('the size row settles into its grid once open, one row, none of it overhang
   )
   const groupBox = (await group.boundingBox())!
 
-  expect(boxes).toHaveLength(6)
+  expect(boxes).toHaveLength(7)
   // One row: every size shares a top edge.
   expect(new Set(boxes.map((b) => b.top)).size).toBe(1)
-  // In order, and none of it hanging off the group's own box. 1px of
-  // tolerance for subpixel layout, and the last cell is allowed a little
-  // slack — "2XL" is wider than its share of six equal columns.
+  // In order, and sitting on the group's own box give or take a few px.
+  // The tolerance is symmetric and deliberately loose: "XXS" and "XXL" are
+  // both wider than one-seventh of the row, so the two outer cells
+  // legitimately overhang by a hair. What this is guarding against is the
+  // fly-out offset failing to settle, which throws each size up to 2.25rem
+  // (36px) off — an order of magnitude past this.
+  const slack = 8
   for (let i = 1; i < boxes.length; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].left)
-  expect(boxes[0].left).toBeGreaterThanOrEqual(groupBox.x - 1)
-  expect(boxes[5].right).toBeLessThanOrEqual(groupBox.x + groupBox.width + 8)
+  expect(boxes[0].left).toBeGreaterThanOrEqual(groupBox.x - slack)
+  expect(boxes[6].right).toBeLessThanOrEqual(groupBox.x + groupBox.width + slack)
 })
 
 test('"Détails" discloses the description and spec list in place of the size grid', async ({

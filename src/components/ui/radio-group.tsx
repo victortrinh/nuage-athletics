@@ -28,21 +28,28 @@ export function RadioGroup({ className, ...props }: RadioGroupProps) {
 
 export interface RadioProps extends AriaRadioProps {
   /**
-   * Tighter padding and type, for a secondary picker that shouldn't carry
-   * the same weight as the primary one on the same page — the product
-   * page's fit tabs against its size grid (ProductStage.tsx).
+   * How much room the control takes, for the two cases on the product page
+   * that can't use the default (ProductStage.tsx):
+   *
+   * - `compact` — smaller type and padding both ways, for a secondary
+   *   picker that shouldn't carry the same weight as the primary one on
+   *   the same page: the fit tabs against the size row.
+   * - `tight` — default type and *vertical* padding, squeezed only
+   *   horizontally. For a row of seven sizes that has to fit across a
+   *   phone: it's the primary control, so shrinking the text or the
+   *   44px-tall tap target to buy the width would be the wrong trade.
    *
    * A prop rather than something the caller passes through `className`:
-   * `cn()` is clsx only (no tailwind-merge, see cn.ts), so a `py-2` from a
-   * caller and the `py-3` below would both land in the class attribute and
+   * `cn()` is clsx only (no tailwind-merge, see cn.ts), so a `px-2` from a
+   * caller and the `px-3` below would both land in the class attribute and
    * the winner would be whichever Tailwind happens to emit later — decided
    * by the framework's sort order, not by this file. Branching inside the
    * one `cn()` call keeps exactly one padding utility in play.
    */
-  compact?: boolean
+  density?: 'compact' | 'tight'
 }
 
-export function Radio({ className, compact, ...props }: RadioProps) {
+export function Radio({ className, density, ...props }: RadioProps) {
   return (
     <AriaRadio
       className={(renderProps) =>
@@ -51,7 +58,12 @@ export function Radio({ className, compact, ...props }: RadioProps) {
           // covers button/summary, and cannot know that this particular
           // <label> is the control itself.
           'press cursor-pointer bg-paper uppercase tracking-label',
-          compact ? 'px-2 py-2 text-[10px]' : 'px-3 py-3 text-xs',
+          density === 'compact' && 'px-2 py-2 text-[10px]',
+          // min-h-11 + centring rather than more `py-`: padding alone left
+          // this at 40px, and it's the primary control on the page.
+          density === 'tight' &&
+            'flex min-h-11 items-center justify-center px-1.5 py-3 text-xs sm:px-2.5',
+          !density && 'px-3 py-3 text-xs',
           'hover:bg-ink hover:text-paper',
           'data-[selected]:bg-ink data-[selected]:text-paper',
           // In forced-colors mode bg-ink/text-paper are both flattened to
