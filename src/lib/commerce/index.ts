@@ -1,21 +1,124 @@
+import type { Locale } from '../../i18n/config'
 import { previewActive } from '../preview'
+import { createShopifyStorefront, StorefrontError } from './shopify'
 import { createStripeAdapter } from './stripe'
-import type { CommerceAdapter } from './types'
+import type { CommerceAdapter, Product } from './types'
 
 export type * from './types'
+
+interface StorefrontEnv {
+  SHOPIFY_STORE_DOMAIN?: string
+  SHOPIFY_STOREFRONT_TOKEN?: string
+}
+
+/**
+ * The product as it is actually for sale right now — catalogue copy with
+ * Shopify's price and per-variant availability joined onto it — or null.
+ *
+ * A null product is the whole failure mode, and it is deliberately the *only*
+ * one. A Storefront outage, an unconfigured store, a SKU that doesn't join:
+ * each returns null, the page renders the state it already has for "there is
+ * nothing to buy yet" (no price, no buy band — see ProductView.astro), and
+ * nobody is shown a number that might be wrong. The alternatives are a stale
+ * price and a 500, and both are worse than a page that quietly declines to
+ * sell for a minute.
+ *
+ * `reason` exists because that design has one cost: from the outside, a store
+ * that was never wired up is indistinguishable from a drop that hasn't opened.
+ * It changes nothing about the render — the pages put it on a response header
+ * (`X-Storefront`) so someone who can already see the page can see why there
+ * is no price on it, without the page itself differing from launch day.
+ * `npx wrangler secret list` answers the two `no-*` cases from the CLI.
+ *
+ * Pages call this rather than reaching for `./shopify` themselves, so the
+ * provider stays swappable from this file alone (CLAUDE.md non-negotiable 5).
+ */
+export type StorefrontReason =
+  /** A price came back. */
+  | 'ok'
+  /** `SHOPIFY_STORE_DOMAIN` is unset on the Worker serving this request. */
+  | 'no-domain'
+  /** `SHOPIFY_STOREFRONT_TOKEN` is unset on the Worker serving this request. */
+  | 'no-token'
+  /** The call threw, answered non-2xx, or came back with GraphQL errors. */
+  | 'unreachable'
+  /** The store answered, and none of this product's SKUs were in it. */
+  | 'no-match'
+
+export interface LiveProduct {
+  product: Product | null
+  reason: StorefrontReason
+  /**
+   * What kind of `unreachable` — `status=401`, `graphql`, `network`. A
+   * refused token and a wrong domain are the same category and different
+   * fixes, and this is the difference between them without reading a log.
+   */
+  detail?: string
+}
+
+export async function getLiveProduct(
+  env: StorefrontEnv,
+  slug: string,
+  locale: Locale
+): Promise<LiveProduct> {
+  const domain = env.SHOPIFY_STORE_DOMAIN
+  // A secret is pasted by hand, and a paste picks things up: a trailing
+  // newline from `echo | wrangler secret put`, or the quotes someone put
+  // around it. Shopify answers a token with either on it exactly as it
+  // answers a wrong one — 401 — so this is one more thing that looks like a
+  // credential problem and isn't. (`normalizeDomain` does the same for the
+  // domain.)
+  const token = env.SHOPIFY_STOREFRONT_TOKEN?.trim().replace(/^(['"])(.*)\1$/, '$2')
+  if (!domain || !token) {
+    // Said out loud for the same reason the no-join case in ./shopify.ts is:
+    // an unconfigured store renders exactly like a pre-drop page, so without
+    // this the only symptom is a buy band that never appears.
+    //
+    // Which of the two is missing is worth a distinct answer rather than one
+    // "not configured": the two have different causes. A missing token is
+    // usually a name that doesn't match what was set; a missing domain is
+    // usually a secret that landed on a different Worker, or a version
+    // uploaded before it was added.
+    const missing = !domain ? 'SHOPIFY_STORE_DOMAIN' : 'SHOPIFY_STOREFRONT_TOKEN'
+    console.error(`storefront: ${missing} is unset — no price will render`)
+    return { product: null, reason: !domain ? 'no-domain' : 'no-token' }
+  }
+
+  try {
+    const product = await createShopifyStorefront({ domain, token }).getProduct(slug, locale)
+    return { product, reason: product ? 'ok' : 'no-match' }
+  } catch (err) {
+    console.error('storefront read failed', err)
+    return {
+      product: null,
+      reason: 'unreachable',
+      // Anything that isn't a refusal we recognise never left the machine:
+      // DNS, TLS, a domain that doesn't resolve.
+      detail: err instanceof StorefrontError ? err.detail : 'network',
+    }
+  }
+}
 
 /**
  * Single place where the backend is chosen. To move to Lightspeed later,
  * implement LightspeedAdapter with the same interface and change this function.
  */
-export function getCommerce(env: {
-  STRIPE_SECRET_KEY?: string
-  STRIPE_WEBHOOK_SECRET?: string
-}): CommerceAdapter {
+export function getCommerce(
+  env: StorefrontEnv & {
+    STRIPE_SECRET_KEY?: string
+    STRIPE_WEBHOOK_SECRET?: string
+  }
+): CommerceAdapter {
   if (!env.STRIPE_SECRET_KEY) {
     throw new Error('STRIPE_SECRET_KEY is not configured')
   }
-  return createStripeAdapter(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET)
+  // Stripe still takes the payment; it no longer decides what to charge.
+  // The line item is priced from the same `getLiveProduct` read the page
+  // rendered from, so "the price you saw is the price you pay" holds by
+  // construction rather than by two files agreeing on a constant.
+  return createStripeAdapter(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET, async (slug, locale) =>
+    (await getLiveProduct(env, slug, locale)).product
+  )
 }
 
 /**

@@ -18,6 +18,7 @@
     "db:subscribers": "node scripts/subscribers.ts",
     "broadcast": "node scripts/broadcast.ts",
     "email:preview": "node scripts/email-preview.ts",
+    "shopify:check": "node scripts/shopify-check.ts",
     "email:wordmark": "node scripts/email-wordmark.mjs"
   },
   "dependencies": {

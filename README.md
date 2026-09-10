@@ -45,11 +45,27 @@ Without `RESEND_API_KEY` the confirmation email is logged to the console with th
 confirm URL, and the signup endpoint returns `email_failed` — the row is still
 written, so paste the logged URL to finish the double opt-in locally.
 
+Without `SHOPIFY_STOREFRONT_TOKEN` there is no price and no buy band, founder
+preview included: the product page's price and sold-out states come from the
+Shopify Storefront API and nowhere else. The store it reads is
+`SHOPIFY_STORE_DOMAIN` in `wrangler.toml`'s `[vars]` — a var, not a secret,
+since it is public on any storefront URL and shipping it with the code is what
+keeps it from going missing on a deployed version. Its variant SKUs have to
+match `src/lib/catalogue.ts` — the SKU is the join key. `npm run shopify:check` runs that read and prints why
+there is or isn't a price: it catches a refused token, products not published
+to the token's sales channel, and SKUs that don't match, all of which otherwise
+render as an ordinary pre-drop page. In a browser, the response headers say the
+same thing: `Cache-Control: private, no-store` means the preview cookie is live,
+and `X-Storefront: no-domain | no-token | unreachable | no-match` appears only
+when commerce was on and no price came back — `unreachable` carries the reason
+with it (`unreachable;status=401` is the token, `;status=404` the domain).
+
 ## Deploy
 
 ```bash
 wrangler kv namespace create SESSION   # adapter expects a SESSION binding
 wrangler secret put RESEND_API_KEY
+wrangler secret put SHOPIFY_STOREFRONT_TOKEN
 npm run db:migrate:remote
 npm run deploy
 ```
@@ -66,6 +82,7 @@ Then point DNS at the Worker. **Adding the web records does not touch MX** —
 | `npm run build` | production build |
 | `npm run db:subscribers` | subscriber counts by status + recent rows from remote D1 (`-- --local`, `--status`, `--csv <path outside the repo>`) |
 | `npm run broadcast` | send a one-off email to confirmed subscribers (`-- <file> --dry-run` first, `--local` to test against local D1) |
+| `npm run shopify:check` | ask the Storefront API what the site asks it, and print why the product page has a price or hasn't |
 | `npm run email:preview` | render every outbound email to `tmp/email-preview/` for eyeballing, no Resend account needed |
 | `npm run email:wordmark` | regenerate `public/img/wordmark-email.png` from `public/logo-nuage.svg` |
 

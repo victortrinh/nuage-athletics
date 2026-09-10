@@ -21,6 +21,11 @@ declare namespace Cloudflare {
     PREVIEW_PASSWORD?: string
     STRIPE_SECRET_KEY?: string
     STRIPE_WEBHOOK_SECRET?: string
+    // Shopify Storefront API — with the store domain in [vars] below, this
+    // token is the only source of a customer-visible price and of
+    // per-variant availability (src/lib/commerce/shopify.ts). Unset means no
+    // price and no buy band, whatever COMMERCE_ENABLED says.
+    SHOPIFY_STOREFRONT_TOKEN?: string
 
     // [vars] in wrangler.toml
     PUBLIC_SITE_URL?: string
@@ -28,6 +33,11 @@ declare namespace Cloudflare {
     // only a visitor carrying the preview cookie sees them, and /api/checkout
     // returns 404 for everyone else — see src/lib/commerce/index.ts.
     COMMERCE_ENABLED?: string
+    // The Shopify store, host only — no scheme, no path. A var rather than a
+    // secret on purpose: it is public on any storefront URL, and shipping it
+    // with the code is what keeps it from going missing on a Worker version
+    // while the page renders as if the drop hadn't opened.
+    SHOPIFY_STORE_DOMAIN?: string
   }
 }
 

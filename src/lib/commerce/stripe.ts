@@ -2,22 +2,26 @@ import type {
   CheckoutInput,
   CommerceAdapter,
   Order,
+  Product,
   WebhookEvent,
 } from './types'
 import type { Locale } from '../../i18n/config'
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config'
-import { CATALOGUE, getCatalogueProduct } from '../catalogue'
+import { CATALOGUE } from '../catalogue'
 import { hmacHex, timingSafeEqual } from '../crypto'
 
 /**
  * Stripe via REST + fetch rather than the stripe-node SDK: the SDK needs a
  * custom HTTP client to run on Workers, and we use three endpoints.
  *
- * The catalogue is local and lives in src/lib/catalogue.ts — one SKU does not
+ * Product *copy* is local and lives in src/lib/catalogue.ts — one SKU does not
  * justify a product API round trip, and the site has to render the product
- * while Stripe is still switched off. Move it behind Stripe Products (or
- * Lightspeed) when there is a second product or someone non-technical needs to
- * edit it.
+ * while Stripe is still switched off. The *price* is not: it comes from
+ * Shopify through the `liveProduct` resolver this adapter is constructed
+ * with (see ./index.ts), so the number a line item is charged at is the same
+ * read the page rendered from. Stripe Products is deliberately not in the
+ * picture — a third place a price could live is a third place two of them can
+ * disagree.
  */
 
 const API = 'https://api.stripe.com/v1'
@@ -62,7 +66,18 @@ async function verifyStripeSignature(
   return timingSafeEqual(expectedHex, signature)
 }
 
-export function createStripeAdapter(secretKey: string, webhookSecret?: string): CommerceAdapter {
+/**
+ * Resolves the priced, live product for a slug — `getLiveProduct` in
+ * ./index.ts. Injected rather than imported so this file keeps its single
+ * direction of dependency (index → stripe, never back).
+ */
+type LiveProductResolver = (slug: string, locale: Locale) => Promise<Product | null>
+
+export function createStripeAdapter(
+  secretKey: string,
+  webhookSecret: string | undefined,
+  liveProduct: LiveProductResolver
+): CommerceAdapter {
   async function call<T>(path: string, body?: string): Promise<T> {
     const res = await fetch(`${API}${path}`, {
       method: body ? 'POST' : 'GET',
@@ -80,7 +95,7 @@ export function createStripeAdapter(secretKey: string, webhookSecret?: string): 
     name: 'stripe',
 
     async getProduct(slug, locale) {
-      return getCatalogueProduct(slug, locale)
+      return liveProduct(slug, locale)
     },
 
     async createCheckout(input: CheckoutInput) {
@@ -106,12 +121,24 @@ export function createStripeAdapter(secretKey: string, webhookSecret?: string): 
       }
 
       let subtotal = 0
-      input.lines.forEach((line, i) => {
-        const product = products.find((p) =>
-          p.variants.some((v) => v.id === line.variantId)
-        )
-        const variant = product?.variants.find((v) => v.id === line.variantId)
-        if (!product || !variant) throw new Error(`unknown variant ${line.variantId}`)
+      for (const [i, line] of input.lines.entries()) {
+        // Two lookups on purpose. The catalogue resolves a variant id to the
+        // product that owns it — that's local, and it is what gives us a slug
+        // to ask Shopify about. Everything the customer is actually charged
+        // for (the price, and whether the size is still there to sell) comes
+        // back from that Shopify read, never from the local copy.
+        const copy = products.find((p) => p.variants.some((v) => v.id === line.variantId))
+        if (!copy) throw new Error(`unknown variant ${line.variantId}`)
+
+        const product = await liveProduct(copy.slug, input.locale)
+        if (!product) throw new Error(`no live price for ${copy.id}`)
+
+        const variant = product.variants.find((v) => v.id === line.variantId)
+        if (!variant) throw new Error(`unknown variant ${line.variantId}`)
+        // The band already disables a sold-out size; this is the same answer
+        // enforced where it counts, against inventory read at checkout time
+        // rather than whatever was true when the page rendered.
+        if (!variant.inStock) throw new Error(`variant ${line.variantId} is out of stock`)
 
         subtotal += product.price.amount * line.quantity
         params[`line_items[${i}][quantity]`] = line.quantity
@@ -120,7 +147,7 @@ export function createStripeAdapter(secretKey: string, webhookSecret?: string): 
         params[`line_items[${i}][price_data][product_data][name]`] =
           `${product.name} (${variant.label})`
         params[`line_items[${i}][price_data][tax_behavior]`] = 'exclusive'
-      })
+      }
 
       // Flat national rate, free above a threshold — no calculated/carrier
       // rates. Computed here rather than as two Checkout shipping_options

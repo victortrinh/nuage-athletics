@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { STOREFRONT_STUB_PORT, STOREFRONT_STUB_TOKEN } from './e2e/storefront-stub.ts'
 
 const PORT = 8791
 export const BASE_URL = `http://localhost:${PORT}`
@@ -44,20 +45,32 @@ export default defineConfig({
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
       : undefined,
   },
-  webServer: {
-    // A clean D1 every run: the preview rate-limiter caps at 8 attempts per
-    // 10 minutes (src/lib/db.ts), and every request from `wrangler dev`
-    // shares one clientAddress, so a persisted state directory would lock
-    // the suite out after ~8 local re-runs. Build first — `wrangler dev`
-    // serves the Worker astro build produces, it doesn't build on its own.
-    command: `rm -rf ${PERSIST_DIR} && npm run build && npx wrangler d1 migrations apply nuage-athletics --local --persist-to ${PERSIST_DIR} && npx wrangler dev --local --port ${PORT} --persist-to ${PERSIST_DIR} --var PREVIEW_PASSWORD:${E2E_PREVIEW_PASSWORD} --show-interactive-dev-session=false`,
-    // A cheap static route to poll for readiness; the site is public now,
-    // so any path would do.
-    url: `${BASE_URL}/robots.txt`,
-    timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
-    env: { CI: 'true' },
-  },
+  webServer: [
+    {
+      // Shopify stands between the preview cookie and the buy band now: no
+      // Storefront answer, no price, no band (src/lib/commerce/index.ts). This
+      // serves the one query the adapter sends, so the suite exercises the
+      // real join instead of a bypass. See e2e/storefront-stub.ts.
+      command: 'node e2e/storefront-stub.ts',
+      url: `http://127.0.0.1:${STOREFRONT_STUB_PORT}/`,
+      timeout: 30_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      // A clean D1 every run: the preview rate-limiter caps at 8 attempts per
+      // 10 minutes (src/lib/db.ts), and every request from `wrangler dev`
+      // shares one clientAddress, so a persisted state directory would lock
+      // the suite out after ~8 local re-runs. Build first — `wrangler dev`
+      // serves the Worker astro build produces, it doesn't build on its own.
+      command: `rm -rf ${PERSIST_DIR} && npm run build && npx wrangler d1 migrations apply nuage-athletics --local --persist-to ${PERSIST_DIR} && npx wrangler dev --local --port ${PORT} --persist-to ${PERSIST_DIR} --var PREVIEW_PASSWORD:${E2E_PREVIEW_PASSWORD} --var SHOPIFY_STORE_DOMAIN:127.0.0.1:${STOREFRONT_STUB_PORT} --var SHOPIFY_STOREFRONT_TOKEN:${STOREFRONT_STUB_TOKEN} --show-interactive-dev-session=false`,
+      // A cheap static route to poll for readiness; the site is public now,
+      // so any path would do.
+      url: `${BASE_URL}/robots.txt`,
+      timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+      env: { CI: 'true' },
+    },
+  ],
   projects: [
     {
       name: 'a11y',

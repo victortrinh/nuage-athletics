@@ -9,7 +9,7 @@ fall 2026. Commerce is scaffolded behind an adapter but not wired to any page.
 
 **Stack:** Astro 7 (static output + SSR endpoints) · React islands (shadcn/ui on
 React Aria Components) · Tailwind 4 · Cloudflare Workers · D1 · Resend ·
-Stripe (phase 2)
+Shopify Storefront API (price + availability) · Stripe (phase 2)
 
 ## Non-negotiables
 
@@ -35,13 +35,52 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 
 5. **Nothing under `src/pages` imports Stripe directly.** Commerce goes through
    `CommerceAdapter` (`src/lib/commerce/`). Lightspeed may replace Stripe later;
-   the swap should be one line in `src/lib/commerce/index.ts`. Product data lives
-   in `src/lib/catalogue.ts`, which imports no payment provider — pages read it
-   directly and the Stripe adapter reads it too.
+   the swap should be one line in `src/lib/commerce/index.ts`. Product *copy*
+   lives in `src/lib/catalogue.ts`, which imports no payment provider — pages
+   read it directly, and both adapters read it too. Price and availability are
+   not copy; see 5.5.
 
-5.5 **Never render a price while `COMMERCE_ENABLED` is off.** The number in
-   `catalogue.ts` is a placeholder, and an advertised price is one a Quebec
-   merchant is expected to honour. Set the real one before flipping the flag.
+5.5 **The price comes from Shopify or it does not exist.** `catalogue.ts`
+   holds no price at all — `PLACEHOLDER_PRICE_CENTS` is gone, and putting a
+   number back there is the regression this rule now guards against. An
+   advertised price is one a Quebec merchant is expected to honour, and the
+   only number anyone can honour is the one the Storefront API answers with
+   (`src/lib/commerce/shopify.ts`, joined to the catalogue by SKU, cached
+   ~15s). `getLiveProduct()` (`src/lib/commerce/index.ts`) is the single seam:
+   it returns the priced product or **null**, and null covers every reason
+   there isn't one — commerce off, no preview cookie, Shopify unreachable,
+   SKUs that don't join, a price in the wrong currency. `ProductView.astro`
+   takes that nullable product rather than a `commerceEnabled` boolean, so a
+   Storefront outage renders the pre-drop page (no price, no buy band) and
+   there is no code path that renders a band without a Shopify price behind
+   it. Stripe checkout prices its line items from the same read, so what was
+   rendered and what is charged cannot disagree.
+
+   The cost of that design is that every failure looks like an ordinary
+   pre-drop page. So the two silent ones say so in the Worker log (an
+   unconfigured store, and a read that joined no SKU — the latter names the
+   SKUs it looked for), and `npm run shopify:check` runs the same query and
+   the same join outside the Worker: it tells a refused token from products
+   that aren't published to the token's sales channel from a SKU that doesn't
+   match. Reach for it before assuming the site is broken.
+
+   In a browser the same question is answered by two response headers, which
+   is all the render will tell you: `Cache-Control: private, no-store` means
+   the preview cookie is live (5.6 — nothing else in the codebase sets it),
+   and `X-Storefront: no-domain | no-token | unreachable | no-match` appears
+   only when commerce was on for that request and no price came back — the
+   first two name the binding the serving Worker is missing. `no-token` is
+   the live one: `SHOPIFY_STOREFRONT_TOKEN` is a secret, and
+   `npx wrangler secret list` confirms whether it reached the Worker.
+   `unreachable` carries the refusal with it — `unreachable;status=401` is the
+   token, `;status=404` the domain or a retired API version, `;graphql` a
+   field the token may not read, `;network` a call that never left the
+   machine. `no-domain` should be unreachable now that `SHOPIFY_STORE_DOMAIN` is a
+   `[vars]` entry in `wrangler.toml` — it ships with the code precisely so a
+   deployed version cannot be missing it; seeing it means the entry was
+   removed. The header
+   names a category, never a credential, and the *render* stays identical to
+   launch day — which is what keeps this from widening preview.
 
 5.6 **Preview is per-visitor, so a preview render must never be cached.**
    `commerceEnabled()` (`src/lib/commerce/index.ts`) answers yes either because
@@ -140,6 +179,17 @@ of us to see the real buy flow on the real site before it opens.
   for the sake of its self-contained drag/keyboard/pagination logic, but
   it's a plain child of `ProductStage`, not a second island — `fit` and its
   setter come down as props.
+  A sold-out size is struck through and dimmed (`data-[disabled]` in
+  `ui/radio-group.tsx`), carries "— Épuisé" in its accessible name, and
+  says the same word visibly in a CSS-only tip on hover. Three renderings
+  of one fact, and each is there for someone the others miss: the
+  strikethrough for the glance, the name for a screen reader, the tip for
+  the pointer user the strikethrough leaves guessing. The tip is a plain
+  `group-hover` span, not RAC's Tooltip — overlay machinery would be the
+  largest thing on the client bundle for one non-interactive bubble — and
+  it is absolutely positioned, so the band's fixed height is untouched
+  whether it shows or not. Hover lives on a wrapper because a disabled
+  Radio has `pointer-events-none` and no hover of its own.
   The buy button still redirects straight to Stripe's hosted checkout, same
   as before — there is no cart behind "Ajouter au panier" yet. That's a
   known, deliberate gap in the label, not an oversight.
@@ -303,7 +353,14 @@ npm run test:a11y # Playwright + axe — builds and runs its own wrangler dev
 
 All four must pass. `test:a11y` is slower (it builds, migrates a throwaway local
 D1, and boots `wrangler dev` itself) — run it before claiming an accessibility or
-`src/components/ui/` change is done, not on every unrelated edit.
+`src/components/ui/` change is done, not on every unrelated edit. It also boots
+`e2e/storefront-stub.ts`, a loopback stand-in for the Storefront API: without a
+store to answer, founder preview would render the pre-drop page and every
+assertion about the buy band would fail for the wrong reason. The stub serves
+the real catalogue's SKUs and holds one size back as sold out. The *outage*
+half of that contract is asserted in `test/shopify.test.ts` instead — it's
+process-wide state on a server the parallel suite shares, so faking it in
+Playwright would break every other spec for a cache window.
 
 Pages are **not** prerendered — every route under `src/pages` sets
 `prerender = false`, because Workers serves a prerendered file straight from

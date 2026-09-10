@@ -19,12 +19,24 @@ export const SLUGS: Record<string, Record<Locale, string>> = {
 }
 
 /**
- * Placeholder. This must be set to the real number before COMMERCE_ENABLED is
- * ever flipped to "true" — an advertised price is one a Quebec merchant is
- * expected to honour. Nothing renders it while commerce is off; see
- * `commerceEnabled` in ./commerce/index.ts.
+ * Copy, minus the price.
+ *
+ * There is no price in this file at all — `PLACEHOLDER_PRICE_CENTS` used to
+ * sit here with a note to replace it before the drop, and a placeholder one
+ * edit away from being served as a real number is exactly the failure
+ * non-negotiable 5.5 is about. The price now comes from Shopify and nowhere
+ * else (`./commerce/shopify.ts`), joined to this copy by SKU, so the number
+ * on the product page and the number at checkout cannot disagree.
+ *
+ * Availability is missing for the same reason. Every variant here used to
+ * report `inStock: true` unconditionally, which is a claim this file has no
+ * way to make good on; Shopify's `availableForSale` is the only answer, and
+ * leaving the field off the type means nothing can render the old lie.
  */
-const PLACEHOLDER_PRICE_CENTS = 6500
+export type CatalogueVariant = Omit<ProductVariant, 'inStock'>
+export type CatalogueProduct = Omit<Product, 'price' | 'variants'> & {
+  variants: CatalogueVariant[]
+}
 
 const SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'] as const
 
@@ -54,13 +66,12 @@ const FIT_NAMES: Record<Locale, Record<FitId, string>> = {
  * to resolve a variant from a (fit, size) selection without re-deriving the
  * id scheme in a second file.
  */
-function variants(productId: string, skuBase: string, locale: Locale): ProductVariant[] {
+function variants(productId: string, skuBase: string, locale: Locale): CatalogueVariant[] {
   return FIT_IDS.flatMap((fit) =>
     SIZES.map((size) => ({
       id: `${productId}-${fit}-${size.toLowerCase()}`,
       sku: `${skuBase}-${FIT_SKU[fit]}-${size}`,
       label: `${FIT_NAMES[locale][fit]} · ${size}`,
-      inStock: true,
       options: { fit, size },
     }))
   )
@@ -135,7 +146,7 @@ function allImagePaths(): string[] {
   return FIT_IDS.flatMap((fit) => VIEWS.map((view) => IMAGES[fit][view].src))
 }
 
-export const CATALOGUE: Record<Locale, Product[]> = {
+export const CATALOGUE: Record<Locale, CatalogueProduct[]> = {
   'fr-CA': [
     {
       id: 'ls-01',
@@ -144,7 +155,6 @@ export const CATALOGUE: Record<Locale, Product[]> = {
       name: 'Manches longues 01',
       description:
         'Un chandail à manches longues en laine mérinos et modal, conçu au Québec et fabriqué en Chine.',
-      price: { amount: PLACEHOLDER_PRICE_CENTS, currency: 'CAD' },
       images: allImagePaths(),
       variants: variants('ls-01', 'NA-LS01', 'fr-CA'),
     },
@@ -157,7 +167,6 @@ export const CATALOGUE: Record<Locale, Product[]> = {
       name: 'Long Sleeve 01',
       description:
         'A long sleeve in merino wool and modal, designed in Quebec and made in China.',
-      price: { amount: PLACEHOLDER_PRICE_CENTS, currency: 'CAD' },
       images: allImagePaths(),
       variants: variants('ls-01', 'NA-LS01', 'en-CA'),
     },
@@ -229,11 +238,11 @@ export const EDITORIAL: Record<Locale, Record<string, ProductEditorial>> = {
 /** The single SKU the site is built around today. */
 export const FEATURED_ID = 'ls-01'
 
-export function getCatalogueProduct(slug: string, locale: Locale): Product | null {
+export function getCatalogueProduct(slug: string, locale: Locale): CatalogueProduct | null {
   return CATALOGUE[locale].find((p) => p.slug === slug) ?? null
 }
 
-export function featuredProduct(locale: Locale): Product {
+export function featuredProduct(locale: Locale): CatalogueProduct {
   const product = CATALOGUE[locale].find((p) => p.id === FEATURED_ID)
   if (!product) throw new Error(`featured product ${FEATURED_ID} missing from ${locale} catalogue`)
   return product
@@ -249,8 +258,9 @@ export function editorialFor(id: string, locale: Locale): ProductEditorial {
  * Same formatting `sendOrderConfirmationEmail` (src/lib/email.ts) already
  * does for a receipt — locale-aware via `Intl.NumberFormat`'s own currency
  * symbol/spacing rules (e.g. "65,00 $" vs "$65.00"), rather than a hand-built
- * string. Called server-side only (ProductView.astro), and only behind
- * `commerceEnabled` — see non-negotiable 5.5 in CLAUDE.md.
+ * string. Called server-side only (ProductView.astro), and only ever on a
+ * `Money` that came back from Shopify — this file has no number of its own
+ * to format. See non-negotiable 5.5 in CLAUDE.md.
  */
 export function formatPrice(price: Money, locale: Locale): string {
   return new Intl.NumberFormat(locale, { style: 'currency', currency: price.currency }).format(
