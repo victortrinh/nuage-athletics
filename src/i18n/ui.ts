@@ -18,7 +18,7 @@ import type { Locale } from './config.ts'
  *   - Anything that names a control or is read by a screen reader —
  *     emailLabel, productSizeLabel, productFitLabel,
  *     productGalleryLabel, productImagePosition, productImagePrev,
- *     productImageNext, productChooseSize, productCloseSizes,
+ *     productImageNext, productChooseSize,
  *     skipToContent, switchTo, navMenu, navMenuClose,
  *     navLabel, navFooterLabel, promptClose.
  *     A weather word in an accessible name is a broken accessible name.
@@ -26,15 +26,15 @@ import type { Locale } from './config.ts'
  *     errorEmailSend. Cute is hostile when someone is stuck. Errors that are
  *     only "wait and retry" (errorGeneric, errorRate) carry the voice
  *     instead. (There used to be a "choose a size" error here too —
- *     productSelectSizeError — but the buy band's two-tap design, tapping a
- *     size only ever reveals a confirm step, makes it unreachable, so it
- *     was removed rather than left to rot. See ProductStage.tsx.)
- *   - submitting, successTitle, productAdding: progress and success are
- *     announced through a live region, where being understood on the first
- *     hearing beats charm.
+ *     productSelectSizeError — but the buy band's disabled-until-picked
+ *     button makes it unreachable, so it was removed rather than left to
+ *     rot. See ProductStage.tsx.)
+ *   - submitting, successTitle, productAdding, productAdded: progress and
+ *     success are announced through a live region, where being understood
+ *     on the first hearing beats charm.
  *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
  *     mailUnsub, mailSubject/mailHeading/mailCta, orderCancelled*, privacy,
- *     terms, rights, productOutOfStock, productBuySize.
+ *     terms, precontract, rights, productOutOfStock, productAddToCart.
  *   - dropAnnounceAvailability most of the rest: it is the only place the site
  *     tells a shopper when they can buy, on a page anyone can now reach. A
  *     stated availability date is a representation, so it says a real date
@@ -82,6 +82,7 @@ export type Dict = {
   unsubBody: string
   privacy: string
   terms: string
+  precontract: string
   contact: string
   rights: string
   switchTo: string
@@ -112,12 +113,13 @@ export type Dict = {
   productImagePosition: string
   productImagePrev: string
   productImageNext: string
-  // product buy band (ProductStage.tsx) — the fixed-height "select size /
-  // buy / adding" roller under the carousel
+  // product buy band (ProductStage.tsx) — sizes are always visible; this is
+  // the accessible hint while no size is picked yet, and the add-to-cart
+  // button's three states
   productChooseSize: string
-  productBuySize: string
+  productAddToCart: string
   productAdding: string
-  productCloseSizes: string
+  productAdded: string
   orderConfirmedTitle: string
   orderConfirmedBody: string
   orderCancelledTitle: string
@@ -158,6 +160,7 @@ export const UI: Record<Locale, Dict> = {
     unsubBody: 'Vous ne recevrez plus de courriels de notre part.',
     privacy: 'Confidentialité',
     terms: 'Conditions',
+    precontract: 'Informations précontractuelles',
     contact: 'Contact',
     rights: 'Tous droits réservés.',
     switchTo: 'English',
@@ -186,9 +189,9 @@ export const UI: Record<Locale, Dict> = {
     productImagePrev: 'Image précédente',
     productImageNext: 'Image suivante',
     productChooseSize: 'Choisir une taille',
-    productBuySize: 'Acheter · {size}',
+    productAddToCart: 'Ajouter au panier',
     productAdding: 'Ajout…',
-    productCloseSizes: 'Fermer la sélection de taille',
+    productAdded: 'Ajouté…',
     orderConfirmedTitle: 'Commande confirmée',
     orderConfirmedBody:
       'Merci. Un courriel de confirmation est en route.',
@@ -226,6 +229,7 @@ export const UI: Record<Locale, Dict> = {
     unsubBody: 'You will no longer receive emails from us.',
     privacy: 'Privacy',
     terms: 'Terms',
+    precontract: 'Pre-contract information',
     contact: 'Contact',
     rights: 'All rights reserved.',
     switchTo: 'Français',
@@ -253,9 +257,9 @@ export const UI: Record<Locale, Dict> = {
     productImagePrev: 'Previous image',
     productImageNext: 'Next image',
     productChooseSize: 'Choose a size',
-    productBuySize: 'Buy · {size}',
+    productAddToCart: 'Add to cart',
     productAdding: 'Adding…',
-    productCloseSizes: 'Close size selection',
+    productAdded: 'Added…',
     orderConfirmedTitle: 'Order confirmed',
     orderConfirmedBody: 'Thanks. A confirmation email is on its way.',
     orderCancelledTitle: 'Order cancelled',

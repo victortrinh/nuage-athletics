@@ -1,10 +1,11 @@
 ---
 import ProductStage from './ProductStage.tsx'
-import CpaDisclosure from './CpaDisclosure.astro'
+import ProductDetails from './ProductDetails.astro'
 import { fmt, t } from '../i18n/ui'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { organizationId } from '../lib/brand'
 import { editorialFor, featuredProduct, formatPrice, DEFAULT_FIT } from '../lib/catalogue'
+import { route } from '../i18n/utils'
 
 interface Props {
   locale: Locale
@@ -128,23 +129,24 @@ const jsonLd = {
 
         {/*
           The commerce render puts `mt-5` + a 1.9375rem fit picker + `mt-10` +
-          a 12rem band under the marker row. This block stands in for all of
-          it: `mt-5` matches that first gap, `min-h` reserves the remaining
-          16.4375rem so the column totals the same height either way, and the
-          `pt` drops the heading past where the fit picker would be (1.9375rem
-          + `mt-10`) plus the 0.375rem that centres 1rem of text in slot A's
-          1.75rem box, so the product name lands on slot A exactly. `min-h`
-          rather than a fixed
-          height because the announcement is the one part here that can wrap
-          to a third line on a narrow phone — the band's own slots are fixed
-          because nothing in them can.
+          a 12.53125rem band under the marker row (the band's own name row,
+          price row, size row, button row and pre-contract link, measured
+          top-to-bottom — see ProductStage.tsx). This block stands in for all
+          of it: `mt-5` matches that first gap, `min-h` reserves the
+          remaining 16.96875rem so the column totals the same height either
+          way, and the `pt` drops the heading past where the fit picker would
+          be (1.9375rem + `mt-10`) plus the 0.375rem that centres 1rem of
+          text in the band's own h-7 name box, so the product name lands
+          there exactly. `min-h` rather than a fixed height because the
+          announcement is the one part here that can wrap to a third line on
+          a narrow phone.
         */}
-        <div class="mt-5 min-h-[16.4375rem] pt-[4.8125rem] text-center">
-          {/* Small and mono, matching slot A's treatment in ProductStage's
-              band (the commerce-enabled view of this same heading) rather
-              than the wordmark display face — there's no band here to roll
-              it into, but there's also no reason for the two states of the
-              same page to set the product name at wildly different sizes. */}
+        <div class="mt-5 min-h-[16.96875rem] pt-[4.8125rem] text-center">
+          {/* Small and mono, matching the band's own name row in
+              ProductStage's commerce render, rather than the wordmark
+              display face — there's no band here to roll it into, but
+              there's also no reason for the two states of the same page to
+              set the product name at wildly different sizes. */}
           <h1 class="font-mono text-xs uppercase tracking-label">{product.name}</h1>
 
           {/*
@@ -220,9 +222,13 @@ const jsonLd = {
             fitOptions={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
             variants={product.variants}
             price={formatPrice(product.price, locale)}
-            description={product.description}
-            specs={editorial.specs}
+            precontractHref={route('precontract', locale)}
           />
+          {/* Images are content, not chrome — the carousel needs JS to page
+              through them, but every photo still has to reach a no-JS
+              visitor. The description/spec list needs no <noscript> twin any
+              more: ProductDetails.astro below is server-rendered plain HTML
+              for everyone, not a JS-only panel. */}
           <noscript>
             <div class="mt-3 grid grid-cols-2 gap-3">
               {editorial.fits.flatMap((fit) =>
@@ -239,25 +245,10 @@ const jsonLd = {
                 ))
               )}
             </div>
-            {/* The information panel inside the band is JS-only (it's an
-                `inert`-by-default branch of a Slot, toggled by React state —
-                see product/Slot.tsx), so a no-JS visitor needs its own plain
-                copy — same pattern as the image grid above. */}
-            <div class="mt-6 text-center">
-              <p class="text-base leading-relaxed text-mute">{product.description}</p>
-              <dl class="mt-5">
-                {editorial.specs.map((spec) => (
-                  <div class="flex justify-between gap-6 border-b border-line py-3 text-sm">
-                    <dt class="text-mute">{spec.label}</dt>
-                    <dd class="text-right">{spec.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
           </noscript>
         </div>
 
-        <CpaDisclosure {locale} productName={product.name} />
+        <ProductDetails {locale} {d} description={product.description} specs={editorial.specs} />
       </>
     )
   }
