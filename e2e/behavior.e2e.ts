@@ -351,6 +351,42 @@ test('the "+" toggles aria-expanded, and closing returns focus to it without los
   ).toBeChecked()
 })
 
+/**
+ * The sizes fly in from a converged position via a `--tx` offset per size
+ * (ProductStage.tsx), and that offset has to land back at 0 once the band
+ * is open — it's a starting position, not a permanent displacement. It
+ * shipped as a permanent one, every size sitting up to 2.25rem off its own
+ * grid cell, and nothing caught it: the markup and the accessible names are
+ * identical either way, so only geometry can see it. Asserted as "one row,
+ * in order, inside the group" rather than against exact offsets, which
+ * would just be restating the CSS.
+ */
+test('the size row settles into its grid once open, one row, none of it overhanging', async ({
+  page,
+}) => {
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+  await openBand(page)
+
+  const group = page.getByRole('radiogroup', { name: 'Taille' })
+  const boxes = await group.locator('label').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect()
+      return { left: r.left, right: r.right, top: Math.round(r.top) }
+    })
+  )
+  const groupBox = (await group.boundingBox())!
+
+  expect(boxes).toHaveLength(6)
+  // One row: every size shares a top edge.
+  expect(new Set(boxes.map((b) => b.top)).size).toBe(1)
+  // In order, and none of it hanging off the group's own box. 1px of
+  // tolerance for subpixel layout, and the last cell is allowed a little
+  // slack — "2XL" is wider than its share of six equal columns.
+  for (let i = 1; i < boxes.length; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].left)
+  expect(boxes[0].left).toBeGreaterThanOrEqual(groupBox.x - 1)
+  expect(boxes[5].right).toBeLessThanOrEqual(groupBox.x + groupBox.width + 8)
+})
+
 test('"Détails" discloses the description and spec list in place of the size grid', async ({
   page,
 }) => {

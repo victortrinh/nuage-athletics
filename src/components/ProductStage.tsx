@@ -207,7 +207,7 @@ export default function ProductStage(props: Props) {
           fit={fit}
           fits={fits}
           initialFit={initialFit}
-          belowFrameRem={{ base: 20, sm: 17 }}
+          belowFrameRem={{ base: 18, sm: 18 }}
         />
 
         {/*
@@ -283,7 +283,16 @@ export default function ProductStage(props: Props) {
             </p>
           </Slot>
 
-          <Slot index={slotCIndex} className="mt-4 h-28 w-full sm:h-16">
+          {/*
+            One height at every breakpoint now that the sizes are one row
+            everywhere (they used to wrap to two below `sm:`, so this slot
+            had to be 3rem taller there to hold them). Worth keeping
+            uniform beyond the tidiness: this slot is also what the
+            information panel renders into, and its height was the only
+            thing making the band's own height breakpoint-dependent — which
+            is the number ProductCarousel's `belowFrameRem` has to track.
+          */}
+          <Slot index={slotCIndex} className="mt-4 h-20 w-full">
             <button
               type="button"
               aria-expanded={open}
@@ -301,7 +310,7 @@ export default function ProductStage(props: Props) {
                 aria-label={d.productSizeLabel}
                 value={size}
                 onChange={onSizeChange}
-                className="grid grid-cols-3 place-items-center gap-x-1 gap-y-2 sm:grid-cols-6"
+                className="grid grid-cols-6 place-items-center gap-x-1"
               >
                 {sizesForFit.map((v, i) => (
                   <Radio
@@ -310,7 +319,14 @@ export default function ProductStage(props: Props) {
                     isDisabled={!v.inStock}
                     style={
                       {
-                        '--tx': `${(center - i) * -FLY_OUT_STEP_REM}rem`,
+                        // Settles at 0 once open — the offset is the
+                        // *starting* position the size flies in from, not a
+                        // permanent displacement. Leaving it applied in both
+                        // states (as this did until the sizes moved onto one
+                        // row and it showed up as the outer two overhanging
+                        // the band) means every size sits up to 2.25rem off
+                        // its own grid cell for as long as the band is open.
+                        '--tx': open ? '0rem' : `${(center - i) * -FLY_OUT_STEP_REM}rem`,
                         transitionDelay: open ? `${i * 20}ms` : '0ms',
                       } as CSSProperties
                     }
