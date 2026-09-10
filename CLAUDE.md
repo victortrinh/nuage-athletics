@@ -116,7 +116,15 @@ of us to see the real buy flow on the real site before it opens.
   axis alongside size, not just a photo toggle — 12 variants, fit × size.
   `ProductStage.tsx` is the one island for the whole interactive product
   body: carousel, fit picker, and the fixed-height buy band (name, price,
-  sizes, information) that the redesign put all of that inside. It used to
+  sizes, information) that the redesign put all of that inside. The size
+  row is seven identically sized, unboxed buttons — they stretch to fill
+  their own grid column and carry no background until one is selected
+  (`tight` density in `ui/radio-group.tsx`), so the row reads as lettering
+  rather than seven boxes the width of their own labels. The prev/next
+  carousel arrows sit *beside* the frame, not pinned inside its edges: a
+  2:1 flat-lay in a 2:1 frame leaves no margin for them to land in, so
+  inside they sat on the garment. The room for them is bought from the
+  frame's own width cap from `md:` up, which is where they render at all. It used to
   be two islands — `ProductCarousel.tsx` and `ProductActions.tsx`, in
   separate grid columns, sharing the selected fit through a module-level
   store (`src/lib/fit-store.ts`) because they had no common parent to lift
@@ -204,11 +212,18 @@ defer behind; it stays `client:load`.
   `inputVariants`, `labelVariants`, `fieldErrorVariants` from these directly —
   never from the `.tsx` primitives, which pull in `react-aria-components`.
   `scripts/check-guards.sh` (run by `npm run check`) enforces this.
-- **This site has no radii, ever.** `--radius-*` are all `0` in `global.css`,
-  which handles shadcn's own `rounded-*` classes, but a custom one-off
-  (`rounded-[6px]`, say) would slip past that. `check-guards.sh` also greps for
-  any `rounded` utility inside a `class`/`className` attribute — that's what
-  actually catches it.
+- **This site has no radii, with exactly one exception.** `--radius-*` are all
+  `0` in `global.css` except `--radius-full`, which is Tailwind's own value
+  again so the product carousel's pagination dots can be dots
+  (`ProductCarousel.tsx`) — the reference sets them round, and a 6px square
+  reads as grit. That token is not a general reopening: `check-guards.sh`
+  fails the build on any `rounded` utility in a `class`/`className` attribute
+  *or* in a quoted string in a `.tsx`/`.astro` file (which is how a
+  multi-line `cn()` call carries one), unless the line also carries the
+  marker `guard-allow-rounded`. Exactly one line does today. Adding a second
+  is a design decision that has to be written next to the class and shows up
+  in a diff as one; a circle drawn some other way to dodge the grep is the
+  regression this is here to catch.
 - **Focus is a hard offset outline, not a ring** (the WebGL sky washes soft
   rings out). Defined once as the `focus-block` utility in `global.css`, applied
   to native `:focus-visible` and to RAC's `data-[focus-visible]` attribute

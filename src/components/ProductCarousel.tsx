@@ -16,19 +16,30 @@ interface Props {
   fits: ProductFit[]
   initialFit: FitId
   /**
-   * Everything in the column *below* the frame — pagination row, fit
-   * caption, and whatever the caller puts after this component (the fit
-   * picker and buy band, or just the drop announcement) — hand-measured in
-   * rem at the base and `sm:` breakpoints. See the frame-sizing comment
-   * below for what this drives. The two callers (ProductStage.tsx) pass
-   * very different values: the full band is a lot more chrome than a
-   * one-line announcement, and reusing one constant for both either
-   * shrinks the pre-launch photo for no reason or risks the band falling
-   * off a short screen post-launch — see e2e/mobile-layout.e2e.ts's sticky
-   * header test, which is what caught the first version reusing one value.
+   * Everything in the caller's column that isn't this frame — whatever it
+   * puts after this component (the fit picker and buy band, or just the
+   * drop announcement) plus anything it pads above it — hand-measured in
+   * rem at the base and `sm:` breakpoints. This component's own chrome
+   * (the marker row and the gap above it) is not the caller's to know and
+   * is added below. See the frame-sizing comment for what this drives.
+   * The two callers (ProductStage.tsx) pass very different values: the
+   * full band is a lot more chrome than a one-line announcement, and
+   * reusing one constant for both either shrinks the pre-launch photo for
+   * no reason or risks the band falling off a short screen post-launch —
+   * see e2e/mobile-layout.e2e.ts's sticky header test, which is what
+   * caught the first version reusing one value.
    */
-  belowFrameRem: { base: number; sm: number }
+  chromeRem: { base: number; sm: number }
 }
+
+/**
+ * The part of `--chrome-h` this component owns, per breakpoint: the fixed
+ * 4rem header plus ProductView.astro's 3rem of article padding, plus the
+ * marker row (1.5rem) and the gap above it — `mt-8` at the base width,
+ * `mt-4` from `sm:` up, which is where the two numbers differ. Re-measure
+ * both if either changes.
+ */
+const FRAME_CHROME_REM = { base: 10.5, sm: 9.5 }
 
 /** Distance (px) a pointer must travel horizontally before the gesture counts
  *  as a swipe rather than the start of a vertical page scroll or a stray
@@ -58,7 +69,7 @@ const DRAG_INTENT_PX = 8
  * finger — a fade has nothing to drag. The two fits are still two stacked
  * tracks that crossfade, so the DOM invariant above is unchanged.
  */
-export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRem }: Props) {
+export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }: Props) {
   const [index, setIndex] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const [warm, setWarm] = useState(false)
@@ -205,8 +216,8 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
         onKeyDown relies on React's bubbling, which follows the DOM tree,
         so a marker button has to be a descendant of this div for an arrow
         key pressed on it to ever reach the handler below. The prev/next
-        arrows live inside the frame now (see below) — still descendants,
-        so that still holds for them too.
+        arrows flank the frame (see below) — still descendants, so that
+        still holds for them too.
       */}
       <div
         role="group"
@@ -256,7 +267,12 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
           still centers it correctly even wider than its own containing
           block, via negative margins, same mechanism as any breakout.
           `calc(100vw-3rem)` is the real floor on a narrow phone, where
-          56rem never binds and the column's own width would have; 56rem
+          56rem never binds and the column's own width would have; from
+          `md:` up it tightens to `calc(100vw-10rem)`, which is that same
+          3rem of page margin plus the two 2.75rem arrows and the 0.75rem
+          gaps either side of the frame — they are `hidden` below `md:` and
+          take no room there, so the floor only has to make space for them
+          at the widths where they actually render. 56rem
           is deliberately less than `main`'s 80rem ceiling (Base.astro) —
           wide enough to fill real vertical headroom, not so wide a single
           garment photo reads as mostly empty background.
@@ -282,8 +298,10 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
           to look at.
         */}
         {/*
-          flex + justify-center, not mx-auto, on the frame below: `margin:
-          auto` only centers a box *narrower* than its containing block —
+          flex + justify-center, not mx-auto, on the frame below (which is
+          the middle of this row's three items, the prev/next arrows being
+          the other two): `margin: auto` only centers a box *narrower* than
+          its containing block —
           CSS resolves both auto margins to 0 (left-aligning, not
           centering) the moment the box is wider, which is exactly the
           breakout case above. Flexbox's justify-content doesn't have that
@@ -294,20 +312,48 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
           what keeps it at its full computed width instead of being
           compressed to the flex container's own (narrower) box.
         */}
-        <div className="flex justify-center">
+        <div className="flex items-center justify-center gap-3">
+          {/*
+            The arrows flank the photo rather than sitting in a row under it,
+            matching the reference — but *beside* the frame, not pinned inside
+            its edges. Inside, they sat over the photo itself: `object-contain`
+            only leaves margin when the shot is taller in ratio than the 2:1
+            frame, so on a 2:1 flat-lay the chevron landed on the garment and
+            was, depending on the photo, invisible. Out here they always have
+            paper behind them. That room is bought from the frame's own width
+            cap below (`md:max-w-…calc(100vw-10rem)`), so nothing overflows the
+            column on the narrowest viewport that renders them.
+
+            Siblings of the stage, not children: pointer events on an arrow
+            never reach the stage's drag handlers this way, so a click on one
+            can't also be read as the start of a swipe.
+
+            `hidden md:flex` — on a phone the swipe and the markers below
+            already cover this, and two more controls crowding a small frame
+            buys nothing. Hiding them takes them out of the accessibility tree
+            along with the layout, which is the honest outcome: on that
+            viewport they genuinely aren't there, and nothing is left
+            announcing a control that can't be reached. Arrow keys still page
+            the carousel at every width — that handler is on the group, not on
+            these buttons.
+          */}
+          <button
+            type="button"
+            aria-label={d.productImagePrev}
+            onClick={() => goTo(index - 1)}
+            className="group press hidden size-11 shrink-0 items-center justify-center text-mute hover:text-ink md:flex"
+          >
+            <Chevron dir="left" />
+          </button>
           <div
-            className="relative shrink-0 aspect-[2/1] max-w-[min(56rem,calc(100vw-3rem))] [--chrome-h:var(--chrome-base)] sm:[--chrome-h:var(--chrome-sm)]"
+            className="relative shrink-0 aspect-[2/1] max-w-[min(56rem,calc(100vw-3rem))] md:max-w-[min(56rem,calc(100vw-10rem))] [--chrome-h:var(--chrome-base)] sm:[--chrome-h:var(--chrome-sm)]"
             style={
               {
-                // 9.25rem: header (4rem) + article padding (3rem) + this
-                // frame's own marker row and the gap above it (2.25rem), at
-                // every breakpoint — the part of "everything but the frame"
-                // that's fixed regardless of which caller renders below
-                // `belowFrameRem`. Re-measure it if the marker row changes
-                // size; it dropped from 11.25 when the numbered pagination
-                // became markers and the fit caption under them went away.
-                '--chrome-base': `${belowFrameRem.base + 9.25}rem`,
-                '--chrome-sm': `${belowFrameRem.sm + 9.25}rem`,
+                // The caller's own chrome plus this component's own —
+                // FRAME_CHROME_REM, above, which is where the header, the
+                // article padding and the marker row are accounted for.
+                '--chrome-base': `${chromeRem.base + FRAME_CHROME_REM.base}rem`,
+                '--chrome-sm': `${chromeRem.sm + FRAME_CHROME_REM.sm}rem`,
                 // No numeric ceiling here — the className's max-w is the
                 // only cap, and it's deliberately wider than the column
                 // (above), so a tall window lets the photo grow toward the
@@ -392,60 +438,42 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
                 )
               })}
             </div>
-
-            {/*
-              The arrows flank the photo rather than sitting in a row under
-              it, matching the reference. They're inside the frame (which is
-              the breakout-width box) and pinned to its edges, so they land
-              in the photo's own margins — every shot is object-contain on a
-              wide flat-lay, so there's background there, never garment.
-
-              Siblings of the stage, not children: pointer events on an
-              arrow never reach the stage's drag handlers this way, so a
-              click on one can't also be read as the start of a swipe.
-
-              `hidden md:flex` — on a phone the swipe and the markers below
-              already cover this, and two more controls crowding a small
-              frame buys nothing. Hiding them takes them out of the
-              accessibility tree along with the layout, which is the honest
-              outcome: on that viewport they genuinely aren't there, and
-              nothing is left announcing a control that can't be reached.
-              Arrow keys still page the carousel at every width — that
-              handler is on the group, not on these buttons.
-            */}
-            <button
-              type="button"
-              aria-label={d.productImagePrev}
-              onClick={() => goTo(index - 1)}
-              className="group press absolute left-0 top-1/2 z-10 hidden size-11 -translate-y-1/2 items-center justify-center text-mute hover:text-ink md:flex"
-            >
-              <Chevron dir="left" />
-            </button>
-            <button
-              type="button"
-              aria-label={d.productImageNext}
-              onClick={() => goTo(index + 1)}
-              className="group press absolute right-0 top-1/2 z-10 hidden size-11 -translate-y-1/2 items-center justify-center text-mute hover:text-ink md:flex"
-            >
-              <Chevron dir="right" />
-            </button>
           </div>
+          <button
+            type="button"
+            aria-label={d.productImageNext}
+            onClick={() => goTo(index + 1)}
+            className="group press hidden size-11 shrink-0 items-center justify-center text-mute hover:text-ink md:flex"
+          >
+            <Chevron dir="right" />
+          </button>
         </div>
 
         {/*
           Markers, not numbers — the reference's own device, and with two
           photos per fit a numbered row was reading as more machinery than
-          the thing deserves. Square, not round: `rounded-full` is exactly
-          what CLAUDE.md's no-radii rule (and check-guards.sh) rules out,
-          and a circle drawn some other way to dodge the grep would be the
-          same regression the Chevron's square caps below exist to avoid.
+          the thing deserves. Round, and the one deliberate exception to the
+          no-radii rule the rest of the site is built on: these read as dots
+          on the reference, a 6px square reads as a speck of grit, and every
+          other way of drawing a circle here would be the same exception
+          taken quietly instead — the sanctioned form is `rounded-full` with
+          a `guard-allow-rounded` marker check-guards.sh honours. `rounded`
+          anywhere else still fails the build, and the Chevron's square caps
+          below stay square: the exception is these dots, not a change of
+          mind about radii.
 
-          The visible mark is 6px; the button around it is 24px so the tap
-          target isn't. The accessible name is unchanged from the numbered
-          version ("Image 1 de 2") — a marker with no name is the usual way
-          this pattern gets shipped broken.
+          The visible mark is 8px and the row is gapless, so the dots sit as
+          one cluster rather than a spaced-out row; the button around each is
+          still 24px, so the tap target isn't 8px. The row also sits further
+          below the photo on a phone (`mt-8`) than from `sm:` up (`mt-4`) —
+          air the band under it would otherwise trail as slack, see the pad
+          note in ProductStage. Both numbers are in FRAME_CHROME_REM above.
+
+          The accessible name is unchanged from the numbered version
+          ("Image 1 de 2") — a marker with no name is the usual way this
+          pattern gets shipped broken.
         */}
-        <div className="mt-3 flex items-center justify-center gap-1">
+        <div className="mt-8 flex items-center justify-center gap-0 sm:mt-4">
           {activeFit.gallery.map((_, i) => (
             <button
               key={i}
@@ -468,7 +496,7 @@ export default function ProductCarousel({ d, fit, fits, initialFit, belowFrameRe
               <span
                 aria-hidden="true"
                 className={cn(
-                  'block size-1.5',
+                  'block size-2 rounded-full', // guard-allow-rounded: the markers are dots, see above
                   i === index
                     ? 'bg-ink forced-colors:bg-[Highlight]'
                     : 'bg-mute group-hover:bg-ink forced-colors:bg-[GrayText]'
