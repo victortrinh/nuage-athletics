@@ -49,7 +49,10 @@ Without `SHOPIFY_STORE_DOMAIN` / `SHOPIFY_STOREFRONT_TOKEN` there is no price
 and no buy band, founder preview included: the product page's price and
 sold-out states come from the Shopify Storefront API and nowhere else. Point
 them at a development store whose variant SKUs match `src/lib/catalogue.ts` —
-the SKU is the join key.
+the SKU is the join key. `npm run shopify:check` runs that read and prints why
+there is or isn't a price: it catches a refused token, products not published
+to the token's sales channel, and SKUs that don't match, all of which otherwise
+render as an ordinary pre-drop page.
 
 ## Deploy
 
@@ -74,6 +77,7 @@ Then point DNS at the Worker. **Adding the web records does not touch MX** —
 | `npm run build` | production build |
 | `npm run db:subscribers` | subscriber counts by status + recent rows from remote D1 (`-- --local`, `--status`, `--csv <path outside the repo>`) |
 | `npm run broadcast` | send a one-off email to confirmed subscribers (`-- <file> --dry-run` first, `--local` to test against local D1) |
+| `npm run shopify:check` | ask the Storefront API what the site asks it, and print why the product page has a price or hasn't |
 | `npm run email:preview` | render every outbound email to `tmp/email-preview/` for eyeballing, no Resend account needed |
 | `npm run email:wordmark` | regenerate `public/img/wordmark-email.png` from `public/logo-nuage.svg` |
 

@@ -56,6 +56,14 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    it. Stripe checkout prices its line items from the same read, so what was
    rendered and what is charged cannot disagree.
 
+   The cost of that design is that every failure looks like an ordinary
+   pre-drop page. So the two silent ones say so in the Worker log (an
+   unconfigured store, and a read that joined no SKU — the latter names the
+   SKUs it looked for), and `npm run shopify:check` runs the same query and
+   the same join outside the Worker: it tells a refused token from products
+   that aren't published to the token's sales channel from a SKU that doesn't
+   match. Reach for it before assuming the site is broken.
+
 5.6 **Preview is per-visitor, so a preview render must never be cached.**
    `commerceEnabled()` (`src/lib/commerce/index.ts`) answers yes either because
    `COMMERCE_ENABLED` is on for everyone or because this one visitor carries the

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getLiveProduct } from '../src/lib/commerce/index'
-import { parsePriceToCents, resetStorefrontCache } from '../src/lib/commerce/shopify'
+import { normalizeDomain, parsePriceToCents, resetStorefrontCache } from '../src/lib/commerce/shopify'
 import { featuredProduct } from '../src/lib/catalogue'
 
 /**
@@ -69,7 +69,31 @@ describe('parsePriceToCents', () => {
   })
 })
 
+describe('normalizeDomain', () => {
+  it('takes the host out of whatever was pasted into the secret', () => {
+    expect(normalizeDomain('nuage.myshopify.com')).toBe('nuage.myshopify.com')
+    expect(normalizeDomain(' nuage.myshopify.com ')).toBe('nuage.myshopify.com')
+    expect(normalizeDomain('https://nuage.myshopify.com')).toBe('nuage.myshopify.com')
+    expect(normalizeDomain('https://nuage.myshopify.com/admin/products')).toBe(
+      'nuage.myshopify.com'
+    )
+  })
+})
+
 describe('getLiveProduct', () => {
+  it('still reaches the store when the domain was pasted as a URL', async () => {
+    const calls = stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku))))
+
+    const product = await getLiveProduct(
+      { ...ENV, SHOPIFY_STORE_DOMAIN: `https://${ENV.SHOPIFY_STORE_DOMAIN}/` },
+      SLUG,
+      'fr-CA'
+    )
+
+    expect(product?.price.amount).toBe(6500)
+    expect(calls[0].url).toBe(`https://${ENV.SHOPIFY_STORE_DOMAIN}/api/2026-01/graphql.json`)
+  })
+
   it('prices the catalogue product from Shopify, joined by SKU', async () => {
     stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku, '72.50'))))
 

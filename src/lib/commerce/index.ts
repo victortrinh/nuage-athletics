@@ -33,7 +33,15 @@ export async function getLiveProduct(
 ): Promise<Product | null> {
   const domain = env.SHOPIFY_STORE_DOMAIN
   const token = env.SHOPIFY_STOREFRONT_TOKEN
-  if (!domain || !token) return null
+  if (!domain || !token) {
+    // Said out loud for the same reason the no-join case below is: an
+    // unconfigured store renders exactly like a pre-drop page, so without
+    // this the only symptom is a buy band that never appears.
+    console.error(
+      `storefront: not configured (${!domain ? 'SHOPIFY_STORE_DOMAIN' : 'SHOPIFY_STOREFRONT_TOKEN'} unset) — no price will render`
+    )
+    return null
+  }
 
   try {
     return await createShopifyStorefront({ domain, token }).getProduct(slug, locale)

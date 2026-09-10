@@ -1,5 +1,7 @@
 import type { Locale } from '../../i18n/config'
-import { getCatalogueProduct } from '../catalogue'
+// Explicit extension: scripts/shopify-check.ts imports this file under plain
+// node, which resolves nothing for you.
+import { getCatalogueProduct } from '../catalogue.ts'
 import type { Money, Product, ProductVariant } from './types'
 
 /**
@@ -102,8 +104,20 @@ export interface StorefrontConfig {
  * bearer credential.
  */
 function endpoint(domain: string): string {
-  const loopback = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(domain)
-  return `${loopback ? 'http' : 'https'}://${domain}/api/${API_VERSION}/graphql.json`
+  const host = normalizeDomain(domain)
+  const loopback = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)
+  return `${loopback ? 'http' : 'https'}://${host}/api/${API_VERSION}/graphql.json`
+}
+
+/**
+ * `SHOPIFY_STORE_DOMAIN` is a host — "nuage-athletics.myshopify.com" — but it
+ * is set by hand as a secret, and pasting the URL it came from is the obvious
+ * slip. Left alone that builds `https://https://…`, which fails open like any
+ * other outage: silently, for fifteen seconds at a time, with no price. Take
+ * the host out of whatever was pasted instead.
+ */
+export function normalizeDomain(domain: string): string {
+  return domain.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '')
 }
 
 /**
@@ -232,9 +246,24 @@ export function createShopifyStorefront(config: StorefrontConfig): StorefrontSou
         .filter((amount): amount is number => amount !== undefined)
 
       // Nothing joined: the store is up but doesn't carry this product yet
-      // (or the SKUs drifted). Fail open — no price, no buy panel — rather
-      // than render a product page with a blank price.
-      if (prices.length === 0) return null
+      // (or the SKUs drifted, or the products aren't published to the sales
+      // channel this token reads). Fail open — no price, no buy panel —
+      // rather than render a product page with a blank price.
+      //
+      // Logged, because this is the one failure that looks identical to
+      // "commerce is simply off" from the outside: the page renders exactly
+      // as it did the week before and nothing says why. Names the SKUs asked
+      // for and how many the store answered with, which is enough to tell an
+      // empty sales channel from a SKU typo. `npm run shopify:check` runs the
+      // same join outside the Worker and prints the same answer.
+      if (prices.length === 0) {
+        console.error(
+          `storefront: no SKU of ${copy.id} matched the store — ` +
+            `looked for ${copy.variants.map((v) => v.sku).join(', ')}; ` +
+            `the store returned ${inventory.size} priced CAD variant(s)`
+        )
+        return null
+      }
 
       // One `Product`, one price. Per-variant pricing would need the band to
       // reprice as the size changes, which it isn't built to do, so a store
