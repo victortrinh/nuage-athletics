@@ -266,3 +266,43 @@ test('the sky fallback is a drawn sky, not a flat white field', async ({ page })
   // retouched, while still failing if it collapses back to a single ellipse.
   expect(image.match(/gradient\(/g)?.length ?? 0).toBeGreaterThanOrEqual(4)
 })
+
+/**
+ * Regression test for the flat grey band that used to sit across the bottom
+ * of the page on iOS Safari.
+ *
+ * The canvas is `absolute inset-0 h-full w-full` inside Sky.astro's fixed
+ * layer, but OGL's renderer.setSize() also writes an inline pixel width and
+ * height onto the element, and the engine feeds it window.innerHeight — the
+ * visual viewport, which on iOS excludes the URL bar, while the fixed layer
+ * it lives in is the large viewport. The canvas therefore ended ~60-90px
+ * short of its own layer, and the static sky-fallback showed through
+ * underneath it as a hard-edged strip.
+ *
+ * Chromium has no URL bar to collapse, so the resize is driven directly, at
+ * a height-only delta deliberately smaller than the engine's
+ * TOOLBAR_RESIZE_SLOP (120px): under that threshold the engine keeps its
+ * render targets and relies on the CSS box following the viewport by itself,
+ * which is precisely what the inline pin prevented.
+ */
+test('the sky canvas keeps covering its layer when the viewport grows', async ({ page }) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  const canvas = page.locator('.sky-canvas')
+  await expect(canvas).toHaveCSS('opacity', '1', { timeout: 15_000 })
+
+  const viewport = page.viewportSize()!
+  await page.setViewportSize({ width: viewport.width, height: viewport.height + 60 })
+
+  // Polled rather than read once: the engine's resize handler is debounced
+  // by 150ms, and the canvas has to cover its layer both before that runs
+  // (the sub-threshold path, which never touches the canvas again) and
+  // after.
+  await expect
+    .poll(async () => {
+      const box = await canvas.boundingBox()
+      const layer = await page.locator('.sky-fallback').boundingBox()
+      return box && layer ? Math.round(layer.height - box.height) : null
+    })
+    .toBe(0)
+})
