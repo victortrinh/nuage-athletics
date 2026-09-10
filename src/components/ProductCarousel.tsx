@@ -462,9 +462,10 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
           below stay square: the exception is these dots, not a change of
           mind about radii.
 
-          The visible mark is 8px and the row is gapless, so the dots sit as
+          The visible mark is 6px and the row is gapless, so the dots sit as
           one cluster rather than a spaced-out row; the button around each is
-          still 24px, so the tap target isn't 8px. The row also sits further
+          16px, close enough to the mark that the tap target doesn't read as
+          its own gap between dots. The row also sits further
           below the photo on a phone (`mt-8`) than from `sm:` up (`mt-4`) —
           air the band under it would otherwise trail as slack, see the pad
           note in ProductStage. Both numbers are in FRAME_CHROME_REM above.
@@ -485,7 +486,7 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
               aria-label={fmt(d.productImagePosition, { n: i + 1, total })}
               aria-current={i === index ? 'true' : undefined}
               onClick={() => goTo(i)}
-              className="press group flex size-6 items-center justify-center"
+              className="press group flex size-4 items-center justify-center"
             >
               {/* `bg-mute`, not `bg-line`, for the inactive marker: the
                   hairline colour is meant for rules against paper and
@@ -496,7 +497,7 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
               <span
                 aria-hidden="true"
                 className={cn(
-                  'block size-2 rounded-full', // guard-allow-rounded: the markers are dots, see above
+                  'block size-1.5 rounded-full', // guard-allow-rounded: the markers are dots, see above
                   i === index
                     ? 'bg-ink forced-colors:bg-[Highlight]'
                     : 'bg-mute group-hover:bg-ink forced-colors:bg-[GrayText]'

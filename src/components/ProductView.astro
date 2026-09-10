@@ -117,7 +117,12 @@ const jsonLd = {
           </div>
         </noscript>
 
-        <h1 class="wordmark mt-6 text-center text-3xl leading-none sm:text-4xl">{product.name}</h1>
+        {/* Small and mono, matching slot A's treatment in ProductStage's
+            band (the commerce-enabled view of this same heading) rather
+            than the wordmark display face — there's no band here to roll
+            it into, but there's also no reason for the two states of the
+            same page to set the product name at wildly different sizes. */}
+        <h1 class="mt-6 text-center font-mono text-xs uppercase tracking-label">{product.name}</h1>
 
         {/*
           The drop announcement — what a visitor gets instead of a buy band,
