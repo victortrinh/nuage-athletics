@@ -44,7 +44,7 @@ export interface RadioProps extends AriaRadioProps {
    *   rather than seven boxes the width of their own text. For a row that
    *   has to fit across a phone: it's the primary control, so shrinking
    *   the text or the 44px-tall tap target to buy the width would be the
-   *   wrong trade. It does carry 4px of its own left padding (`pl-1`) —
+   *   wrong trade. It does carry 2px of its own left padding (`pl-0.5`) —
    *   see the branch below.
    *
    * A prop rather than something the caller passes through `className`:
@@ -76,14 +76,14 @@ export function Radio({ className, density, ...props }: RadioProps) {
           density === 'compact' && 'flex items-center justify-center px-2 py-2 text-center text-[10px]',
           // min-h-11 + centring rather than more `py-`: padding alone left
           // this at 40px, and it's the primary control on the page. `w-full`
-          // and no `px-` beyond `pl-1`: the width comes from the grid cell,
-          // which is what makes every size the same size. `pl-1` is a 4px
-          // nudge, not a `px-1` pair — the label is still `justify-center`,
+          // and no `px-` beyond `pl-0.5`: the width comes from the grid cell,
+          // which is what makes every size the same size. `pl-0.5` is a 2px
+          // nudge, not a `px-0.5` pair — the label is still `justify-center`,
           // so adding it to both sides would cancel out; this shifts the
-          // centred lettering 2px right instead of indenting it from a
+          // centred lettering 1px right instead of indenting it from a
           // left edge.
           density === 'tight' &&
-            'flex min-h-11 w-full items-center justify-center py-3 pl-1 text-xs',
+            'flex min-h-11 w-full items-center justify-center py-3 pl-0.5 text-xs',
           !density && 'px-3 py-3 text-xs',
           'hover:bg-ink hover:text-paper',
           'data-[selected]:bg-ink data-[selected]:text-paper',
