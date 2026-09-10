@@ -80,7 +80,16 @@ const jsonLd = {
 <article class="mx-auto max-w-[34rem] py-8 lg:py-12">
   {
     !commerceEnabled ? (
-      <>
+      /*
+        Same reserved screenful and same centring as the commerce branch
+        below, and the block under the carousel reserves the same height the
+        fit picker and buy band occupy there. Together with the shared
+        CHROME_REM in ProductStage.tsx, that makes the two renders identical
+        from the top of the page down through the marker row: turning founder
+        preview on reveals the buy flow without the photograph moving, which
+        is the only way previewing it tells you what launch day looks like.
+      */
+      <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col justify-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
         {/* Pre-drop: carousel, the plain product-name heading, and the
             announcement — nothing else. Once commerce is on, this same
             heading moves inside ProductStage's band (slot A's collapsed
@@ -117,31 +126,46 @@ const jsonLd = {
           </div>
         </noscript>
 
-        {/* Small and mono, matching slot A's treatment in ProductStage's
-            band (the commerce-enabled view of this same heading) rather
-            than the wordmark display face — there's no band here to roll
-            it into, but there's also no reason for the two states of the
-            same page to set the product name at wildly different sizes. */}
-        <h1 class="mt-6 text-center font-mono text-xs uppercase tracking-label">{product.name}</h1>
-
         {/*
-          The drop announcement — what a visitor gets instead of a buy band,
-          and what replaced the pre-launch password screen as the answer to
-          "what is this site for right now".
-
-          It is the availability statement, so the old bordered "coming
-          soon" badge went with it: a badge saying the drop is ahead sitting
-          above a line naming the season is the same sentence twice.
-          Monospace, uppercase and tracked out, set apart from the editorial
-          copy below — this is a notice, not prose, and it should read as
-          one at a glance.
+          The commerce render puts `mt-5` + a 1.9375rem fit picker + `mt-10` +
+          a 12rem band under the marker row. This block stands in for all of
+          it: `mt-5` matches that first gap, `min-h` reserves the remaining
+          16.4375rem so the column totals the same height either way, and the
+          `pt` drops the heading past where the fit picker would be (1.9375rem
+          + `mt-10`) plus the 0.375rem that centres 1rem of text in slot A's
+          1.75rem box, so the product name lands on slot A exactly. `min-h`
+          rather than a fixed
+          height because the announcement is the one part here that can wrap
+          to a third line on a narrow phone — the band's own slots are fixed
+          because nothing in them can.
         */}
-        <p class="mt-6 text-center font-mono text-xs uppercase leading-loose tracking-label">
-          {fmt(d.dropAnnounceProduct, { product: product.name })}
-          <br />
-          {d.dropAnnounceAvailability}
-        </p>
-      </>
+        <div class="mt-5 min-h-[16.4375rem] pt-[4.8125rem] text-center">
+          {/* Small and mono, matching slot A's treatment in ProductStage's
+              band (the commerce-enabled view of this same heading) rather
+              than the wordmark display face — there's no band here to roll
+              it into, but there's also no reason for the two states of the
+              same page to set the product name at wildly different sizes. */}
+          <h1 class="font-mono text-xs uppercase tracking-label">{product.name}</h1>
+
+          {/*
+            The drop announcement — what a visitor gets instead of a buy band,
+            and what replaced the pre-launch password screen as the answer to
+            "what is this site for right now".
+
+            It is the availability statement, so the old bordered "coming
+            soon" badge went with it: a badge saying the drop is ahead sitting
+            above a line naming the season is the same sentence twice.
+            Monospace, uppercase and tracked out, set apart from the editorial
+            copy below — this is a notice, not prose, and it should read as
+            one at a glance.
+          */}
+          <p class="mt-6 font-mono text-xs uppercase leading-loose tracking-label">
+            {fmt(d.dropAnnounceProduct, { product: product.name })}
+            <br />
+            {d.dropAnnounceAvailability}
+          </p>
+        </div>
+      </div>
     ) : (
       <>
         {/*
