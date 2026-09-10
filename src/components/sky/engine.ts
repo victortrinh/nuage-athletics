@@ -297,6 +297,22 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
     width = w
     height = h
     renderer.setSize(width, height)
+    // OGL's setSize does not only size the drawing buffer — it also pins the
+    // element's CSS box to those exact pixels, inline. That is wrong for this
+    // canvas twice over. `height` comes from window.innerHeight, the *visual*
+    // viewport, which on iOS Safari excludes the URL bar, while the canvas's
+    // containing block is Sky.astro's `fixed inset-0` layer, which is the
+    // *large* viewport — toolbar included. So the pinned canvas sat 60-90px
+    // short of its own layer, and the static sky-fallback underneath showed
+    // through as a flat band across the bottom of the page. The pin is also
+    // what kept TOOLBAR_RESIZE_SLOP above from doing what it says: a
+    // sub-threshold change can only be "absorbed into the existing CSS box"
+    // if that box is free to follow the viewport. Clearing the inline size
+    // hands sizing back to the element's own h-full/w-full — the buffer stays
+    // exactly as allocated here, stretched over whatever the layer measures
+    // in every toolbar state.
+    canvas.style.width = ''
+    canvas.style.height = ''
     allocateTargets()
   }
   resize()
