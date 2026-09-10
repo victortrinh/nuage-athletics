@@ -238,10 +238,51 @@ export default function ProductStage(props: Props) {
             className="mt-4 grid w-full grid-cols-7 gap-x-0.5"
           >
             {sizesForFit.map((v) => (
-              <Radio key={v.id} value={v.options?.size ?? v.id} isDisabled={!v.inStock} density="tight">
-                {v.options?.size ?? v.label}
-                {!v.inStock && <span className="sr-only"> — {d.productOutOfStock}</span>}
-              </Radio>
+              /*
+                The wrapper exists for the sold-out tip below, and it holds
+                the grid cell the Radio used to hold directly — hence
+                `flex`, so the Radio's own `w-full`/`min-h-11` still fill
+                the cell and every size stays the same size.
+
+                Hover on the wrapper rather than the control: a disabled
+                Radio carries `pointer-events-none` (radio-group.tsx), so it
+                has no hover of its own. Pointer events pass through it to
+                this parent, which is what makes `group-hover` fire over a
+                control that can't be interacted with.
+              */
+              <span key={v.id} className="group relative flex">
+                <Radio value={v.options?.size ?? v.id} isDisabled={!v.inStock} density="tight">
+                  {v.options?.size ?? v.label}
+                  {/*
+                    The accessible half, and it stays: a screen reader gets
+                    "XXL — Épuisé" from the control's own name, which is
+                    information a hover can't carry to someone who never
+                    hovers.
+                  */}
+                  {!v.inStock && <span className="sr-only"> — {d.productOutOfStock}</span>}
+                </Radio>
+                {/*
+                  And the visible half, for the pointer user the strikethrough
+                  leaves guessing. `aria-hidden` because the name above
+                  already says it — announced twice, it reads as two facts.
+
+                  CSS only, no RAC Tooltip: this is one non-interactive
+                  bubble on one control, and the overlay machinery would be
+                  the largest thing added to the bundle on this branch
+                  (scripts/check-bundle.sh) to say a word the markup already
+                  contains. Absolutely positioned, so the band's fixed
+                  height — the thing the whole layout is built around — is
+                  untouched whether it shows or not.
+                */}
+                {!v.inStock && (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap bg-ink px-1.5 py-1 font-mono text-[10px] uppercase leading-none tracking-label text-paper opacity-0 group-hover:opacity-100 motion-safe:transition-opacity forced-colors:border forced-colors:border-[CanvasText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
+                  >
+                    {d.productOutOfStock}
+                  </span>
+                )}
+              </span>
             ))}
           </RadioGroup>
 

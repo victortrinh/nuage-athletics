@@ -179,6 +179,17 @@ of us to see the real buy flow on the real site before it opens.
   for the sake of its self-contained drag/keyboard/pagination logic, but
   it's a plain child of `ProductStage`, not a second island — `fit` and its
   setter come down as props.
+  A sold-out size is struck through and dimmed (`data-[disabled]` in
+  `ui/radio-group.tsx`), carries "— Épuisé" in its accessible name, and
+  says the same word visibly in a CSS-only tip on hover. Three renderings
+  of one fact, and each is there for someone the others miss: the
+  strikethrough for the glance, the name for a screen reader, the tip for
+  the pointer user the strikethrough leaves guessing. The tip is a plain
+  `group-hover` span, not RAC's Tooltip — overlay machinery would be the
+  largest thing on the client bundle for one non-interactive bubble — and
+  it is absolutely positioned, so the band's fixed height is untouched
+  whether it shows or not. Hover lives on a wrapper because a disabled
+  Radio has `pointer-events-none` and no hover of its own.
   The buy button still redirects straight to Stripe's hosted checkout, same
   as before — there is no cart behind "Ajouter au panier" yet. That's a
   known, deliberate gap in the label, not an oversight.

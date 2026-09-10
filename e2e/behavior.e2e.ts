@@ -764,6 +764,43 @@ test.describe('founder preview', () => {
     await context.close()
   })
 
+  /**
+   * The strikethrough on a sold-out size says *something* happened; it does
+   * not say what. A screen reader has had the word all along (it is in the
+   * control's own name, asserted above), so this is the pointer user's half
+   * of the same fact — and it must not cost the band its fixed height, which
+   * is why the tip is positioned out of flow.
+   */
+  test('a sold-out size explains itself on hover, without moving the band', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
+    const page = await context.newPage()
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    const soldOut = page.getByRole('radio', { name: new RegExp(`^${SOLD_OUT.size}\\b`) })
+    const cell = soldOut.locator('xpath=ancestor::span[contains(@class, "group")][1]')
+    const tip = cell.locator('[aria-hidden="true"]')
+
+    // Present but unshown — and hidden by opacity, not by `display`, so
+    // there is nothing to lay out when it appears.
+    await expect(tip).toHaveText('Épuisé')
+    await expect(tip).toHaveCSS('opacity', '0')
+
+    const before = await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).boundingBox()
+    await cell.hover()
+    await expect(tip).toHaveCSS('opacity', '1')
+    const after = await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).boundingBox()
+
+    expect(after).toEqual(before)
+
+    // A size that is in stock has nothing to explain.
+    const inStock = page
+      .getByRole('radio', { name: 'XL', exact: true })
+      .locator('xpath=ancestor::span[contains(@class, "group")][1]')
+    await expect(inStock.locator('[aria-hidden="true"]')).toHaveCount(0)
+
+    await context.close()
+  })
+
   test('a wrong secret is refused', async ({ page }) => {
     const response = await page.goto(`${ROUTES.home['fr-CA']}?preview=not-the-password`)
     expect(response?.status()).toBe(404)
