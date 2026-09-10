@@ -19,7 +19,11 @@ import { ROUTES } from '../src/i18n/utils'
  * only that the header stays sticky, see-through, and stacked above
  * scrolled content. The cap needs on-device verification on an actual
  * notched iPhone: the status-bar band should stay solid paper with no page
- * content visible behind the glyphs, in both portrait and landscape.
+ * content visible behind the glyphs, in both portrait and landscape. The
+ * page's opposite edge — body's env(safe-area-inset-bottom) padding, which
+ * keeps the footer's last line clear of the home indicator once Safari's
+ * bottom toolbar minimises — is unverifiable here for the same reason and
+ * belongs to the same on-device pass.
  *
  * Runs against /conditions/, not the home page: the header itself (Base.astro)
  * is identical everywhere, but this test needs a route tall enough to
