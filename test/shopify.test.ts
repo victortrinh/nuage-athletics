@@ -150,9 +150,12 @@ describe('getLiveProduct', () => {
   it('fails open when the Storefront API errors', async () => {
     stubStorefront(() => new Response('upstream is having a day', { status: 503 }))
 
+    // The status rides along: a refused token and a wrong domain are the same
+    // category and completely different fixes.
     expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
       product: null,
       reason: 'unreachable',
+      detail: 'status=503',
     })
   })
 
@@ -168,6 +171,7 @@ describe('getLiveProduct', () => {
     expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
       product: null,
       reason: 'unreachable',
+      detail: 'graphql',
     })
   })
 
@@ -199,6 +203,19 @@ describe('getLiveProduct', () => {
     expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
       product: null,
       reason: 'unreachable',
+      detail: 'price-disagreement',
+    })
+  })
+
+  it('names a call that never left the machine as such', async () => {
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('fetch failed')
+    })
+
+    expect(await getLiveProduct(ENV, SLUG, 'fr-CA')).toEqual({
+      product: null,
+      reason: 'unreachable',
+      detail: 'network',
     })
   })
 

@@ -82,6 +82,26 @@ interface InventoryResponse {
   errors?: { message?: string }[]
 }
 
+/**
+ * A refusal, carrying the status that says which refusal it was.
+ *
+ * 401/403 is the token (wrong store, wrong kind of token, missing scope),
+ * 404 is the domain or an API version that no longer exists, 402/423 is the
+ * store itself being frozen or locked, and a GraphQL error at 200 is usually
+ * a field the token may not read. Those are four different fixes, so the
+ * status travels with the failure instead of being flattened into "the
+ * Storefront call failed" at the point where someone reads it.
+ */
+export class StorefrontError extends Error {
+  constructor(
+    message: string,
+    readonly detail: string
+  ) {
+    super(message)
+    this.name = 'StorefrontError'
+  }
+}
+
 /** What Shopify knows about one SKU. */
 interface LiveVariant {
   price: Money
@@ -148,13 +168,21 @@ async function fetchInventory(config: StorefrontConfig): Promise<Inventory> {
       variables: { products: MAX_PRODUCTS, variants: MAX_VARIANTS },
     }),
   })
-  if (!res.ok) throw new Error(`shopify storefront ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    throw new StorefrontError(
+      `shopify storefront ${res.status}: ${await res.text()}`,
+      `status=${res.status}`
+    )
+  }
 
   const body = (await res.json()) as InventoryResponse
   // GraphQL answers 200 with an `errors` array. Treating that as success is
   // how a partial response turns into a missing price rendered as a real one.
   if (body.errors?.length) {
-    throw new Error(`shopify storefront: ${body.errors.map((e) => e.message).join('; ')}`)
+    throw new StorefrontError(
+      `shopify storefront: ${body.errors.map((e) => e.message).join('; ')}`,
+      'graphql'
+    )
   }
 
   const inventory: Inventory = new Map()
@@ -270,7 +298,10 @@ export function createShopifyStorefront(config: StorefrontConfig): StorefrontSou
       // that prices XXL differently is refused rather than quoted at the
       // wrong number for one of them.
       if (prices.some((amount) => amount !== prices[0])) {
-        throw new Error(`shopify storefront: variants of ${copy.id} disagree on price`)
+        throw new StorefrontError(
+          `shopify storefront: variants of ${copy.id} disagree on price`,
+          'price-disagreement'
+        )
       }
 
       return { ...copy, price: { amount: prices[0], currency: 'CAD' }, variants }

@@ -1,6 +1,6 @@
 import type { Locale } from '../../i18n/config'
 import { previewActive } from '../preview'
-import { createShopifyStorefront } from './shopify'
+import { createShopifyStorefront, StorefrontError } from './shopify'
 import { createStripeAdapter } from './stripe'
 import type { CommerceAdapter, Product } from './types'
 
@@ -48,6 +48,12 @@ export type StorefrontReason =
 export interface LiveProduct {
   product: Product | null
   reason: StorefrontReason
+  /**
+   * What kind of `unreachable` — `status=401`, `graphql`, `network`. A
+   * refused token and a wrong domain are the same category and different
+   * fixes, and this is the difference between them without reading a log.
+   */
+  detail?: string
 }
 
 export async function getLiveProduct(
@@ -77,7 +83,13 @@ export async function getLiveProduct(
     return { product, reason: product ? 'ok' : 'no-match' }
   } catch (err) {
     console.error('storefront read failed', err)
-    return { product: null, reason: 'unreachable' }
+    return {
+      product: null,
+      reason: 'unreachable',
+      // Anything that isn't a refusal we recognise never left the machine:
+      // DNS, TLS, a domain that doesn't resolve.
+      detail: err instanceof StorefrontError ? err.detail : 'network',
+    }
   }
 }
 

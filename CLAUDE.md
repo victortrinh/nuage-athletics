@@ -72,7 +72,10 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    first two name the binding the serving Worker is missing. `no-token` is
    the live one: `SHOPIFY_STOREFRONT_TOKEN` is a secret, and
    `npx wrangler secret list` confirms whether it reached the Worker.
-   `no-domain` should be unreachable now that `SHOPIFY_STORE_DOMAIN` is a
+   `unreachable` carries the refusal with it — `unreachable;status=401` is the
+   token, `;status=404` the domain or a retired API version, `;graphql` a
+   field the token may not read, `;network` a call that never left the
+   machine. `no-domain` should be unreachable now that `SHOPIFY_STORE_DOMAIN` is a
    `[vars]` entry in `wrangler.toml` — it ships with the code precisely so a
    deployed version cannot be missing it; seeing it means the entry was
    removed. The header

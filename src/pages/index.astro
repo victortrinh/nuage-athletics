@@ -31,7 +31,12 @@ const live = storefront?.product ?? null
 // a header instead. It names a category, never a credential, and it changes
 // nothing about the page: whoever can see this render sees exactly what
 // launch day looks like, header or no header.
-if (storefront && !live) Astro.response.headers.set('X-Storefront', storefront.reason)
+if (storefront && !live) {
+  Astro.response.headers.set(
+    'X-Storefront',
+    storefront.detail ? `${storefront.reason};${storefront.detail}` : storefront.reason
+  )
+}
 ---
 
 <Base
