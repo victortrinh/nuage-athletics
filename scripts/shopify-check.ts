@@ -9,7 +9,8 @@
  * outside the Worker and says which step failed.
  *
  * Usage:
- *   npm run shopify:check                  -- reads .dev.vars, else the environment
+ *   npm run shopify:check                  -- domain from wrangler.toml, token
+ *                                             from .dev.vars or the environment
  *   SHOPIFY_STORE_DOMAIN=… SHOPIFY_STOREFRONT_TOKEN=… npm run shopify:check
  *
  * The token is never printed. Nothing here writes anything to the store.
@@ -40,15 +41,32 @@ function devVars(): Record<string, string> {
   }
 }
 
+/** The store domain is a [vars] entry, so it needs no local setup at all. */
+function wranglerVar(name: string): string | undefined {
+  try {
+    const text = readFileSync(resolve(REPO_ROOT, 'wrangler.toml'), 'utf8')
+    return new RegExp(`^${name}\\s*=\\s*"([^"]*)"`, 'm').exec(text)?.[1]
+  } catch {
+    return undefined
+  }
+}
+
 function credentials() {
   const vars = devVars()
-  const domain = process.env.SHOPIFY_STORE_DOMAIN ?? vars.SHOPIFY_STORE_DOMAIN
+  const domain =
+    process.env.SHOPIFY_STORE_DOMAIN ??
+    vars.SHOPIFY_STORE_DOMAIN ??
+    wranglerVar('SHOPIFY_STORE_DOMAIN')
   const token = process.env.SHOPIFY_STOREFRONT_TOKEN ?? vars.SHOPIFY_STOREFRONT_TOKEN
-  if (!domain || !token) {
+  if (!domain) {
+    console.error('No SHOPIFY_STORE_DOMAIN — it should be a [vars] entry in wrangler.toml.')
+    process.exit(1)
+  }
+  if (!token) {
     console.error(
-      'Missing SHOPIFY_STORE_DOMAIN / SHOPIFY_STOREFRONT_TOKEN.\n' +
-        'Put them in .dev.vars (see .dev.vars.example) or pass them in the environment.\n' +
-        'Secrets already set in Cloudflare cannot be read back — paste the same values here.'
+      'Missing SHOPIFY_STOREFRONT_TOKEN.\n' +
+        'Put it in .dev.vars (see .dev.vars.example) or pass it in the environment.\n' +
+        'A secret already set in Cloudflare cannot be read back — paste the same value here.'
     )
     process.exit(1)
   }
@@ -192,7 +210,7 @@ async function main() {
   }
   console.log('\nStill no buy band? Then it is not Shopify:')
   console.log('  • COMMERCE_ENABLED is "false", so you need /?preview=<PREVIEW_PASSWORD>')
-  console.log('  • the same secrets have to be set on the Worker you are visiting')
+  console.log('  • SHOPIFY_STOREFRONT_TOKEN has to be set on the Worker you are visiting')
 }
 
 await main()

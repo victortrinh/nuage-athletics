@@ -45,11 +45,13 @@ Without `RESEND_API_KEY` the confirmation email is logged to the console with th
 confirm URL, and the signup endpoint returns `email_failed` — the row is still
 written, so paste the logged URL to finish the double opt-in locally.
 
-Without `SHOPIFY_STORE_DOMAIN` / `SHOPIFY_STOREFRONT_TOKEN` there is no price
-and no buy band, founder preview included: the product page's price and
-sold-out states come from the Shopify Storefront API and nowhere else. Point
-them at a development store whose variant SKUs match `src/lib/catalogue.ts` —
-the SKU is the join key. `npm run shopify:check` runs that read and prints why
+Without `SHOPIFY_STOREFRONT_TOKEN` there is no price and no buy band, founder
+preview included: the product page's price and sold-out states come from the
+Shopify Storefront API and nowhere else. The store it reads is
+`SHOPIFY_STORE_DOMAIN` in `wrangler.toml`'s `[vars]` — a var, not a secret,
+since it is public on any storefront URL and shipping it with the code is what
+keeps it from going missing on a deployed version. Its variant SKUs have to
+match `src/lib/catalogue.ts` — the SKU is the join key. `npm run shopify:check` runs that read and prints why
 there is or isn't a price: it catches a refused token, products not published
 to the token's sales channel, and SKUs that don't match, all of which otherwise
 render as an ordinary pre-drop page. In a browser, the response headers say the
@@ -62,7 +64,6 @@ when commerce was on and no price came back.
 ```bash
 wrangler kv namespace create SESSION   # adapter expects a SESSION binding
 wrangler secret put RESEND_API_KEY
-wrangler secret put SHOPIFY_STORE_DOMAIN
 wrangler secret put SHOPIFY_STOREFRONT_TOKEN
 npm run db:migrate:remote
 npm run deploy

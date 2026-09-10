@@ -69,8 +69,13 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    the preview cookie is live (5.6 — nothing else in the codebase sets it),
    and `X-Storefront: no-domain | no-token | unreachable | no-match` appears
    only when commerce was on for that request and no price came back — the
-   first two name the binding the serving Worker is missing, which
-   `npx wrangler secret list` confirms. The header
+   first two name the binding the serving Worker is missing. `no-token` is
+   the live one: `SHOPIFY_STOREFRONT_TOKEN` is a secret, and
+   `npx wrangler secret list` confirms whether it reached the Worker.
+   `no-domain` should be unreachable now that `SHOPIFY_STORE_DOMAIN` is a
+   `[vars]` entry in `wrangler.toml` — it ships with the code precisely so a
+   deployed version cannot be missing it; seeing it means the entry was
+   removed. The header
    names a category, never a credential, and the *render* stays identical to
    launch day — which is what keeps this from widening preview.
 

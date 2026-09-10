@@ -18,6 +18,13 @@ migrations_dir = "migrations"
 
 [vars]
 PUBLIC_SITE_URL = "https://nuageathletics.com"
+# The Shopify store, host only — no scheme, no path. Deliberately a var and
+# not a secret: it is public on every storefront URL, and as a secret it was
+# one more thing that could be missing from a Worker version while the page
+# quietly rendered as if the drop hadn't opened (see X-Storefront in
+# src/lib/commerce/index.ts). Here it ships with the code and cannot go
+# missing. The token beside it stays a secret — that one is a credential.
+SHOPIFY_STORE_DOMAIN = "nuage-athletics-dev.myshopify.com"
 # "true" shows prices and the buy flow to everyone. Keep this "false" until
 # the drop: while it is off, only a visitor carrying the preview cookie sees
 # them — see src/lib/commerce/index.ts. It permits a price; it does not supply
@@ -29,8 +36,11 @@ COMMERCE_ENABLED = "false"
 #   STRIPE_SECRET_KEY
 #   STRIPE_WEBHOOK_SECRET
 #   PREVIEW_PASSWORD
-#   SHOPIFY_STORE_DOMAIN      (e.g. nuage-athletics.myshopify.com)
 #   SHOPIFY_STOREFRONT_TOKEN  (Storefront API access token, read scopes)
+#
+# SHOPIFY_STORE_DOMAIN is a [vars] entry above, not a secret. If one was ever
+# set with `wrangler secret put`, delete it (`wrangler secret delete
+# SHOPIFY_STORE_DOMAIN`) so there is one place the domain comes from.
 
 # The Cloudflare adapter enables Astro sessions backed by KV and expects a
 # "SESSION" binding.
