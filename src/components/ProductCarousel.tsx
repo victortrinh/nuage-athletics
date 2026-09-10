@@ -386,6 +386,11 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
                 // room `100dvh - chrome` actually leaves, instead of
                 // stalling at the text column's width well short of that.
                 width: 'max(10rem, calc((100dvh - var(--chrome-h)) * 2))',
+                // The clip layer's own width — see its comment below. Only
+                // set once measured; the CSS fallback (`var(--stage-w,
+                // 100%)`) covers the gap before that, which is also what a
+                // no-JS visitor sees forever.
+                ...(stageWidth !== null ? { '--stage-w': `${stageWidth}px` } : {}),
               } as CSSProperties
             }
           >
