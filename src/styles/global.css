@@ -105,6 +105,18 @@ body {
      viewport, not this padding box — the clouds stay full-bleed and only
      text insets. */
   padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+  /* The bottom edge's share of the same bargain. The top of the page is
+     covered by the header's own pt-safe (it insets its contents) and
+     header-veil (it caps the status-bar band opaque); the bottom had
+     nothing, so the last line of the document — the footer's copyright —
+     sat under the home indicator with no way to scroll it clear. On iOS
+     this inset is 0px while Safari's bottom toolbar is expanded (the
+     toolbar is an overlay Safari deliberately doesn't reserve space for,
+     since it collapses on scroll) and grows once it minimises, which is
+     exactly when the page can reach the screen's bottom edge. Stated on
+     the body rather than the footer so it holds for whatever element
+     happens to end the document. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 :root {
