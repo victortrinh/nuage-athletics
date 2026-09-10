@@ -20,7 +20,8 @@ migrations_dir = "migrations"
 PUBLIC_SITE_URL = "https://nuageathletics.com"
 # "true" shows prices and the buy flow to everyone. Keep this "false" until
 # the drop: while it is off, only a visitor carrying the preview cookie sees
-# them — see src/lib/commerce/index.ts.
+# them — see src/lib/commerce/index.ts. It permits a price; it does not supply
+# one. Without the Shopify secrets below there is nothing to render either way.
 COMMERCE_ENABLED = "false"
 
 # Secrets — set with `wrangler secret put <NAME>`, never commit:
@@ -28,6 +29,8 @@ COMMERCE_ENABLED = "false"
 #   STRIPE_SECRET_KEY
 #   STRIPE_WEBHOOK_SECRET
 #   PREVIEW_PASSWORD
+#   SHOPIFY_STORE_DOMAIN      (e.g. nuage-athletics.myshopify.com)
+#   SHOPIFY_STOREFRONT_TOKEN  (Storefront API access token, read scopes)
 
 # The Cloudflare adapter enables Astro sessions backed by KV and expects a
 # "SESSION" binding.

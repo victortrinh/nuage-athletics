@@ -9,7 +9,7 @@ fall 2026. Commerce is scaffolded behind an adapter but not wired to any page.
 
 **Stack:** Astro 7 (static output + SSR endpoints) · React islands (shadcn/ui on
 React Aria Components) · Tailwind 4 · Cloudflare Workers · D1 · Resend ·
-Stripe (phase 2)
+Shopify Storefront API (price + availability) · Stripe (phase 2)
 
 ## Non-negotiables
 
@@ -35,13 +35,26 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 
 5. **Nothing under `src/pages` imports Stripe directly.** Commerce goes through
    `CommerceAdapter` (`src/lib/commerce/`). Lightspeed may replace Stripe later;
-   the swap should be one line in `src/lib/commerce/index.ts`. Product data lives
-   in `src/lib/catalogue.ts`, which imports no payment provider — pages read it
-   directly and the Stripe adapter reads it too.
+   the swap should be one line in `src/lib/commerce/index.ts`. Product *copy*
+   lives in `src/lib/catalogue.ts`, which imports no payment provider — pages
+   read it directly, and both adapters read it too. Price and availability are
+   not copy; see 5.5.
 
-5.5 **Never render a price while `COMMERCE_ENABLED` is off.** The number in
-   `catalogue.ts` is a placeholder, and an advertised price is one a Quebec
-   merchant is expected to honour. Set the real one before flipping the flag.
+5.5 **The price comes from Shopify or it does not exist.** `catalogue.ts`
+   holds no price at all — `PLACEHOLDER_PRICE_CENTS` is gone, and putting a
+   number back there is the regression this rule now guards against. An
+   advertised price is one a Quebec merchant is expected to honour, and the
+   only number anyone can honour is the one the Storefront API answers with
+   (`src/lib/commerce/shopify.ts`, joined to the catalogue by SKU, cached
+   ~15s). `getLiveProduct()` (`src/lib/commerce/index.ts`) is the single seam:
+   it returns the priced product or **null**, and null covers every reason
+   there isn't one — commerce off, no preview cookie, Shopify unreachable,
+   SKUs that don't join, a price in the wrong currency. `ProductView.astro`
+   takes that nullable product rather than a `commerceEnabled` boolean, so a
+   Storefront outage renders the pre-drop page (no price, no buy band) and
+   there is no code path that renders a band without a Shopify price behind
+   it. Stripe checkout prices its line items from the same read, so what was
+   rendered and what is charged cannot disagree.
 
 5.6 **Preview is per-visitor, so a preview render must never be cached.**
    `commerceEnabled()` (`src/lib/commerce/index.ts`) answers yes either because
@@ -303,7 +316,14 @@ npm run test:a11y # Playwright + axe — builds and runs its own wrangler dev
 
 All four must pass. `test:a11y` is slower (it builds, migrates a throwaway local
 D1, and boots `wrangler dev` itself) — run it before claiming an accessibility or
-`src/components/ui/` change is done, not on every unrelated edit.
+`src/components/ui/` change is done, not on every unrelated edit. It also boots
+`e2e/storefront-stub.ts`, a loopback stand-in for the Storefront API: without a
+store to answer, founder preview would render the pre-drop page and every
+assertion about the buy band would fail for the wrong reason. The stub serves
+the real catalogue's SKUs and holds one size back as sold out. The *outage*
+half of that contract is asserted in `test/shopify.test.ts` instead — it's
+process-wide state on a server the parallel suite shares, so faking it in
+Playwright would break every other spec for a cache window.
 
 Pages are **not** prerendered — every route under `src/pages` sets
 `prerender = false`, because Workers serves a prerendered file straight from

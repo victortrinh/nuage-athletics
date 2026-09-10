@@ -45,11 +45,19 @@ Without `RESEND_API_KEY` the confirmation email is logged to the console with th
 confirm URL, and the signup endpoint returns `email_failed` — the row is still
 written, so paste the logged URL to finish the double opt-in locally.
 
+Without `SHOPIFY_STORE_DOMAIN` / `SHOPIFY_STOREFRONT_TOKEN` there is no price
+and no buy band, founder preview included: the product page's price and
+sold-out states come from the Shopify Storefront API and nowhere else. Point
+them at a development store whose variant SKUs match `src/lib/catalogue.ts` —
+the SKU is the join key.
+
 ## Deploy
 
 ```bash
 wrangler kv namespace create SESSION   # adapter expects a SESSION binding
 wrangler secret put RESEND_API_KEY
+wrangler secret put SHOPIFY_STORE_DOMAIN
+wrangler secret put SHOPIFY_STOREFRONT_TOKEN
 npm run db:migrate:remote
 npm run deploy
 ```

@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { ROUTES } from '../src/i18n/utils'
 import { E2E_PREVIEW_PASSWORD, NUDGE_DISMISSED } from '../playwright.config'
+import { SOLD_OUT, STUB_PRICE } from './storefront-stub'
 import { LOCALES } from '../src/i18n/config'
 
 /**
@@ -714,6 +715,47 @@ test.describe('founder preview', () => {
     // And back out again, without clearing cookies by hand.
     await page.goto(`${ROUTES.home['fr-CA']}?preview=`)
     await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toHaveCount(0)
+
+    await context.close()
+  })
+
+  /**
+   * The price and the sold-out state are Shopify's, not the repo's — there is
+   * no local number left to render (`PLACEHOLDER_PRICE_CENTS` is gone). The
+   * store answering here is e2e/storefront-stub.ts, which quotes STUB_PRICE
+   * and holds one size back, so this asserts the whole join end to end: the
+   * adapter's SKU match, the band's formatting, and `productOutOfStock`
+   * reaching a screen reader on the one size that isn't there.
+   *
+   * The outage half of that contract — Storefront unreachable, page falls
+   * back to the pre-drop render — is asserted in test/shopify.test.ts. It is
+   * process-wide state on a server this whole parallel suite shares, so
+   * faking it here would break every other spec for the length of a cache
+   * window.
+   */
+  test('the band shows the price Shopify quotes, and a sold-out size is disabled', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
+    const page = await context.newPage()
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    // fr-CA formatting of the stub's amount ("65,00 $"), built the same way
+    // formatPrice does rather than hardcoded, so a currency-formatting change
+    // fails in one place instead of reading as a pricing bug.
+    const formatted = new Intl.NumberFormat('fr-CA', {
+      style: 'currency',
+      currency: 'CAD',
+    }).format(Number(STUB_PRICE))
+    await expect(page.getByText(formatted, { exact: true })).toBeVisible()
+
+    // The stub holds back the classic fit's XXL, which is the fit the page
+    // opens on — no picker interaction needed to see it.
+    const soldOut = page.getByRole('radio', { name: new RegExp(`^${SOLD_OUT.size}\\b`) })
+    await expect(soldOut).toBeDisabled()
+    await expect(soldOut).toHaveAccessibleName(/Épuisé/)
+
+    await expect(page.getByRole('radio', { name: 'XL', exact: true })).toBeEnabled()
 
     await context.close()
   })

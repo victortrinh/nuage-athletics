@@ -1,21 +1,68 @@
+import type { Locale } from '../../i18n/config'
 import { previewActive } from '../preview'
+import { createShopifyStorefront } from './shopify'
 import { createStripeAdapter } from './stripe'
-import type { CommerceAdapter } from './types'
+import type { CommerceAdapter, Product } from './types'
 
 export type * from './types'
+
+interface StorefrontEnv {
+  SHOPIFY_STORE_DOMAIN?: string
+  SHOPIFY_STOREFRONT_TOKEN?: string
+}
+
+/**
+ * The product as it is actually for sale right now — catalogue copy with
+ * Shopify's price and per-variant availability joined onto it — or null.
+ *
+ * Null is the whole failure mode, and it is deliberately the *only* one. A
+ * Storefront outage, an unconfigured store, a SKU that doesn't join: each
+ * returns null, the page renders the state it already has for "there is
+ * nothing to buy yet" (no price, no buy band — see ProductView.astro), and
+ * nobody is shown a number that might be wrong. The alternatives are a stale
+ * price and a 500, and both are worse than a page that quietly declines to
+ * sell for a minute.
+ *
+ * Pages call this rather than reaching for `./shopify` themselves, so the
+ * provider stays swappable from this file alone (CLAUDE.md non-negotiable 5).
+ */
+export async function getLiveProduct(
+  env: StorefrontEnv,
+  slug: string,
+  locale: Locale
+): Promise<Product | null> {
+  const domain = env.SHOPIFY_STORE_DOMAIN
+  const token = env.SHOPIFY_STOREFRONT_TOKEN
+  if (!domain || !token) return null
+
+  try {
+    return await createShopifyStorefront({ domain, token }).getProduct(slug, locale)
+  } catch (err) {
+    console.error('storefront read failed', err)
+    return null
+  }
+}
 
 /**
  * Single place where the backend is chosen. To move to Lightspeed later,
  * implement LightspeedAdapter with the same interface and change this function.
  */
-export function getCommerce(env: {
-  STRIPE_SECRET_KEY?: string
-  STRIPE_WEBHOOK_SECRET?: string
-}): CommerceAdapter {
+export function getCommerce(
+  env: StorefrontEnv & {
+    STRIPE_SECRET_KEY?: string
+    STRIPE_WEBHOOK_SECRET?: string
+  }
+): CommerceAdapter {
   if (!env.STRIPE_SECRET_KEY) {
     throw new Error('STRIPE_SECRET_KEY is not configured')
   }
-  return createStripeAdapter(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET)
+  // Stripe still takes the payment; it no longer decides what to charge.
+  // The line item is priced from the same `getLiveProduct` read the page
+  // rendered from, so "the price you saw is the price you pay" holds by
+  // construction rather than by two files agreeing on a constant.
+  return createStripeAdapter(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET, (slug, locale) =>
+    getLiveProduct(env, slug, locale)
+  )
 }
 
 /**

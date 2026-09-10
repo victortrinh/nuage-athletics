@@ -3,7 +3,8 @@ import { env } from 'cloudflare:workers'
 import Base from '../../layouts/Base.astro'
 import ProductView from '../../components/ProductView.astro'
 import { t } from '../../i18n/ui'
-import { commerceEnabled } from '../../lib/commerce/index.ts'
+import { featuredProduct } from '../../lib/catalogue.ts'
+import { commerceEnabled, getLiveProduct } from '../../lib/commerce/index.ts'
 
 // Founder preview in src/middleware.ts never runs for a prerendered page —
 // Workers serves those straight from assets — and a prerendered page would
@@ -13,6 +14,11 @@ export const prerender = false
 const locale = 'en-CA' as const
 const d = t(locale)
 const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
+// Two conditions, one answer. `canBuy` says this visitor is allowed to see a
+// price; the Shopify read says there is one to see. Both have to hold, and the
+// read is skipped entirely when the first doesn't — nobody browsing the
+// pre-drop page should cost a Storefront call.
+const live = canBuy ? await getLiveProduct(env, featuredProduct(locale).slug, locale) : null
 ---
 
 <Base
@@ -21,5 +27,5 @@ const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
   title={`${d.brand} - ${d.tagline}`}
   description={`${d.tagline} ${d.dropLine}`}
 >
-  <ProductView {locale} commerceEnabled={canBuy} />
+  <ProductView {locale} {live} />
 </Base>

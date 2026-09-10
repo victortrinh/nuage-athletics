@@ -5,14 +5,29 @@ import { fmt, t } from '../i18n/ui'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { organizationId } from '../lib/brand'
 import { editorialFor, featuredProduct, formatPrice, DEFAULT_FIT } from '../lib/catalogue'
+import type { Product } from '../lib/commerce/types'
 import { route } from '../i18n/utils'
 
 interface Props {
   locale: Locale
-  commerceEnabled: boolean
+  /**
+   * The product as Shopify currently sells it — copy plus a real price and
+   * real per-variant availability — or null, which is every reason there is
+   * nothing to sell: commerce off, no preview cookie, or the Storefront API
+   * unreachable (`getLiveProduct` in src/lib/commerce/index.ts folds all
+   * three into this one answer). Null is what drives the pre-drop render
+   * below, so a Shopify outage during the drop degrades to the page the
+   * public saw the week before rather than to an error.
+   *
+   * A nullable product rather than the `commerceEnabled` boolean this used to
+   * take: the price is the thing being gated, so the gate may as well *be*
+   * the price's presence. There is no longer a way to render the buy band
+   * without a number that came from Shopify.
+   */
+  live: Product | null
 }
 
-const { locale, commerceEnabled } = Astro.props
+const { locale, live } = Astro.props
 const d = t(locale)
 const product = featuredProduct(locale)
 const editorial = editorialFor(product.id, locale)
@@ -23,8 +38,9 @@ const productUrl = new URL(Astro.url.pathname, site).href
 /**
  * No price is rendered while commerce is off, and the price is left out of the
  * structured data for the same reason: an advertised price is one a Quebec
- * merchant is expected to honour, and the number in the catalogue is still a
- * placeholder. Availability says PreOrder so the omission reads as deliberate.
+ * merchant is expected to honour, and until Shopify answers there is no price
+ * to honour — there is no local number to fall back on any more. Availability
+ * says PreOrder so the omission reads as deliberate.
  */
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -55,13 +71,17 @@ const jsonLd = {
    */
   countryOfOrigin: { '@type': 'Country', name: 'China' },
   inLanguage: HTML_LANG[locale],
-  ...(commerceEnabled
+  ...(live
     ? {
         offers: {
           '@type': 'Offer',
-          priceCurrency: product.price.currency,
-          price: (product.price.amount / 100).toFixed(2),
-          availability: 'https://schema.org/InStock',
+          priceCurrency: live.price.currency,
+          price: (live.price.amount / 100).toFixed(2),
+          // Real availability, not a constant: a drop that has sold through
+          // every size shouldn't keep telling shopping engines it's in stock.
+          availability: live.variants.some((v) => v.inStock)
+            ? 'https://schema.org/InStock'
+            : 'https://schema.org/SoldOut',
         },
       }
     : { offers: { '@type': 'Offer', availability: 'https://schema.org/PreOrder' } }),
@@ -80,7 +100,7 @@ const jsonLd = {
 */}
 <article class="mx-auto max-w-[34rem] py-8 lg:py-12">
   {
-    !commerceEnabled ? (
+    !live ? (
       /*
         Same reserved screenful and same centring as the commerce branch
         below, and the block under the carousel reserves the same height the
@@ -173,14 +193,15 @@ const jsonLd = {
         {/*
           Description, fit/size pickers and the spec table are all product
           *detail* — reachable only once there is something to buy, exactly
-          as before this redesign. `commerceEnabled` already carries the
+          as before this redesign. A non-null `live` already carries the
           founder-preview exception (src/lib/commerce/index.ts), so a
           founder previewing the buy flow sees all of it exactly as it will
-          ship — the price included, which is why `price`/`variants`/
-          `specs` are only ever computed and passed down inside this branch.
+          ship — the real Shopify price included, which is why
+          `price`/`variants`/`specs` are only ever computed and passed down
+          inside this branch.
           See the props-serialization note in ProductStage.tsx: those values
           become part of the island's server-rendered `astro-island` props
-          attribute, so keeping them out of the `!commerceEnabled` branch
+          attribute, so keeping them out of the `!live` branch
           entirely (not just out of what renders) is what non-negotiable 5.5
           actually requires.
         */}
@@ -220,8 +241,8 @@ const jsonLd = {
             initialFit={DEFAULT_FIT}
             commerceEnabled={true}
             fitOptions={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
-            variants={product.variants}
-            price={formatPrice(product.price, locale)}
+            variants={live.variants}
+            price={formatPrice(live.price, locale)}
             precontractHref={route('precontract', locale)}
           />
           {/* Images are content, not chrome — the carousel needs JS to page

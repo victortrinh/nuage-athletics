@@ -21,6 +21,15 @@ declare namespace Cloudflare {
     PREVIEW_PASSWORD?: string
     STRIPE_SECRET_KEY?: string
     STRIPE_WEBHOOK_SECRET?: string
+    // Shopify Storefront API — the only source of a customer-visible price
+    // and of per-variant availability (src/lib/commerce/shopify.ts). The
+    // store domain is a host, not a URL: "nuage-athletics.myshopify.com".
+    // Both unset means no price and no buy band, whatever COMMERCE_ENABLED
+    // says. The domain is a secret only by association: it is public on any
+    // storefront URL, and it lives here so the pair is set and rotated
+    // together rather than one in wrangler.toml and one out of it.
+    SHOPIFY_STORE_DOMAIN?: string
+    SHOPIFY_STOREFRONT_TOKEN?: string
 
     // [vars] in wrangler.toml
     PUBLIC_SITE_URL?: string
