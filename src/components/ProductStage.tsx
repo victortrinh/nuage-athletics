@@ -68,6 +68,18 @@ type Props =
 const FLY_OUT_STEP_REM = 0.9
 
 /**
+ * The column's non-frame chrome, per breakpoint — the pad above the carousel
+ * plus everything the caller puts below the marker row. Deliberately ONE
+ * number for both renders rather than two hand-measured ones: the pre-drop
+ * view reserves exactly the height the fit picker and buy band occupy here
+ * (see ProductView.astro's `min-h`), so the photo and the marker row land in
+ * the same place whether or not commerce is on. Flipping founder preview on
+ * must not move the product — that's the whole point of previewing the real
+ * page. Re-measure both halves together if the band's height changes.
+ */
+const CHROME_REM = { base: 20.5, sm: 18.5 }
+
+/**
  * The product page's single interactive root — carousel, fit picker and the
  * fixed-height buy band, merged into one island.
  *
@@ -171,18 +183,13 @@ export default function ProductStage(props: Props) {
     // announcement are rendered by ProductView.astro itself, outside this
     // island, exactly as they were before this redesign; see the note
     // there on why that stays a plain server-rendered heading rather than
-    // moving into slot A. chromeRem is hand-measured from just that
-    // heading + one line of announcement text, with a little cushion —
-    // see ProductCarousel.tsx's frame-sizing comment. Nothing above the
-    // carousel here, so it's all below-frame chrome.
+    // moving into slot A. Same pad above the carousel and same CHROME_REM as
+    // the commerce branch below — the two renders are deliberately identical
+    // from the top of the page down through the marker row.
     return (
-      <ProductCarousel
-        d={d}
-        fit={fit}
-        fits={fits}
-        initialFit={initialFit}
-        chromeRem={{ base: 14, sm: 13 }}
-      />
+      <div className="pt-10 sm:pt-2">
+        <ProductCarousel d={d} fit={fit} fits={fits} initialFit={initialFit} chromeRem={CHROME_REM} />
+      </div>
     )
   }
 
@@ -205,22 +212,16 @@ export default function ProductStage(props: Props) {
         not by the height budget below, and so leaves real slack — the leftover
         room was splitting evenly and pooling under the collapsed band's `+`,
         which has an empty slot D beneath it besides. Air added above the photo
-        and between it and the marker row (ProductCarousel's own `mt-8 sm:mt-4`)
+        and between it and the marker row (ProductCarousel's own `mt-10 sm:mt-6`)
         comes out of that slack, so the band stops trailing a stretch of nothing.
         Both numbers are part of the column's chrome, hence `chromeRem` below.
       */}
       <div className="pt-10 sm:pt-2">
-        {/* chromeRem is hand-measured from the pad above plus the fit picker
-            and band that follow — see ProductCarousel.tsx's frame-sizing
-            comment. `sm:` is smaller because that pad is (the band itself is
-            the same height at both breakpoints). */}
-        <ProductCarousel
-          d={d}
-          fit={fit}
-          fits={fits}
-          initialFit={initialFit}
-          chromeRem={{ base: 20.5, sm: 18.5 }}
-        />
+        {/* CHROME_REM (above) is hand-measured from the pad above plus the fit
+            picker and band that follow — see ProductCarousel.tsx's
+            frame-sizing comment. `sm:` is smaller because that pad is (the
+            band itself is the same height at both breakpoints). */}
+        <ProductCarousel d={d} fit={fit} fits={fits} initialFit={initialFit} chromeRem={CHROME_REM} />
 
         {/*
           No visible "Coupe" heading above these: the two tabs say

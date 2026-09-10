@@ -822,4 +822,48 @@ test.describe('founder preview', () => {
     const response = await page.goto(`${ROUTES.home['fr-CA']}?preview=not-the-password`)
     expect(response?.status()).toBe(404)
   })
+
+  /**
+   * Founder preview only tells you what launch day looks like if turning it
+   * on doesn't move the page. The two renders are held identical from the top
+   * of the document down through the marker row by two halves of one
+   * arrangement: ProductStage's shared CHROME_REM (which sizes the frame off
+   * the same height budget either way) and the `min-h`/`pt` block in
+   * ProductView.astro's pre-drop branch (which reserves exactly what the fit
+   * picker and buy band occupy in the commerce render). Either half drifting
+   * on its own puts the photo back to a different size or a different place,
+   * which is what this measures — and the arithmetic is spread across two
+   * files, so a comment alone would not have caught it.
+   *
+   * Both viewports on purpose: they fail differently. The frame is
+   * width-bound on a phone (so a chrome mismatch shows up as a vertical
+   * offset) and height-bound on a desktop (where it shows up as a
+   * differently-sized photo).
+   */
+  for (const [name, viewport] of [
+    ['phone', { width: 393, height: 851 }],
+    ['desktop', { width: 1280, height: 720 }],
+  ] as const) {
+    test(`preview does not move the product (${name})`, async ({ browser }) => {
+      async function placement(url: string) {
+        const context = await browser.newContext({ storageState: NUDGE_DISMISSED, viewport })
+        const page = await context.newPage()
+        await page.goto(url)
+        const marker = page.locator('button[data-pagination="true"]').first()
+        await marker.waitFor()
+        const photo = page.locator('[aria-roledescription="carousel"] img').first()
+        const boxes = { photo: await photo.boundingBox(), marker: await marker.boundingBox() }
+        await context.close()
+        return boxes
+      }
+
+      const publicView = await placement(ROUTES.home['fr-CA'])
+      const previewView = await placement(
+        `${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`
+      )
+
+      expect(publicView.photo).toEqual(previewView.photo)
+      expect(publicView.marker).toEqual(previewView.marker)
+    })
+  }
 })
