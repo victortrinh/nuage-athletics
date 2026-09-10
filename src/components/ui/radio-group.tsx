@@ -33,11 +33,18 @@ export interface RadioProps extends AriaRadioProps {
    *
    * - `compact` — smaller type and padding both ways, for a secondary
    *   picker that shouldn't carry the same weight as the primary one on
-   *   the same page: the fit tabs against the size row.
-   * - `tight` — default type and *vertical* padding, squeezed only
-   *   horizontally. For a row of seven sizes that has to fit across a
-   *   phone: it's the primary control, so shrinking the text or the
-   *   44px-tall tap target to buy the width would be the wrong trade.
+   *   the same page: the fit tabs against the size row. Its label is
+   *   centred in the cell rather than sitting where the text happens to
+   *   start: the two tabs are a grid of equal columns with labels of
+   *   unequal length ("Classique" against "Crop"), so left-aligned text
+   *   reads as two boxes whose contents don't line up with each other.
+   * - `tight` — default type and *vertical* padding, and no horizontal
+   *   padding of its own at all: it fills its grid cell instead, so seven
+   *   sizes whose labels run from "S" to "XXL" are seven identically
+   *   sized buttons rather than seven boxes the width of their own text.
+   *   For a row that has to fit across a phone: it's the primary control,
+   *   so shrinking the text or the 44px-tall tap target to buy the width
+   *   would be the wrong trade.
    *
    * A prop rather than something the caller passes through `className`:
    * `cn()` is clsx only (no tailwind-merge, see cn.ts), so a `px-2` from a
@@ -57,12 +64,21 @@ export function Radio({ className, density, ...props }: RadioProps) {
           // cursor-pointer stays local: the global rule in global.css
           // covers button/summary, and cannot know that this particular
           // <label> is the control itself.
-          'press cursor-pointer bg-paper uppercase tracking-label',
-          density === 'compact' && 'px-2 py-2 text-[10px]',
+          'press cursor-pointer uppercase tracking-label',
+          // `bg-paper` on every density except `tight`: over the sky, a
+          // filled cell is what gives an unselected control an edge to
+          // read as a box. That's right for the fit tabs (whose hairline
+          // separators are drawn by the gaps between those fills) and
+          // wrong for the size row, which is meant to read as bare
+          // lettering until one is chosen.
+          density !== 'tight' && 'bg-paper',
+          density === 'compact' && 'flex items-center justify-center px-2 py-2 text-center text-[10px]',
           // min-h-11 + centring rather than more `py-`: padding alone left
-          // this at 40px, and it's the primary control on the page.
+          // this at 40px, and it's the primary control on the page. `w-full`
+          // and no `px-`: the width comes from the grid cell, which is what
+          // makes every size the same size.
           density === 'tight' &&
-            'flex min-h-11 items-center justify-center px-1.5 py-3 text-xs sm:px-2.5',
+            'flex min-h-11 w-full items-center justify-center py-3 text-xs',
           !density && 'px-3 py-3 text-xs',
           'hover:bg-ink hover:text-paper',
           'data-[selected]:bg-ink data-[selected]:text-paper',

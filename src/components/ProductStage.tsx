@@ -171,16 +171,17 @@ export default function ProductStage(props: Props) {
     // announcement are rendered by ProductView.astro itself, outside this
     // island, exactly as they were before this redesign; see the note
     // there on why that stays a plain server-rendered heading rather than
-    // moving into slot A. belowFrameRem is hand-measured from just that
+    // moving into slot A. chromeRem is hand-measured from just that
     // heading + one line of announcement text, with a little cushion —
-    // see ProductCarousel.tsx's frame-sizing comment.
+    // see ProductCarousel.tsx's frame-sizing comment. Nothing above the
+    // carousel here, so it's all below-frame chrome.
     return (
       <ProductCarousel
         d={d}
         fit={fit}
         fits={fits}
         initialFit={initialFit}
-        belowFrameRem={{ base: 14, sm: 13 }}
+        chromeRem={{ base: 14, sm: 13 }}
       />
     )
   }
@@ -197,17 +198,28 @@ export default function ProductStage(props: Props) {
 
   return (
     <I18nProvider locale={locale}>
-      <div>
-        {/* belowFrameRem is hand-measured from the fit picker + band that
-            follow — see ProductCarousel.tsx's frame-sizing comment. `sm:`
-            is smaller because the band itself is shorter there (its own
-            `sm:` slot-C height, ProductStage's Slot classNames below). */}
+      {/*
+        The pad above the carousel is the top half of a trade, not decoration.
+        ProductView.astro centres this whole block inside a reserved screenful
+        (`justify-center`), so on a phone — where the frame is bound by width,
+        not by the height budget below, and so leaves real slack — the leftover
+        room was splitting evenly and pooling under the collapsed band's `+`,
+        which has an empty slot D beneath it besides. Air added above the photo
+        and between it and the marker row (ProductCarousel's own `mt-8 sm:mt-4`)
+        comes out of that slack, so the band stops trailing a stretch of nothing.
+        Both numbers are part of the column's chrome, hence `chromeRem` below.
+      */}
+      <div className="pt-10 sm:pt-2">
+        {/* chromeRem is hand-measured from the pad above plus the fit picker
+            and band that follow — see ProductCarousel.tsx's frame-sizing
+            comment. `sm:` is smaller because that pad is (the band itself is
+            the same height at both breakpoints). */}
         <ProductCarousel
           d={d}
           fit={fit}
           fits={fits}
           initialFit={initialFit}
-          belowFrameRem={{ base: 18, sm: 18 }}
+          chromeRem={{ base: 20.5, sm: 18.5 }}
         />
 
         {/*
@@ -290,7 +302,7 @@ export default function ProductStage(props: Props) {
             uniform beyond the tidiness: this slot is also what the
             information panel renders into, and its height was the only
             thing making the band's own height breakpoint-dependent — which
-            is the number ProductCarousel's `belowFrameRem` has to track.
+            is the number ProductCarousel's `chromeRem` has to track.
           */}
           <Slot index={slotCIndex} className="mt-4 h-20 w-full">
             <button
@@ -310,7 +322,10 @@ export default function ProductStage(props: Props) {
                 aria-label={d.productSizeLabel}
                 value={size}
                 onChange={onSizeChange}
-                className="grid grid-cols-7 place-items-center gap-x-0.5"
+                // No `place-items-center`: the radios stretch to fill their
+                // own column instead, which is what makes "S" and "XXL" the
+                // same-sized button (see radio-group.tsx's `tight` density).
+                className="grid grid-cols-7 gap-x-0.5"
               >
                 {sizesForFit.map((v, i) => (
                   <Radio

@@ -68,8 +68,10 @@
    * 4px)` chain would go negative and silently clamp to 0 by accident with
    * --radius: 0, and its checkbox/radio radii (rounded-[4px], rounded-full)
    * aren't reachable from that chain at all. Literal zeros here survive a
-   * future `shadcn add` without relying on either. `grep -rE "rounded" src/`
-   * asserting zero matches in CI is the guardrail that actually holds this.
+   * future `shadcn add` without relying on either. check-guards.sh, which
+   * fails the build on a `rounded-*` class anywhere in src/, is the
+   * guardrail that actually holds this — including on the one class this
+   * block no longer zeroes, see --radius-full below.
    */
   --radius-xs: 0;
   --radius-sm: 0;
@@ -79,7 +81,19 @@
   --radius-2xl: 0;
   --radius-3xl: 0;
   --radius-4xl: 0;
-  --radius-full: 0;
+  /*
+   * The single exception, and it is a real one: the product carousel's
+   * pagination dots (ProductCarousel.tsx). Everything else on the site is
+   * still unrounded, and this token does not quietly reopen that — a
+   * `rounded-full` anywhere in src/ fails check-guards.sh unless the line
+   * carries an explicit `guard-allow-rounded` marker, which today exactly
+   * one line does. Zeroing this instead (as it was) would have meant
+   * drawing the dots some other way — an arbitrary `rounded-[50%]`, a
+   * hand-rolled utility — which is the same exception with none of the
+   * paper trail. Tailwind's own value for the class, restored: v4 defines
+   * `rounded-full` statically, and a --radius-full here overrides it.
+   */
+  --radius-full: calc(infinity * 1px);
 }
 
 html { -webkit-text-size-adjust: 100%; }

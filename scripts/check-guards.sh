@@ -11,8 +11,25 @@ fail=0
 # The whole site is deliberately unrounded (global.css). shadcn primitives
 # default to rounded-md/rounded-full; a future `shadcn add` re-introducing
 # one would slip past a visual review far more easily than this.
-if grep -rnE '(class|className)=(\{|")[^}"]*\brounded(-[a-zA-Z0-9]+)?\b' src/; then
+#
+# The one sanctioned exception is the carousel's pagination dots
+# (ProductCarousel.tsx). A line may opt out by carrying the marker below —
+# which is the point of spelling it that way: an exception has to be written
+# down next to the class it excuses, and shows up in a diff as one.
+#
+# Two patterns, because a class list is not always on the same line as the
+# attribute that holds it: the first catches `class="…rounded…"` inline, the
+# second any Tailwind-shaped `rounded-*` inside a quoted string anywhere in a
+# component — which is how a multi-line `cn(…)` call would carry one. Prose
+# in these files spells utilities in `backticks`, so it doesn't match the
+# second pattern.
+ALLOW_ROUNDED='guard-allow-rounded'
+if grep -rnE '(class|className)=(\{|")[^}"]*\brounded(-[a-zA-Z0-9]+)?\b' src/ | grep -v "$ALLOW_ROUNDED"; then
   echo "✘ found a 'rounded' utility class — this site has no radii (see global.css)" >&2
+  fail=1
+fi
+if grep -rnE "['\"][^'\"]*\brounded-[a-zA-Z0-9[]" src/ --include=*.tsx --include=*.astro | grep -v "$ALLOW_ROUNDED"; then
+  echo "✘ found a 'rounded-*' class in a quoted string — this site has no radii (see global.css)" >&2
   fail=1
 fi
 
