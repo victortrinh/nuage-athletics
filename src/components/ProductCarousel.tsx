@@ -75,6 +75,12 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
   const [warm, setWarm] = useState(false)
   const [dragDx, setDragDx] = useState(0)
   const [dragging, setDragging] = useState(false)
+  // Null until measured, so the clip layer's `var(--stage-w, 100%)` fallback
+  // renders the pre-JS/first-paint width — today's frame-clipped slide —
+  // and nothing visibly changes once this fills in; only the clip region
+  // widens. `documentElement.clientWidth`, not `100vw`: the latter includes
+  // the scrollbar gutter and would leave a sliver of horizontal overflow.
+  const [stageWidth, setStageWidth] = useState<number | null>(null)
   const paginationRefs = useRef<(HTMLButtonElement | null)[]>([])
   const stageRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ id: number; x: number; y: number; active: boolean } | null>(null)
@@ -98,6 +104,20 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
     }
     const id = window.setTimeout(() => setWarm(true), 200)
     return () => window.clearTimeout(id)
+  }, [])
+
+  // The clip layer is sized to the page, not the frame — see the frame's own
+  // comment below for why the slide has to travel further than the photo's
+  // box. Re-measured on resize; the frame's own size (and therefore the
+  // photo's) doesn't depend on this at all, only how far the track can slide
+  // before it's clipped.
+  useEffect(() => {
+    function measure() {
+      setStageWidth(document.documentElement.clientWidth)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
   }, [])
 
   function announce(nextIndex: number, nextFit: ProductFit) {
@@ -336,12 +356,18 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
             announcing a control that can't be reached. Arrow keys still page
             the carousel at every width — that handler is on the group, not on
             these buttons.
+
+            `relative z-10`: the clip layer below (inside the frame) now
+            extends past the frame's own edges to reach the page's, and with
+            no z-index of its own it would otherwise interleave with these
+            buttons in paint order by plain DOM position — this pins the
+            arrows above it regardless.
           */}
           <button
             type="button"
             aria-label={d.productImagePrev}
             onClick={() => goTo(index - 1)}
-            className="group press hidden size-11 shrink-0 items-center justify-center text-mute hover:text-ink md:flex"
+            className="group press relative z-10 hidden size-11 shrink-0 items-center justify-center text-mute hover:text-ink md:flex"
           >
             <Chevron dir="left" />
           </button>
@@ -364,27 +390,24 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
             }
           >
             {/*
-              touch-pan-y, not touch-none: a vertical flick that happens to
-              start on the photo has to scroll the page — on mobile the
-              carousel is most of the first screen, so swallowing vertical
-              gestures here would strand the visitor.
+              The frame above sizes and caps the *photo* — this layer is
+              deliberately not clipped to it. A slide is supposed to travel
+              the whole page, not stop dead at the frame's own edge, so the
+              clip region here is the page's width (`--stage-w`, measured
+              above) rather than the frame's: `left-1/2 -translate-x-1/2`
+              centers this wider box on the frame, which is itself centred
+              on the page (the flex row's `justify-center`), so its edges
+              land at the true viewport edges. `var(--stage-w, 100%)` falls
+              back to the frame's own width — today's behaviour — until the
+              effect above has measured, so nothing renders too wide on
+              first paint.
+
+              `pointer-events-none`: this layer only carries the track and
+              images now; the interaction surface below (still frame-sized)
+              is what receives the drag.
             */}
             <div
-              ref={stageRef}
-              // A swipe that nothing announces is a swipe nobody on a desktop
-              // ever finds: the grab cursor is the only affordance the drag
-              // has there, and it is driven by the same `dragging` state the
-              // track is, not by :active, so it holds for the whole gesture —
-              // pointer capture included — and lets go exactly when the
-              // gesture does.
-              className={cn(
-                'absolute inset-0 touch-pan-y select-none overflow-hidden',
-                dragging ? 'cursor-grabbing' : 'cursor-grab'
-              )}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerEnd}
-              onPointerCancel={onPointerEnd}
+              className="pointer-events-none absolute inset-y-0 left-1/2 w-[var(--stage-w,100%)] -translate-x-1/2 overflow-hidden"
             >
               {fits.map((f) => {
                 const isActiveFit = f.id === fit
@@ -412,25 +435,34 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
                         // effect above).
                         const isInitial = f.id === initialFit && i === 0
                         return (
-                          <img
+                          // Each cell is a full-bleed track slot; the frame's
+                          // own box (its `aspect-[2/1]`) is reproduced on the
+                          // image itself so the photo keeps its current size
+                          // and position no matter how wide the cell around
+                          // it is.
+                          <div
                             key={`${f.id}-${i}`}
-                            src={image.src}
-                            width={image.width}
-                            height={image.height}
-                            alt={image.alt}
-                            // Driven by the selection, never by what a drag
-                            // happens to have slid into view: exactly one of
-                            // the 4 is in the accessibility tree at any moment.
-                            aria-hidden={isActive ? undefined : true}
-                            loading={isInitial || warm ? 'eager' : 'lazy'}
-                            fetchPriority={isInitial ? 'high' : 'low'}
-                            decoding="async"
-                            // Without this a mouse drag on the photo starts a
-                            // native image drag and the swipe dies on the
-                            // first pixel.
-                            draggable={false}
-                            className="h-full w-full shrink-0 object-contain"
-                          />
+                            className="flex h-full w-full shrink-0 items-center justify-center"
+                          >
+                            <img
+                              src={image.src}
+                              width={image.width}
+                              height={image.height}
+                              alt={image.alt}
+                              // Driven by the selection, never by what a drag
+                              // happens to have slid into view: exactly one of
+                              // the 4 is in the accessibility tree at any moment.
+                              aria-hidden={isActive ? undefined : true}
+                              loading={isInitial || warm ? 'eager' : 'lazy'}
+                              fetchPriority={isInitial ? 'high' : 'low'}
+                              decoding="async"
+                              // Without this a mouse drag on the photo starts a
+                              // native image drag and the swipe dies on the
+                              // first pixel.
+                              draggable={false}
+                              className="aspect-[2/1] h-full object-contain"
+                            />
+                          </div>
                         )
                       })}
                     </div>
@@ -438,12 +470,43 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
                 )
               })}
             </div>
+            {/*
+              touch-pan-y, not touch-none: a vertical flick that happens to
+              start on the photo has to scroll the page — on mobile the
+              carousel is most of the first screen, so swallowing vertical
+              gestures here would strand the visitor.
+
+              Frame-sized and on top of the clip layer above (later in
+              document order, same z-index:auto, so it paints over it): this
+              is what the pointer actually meets, which is why dragging still
+              reads as dragging *the photo*, and why the swipe threshold
+              below — `stageRef.current.clientWidth` — still measures the
+              frame rather than the page. It carries no children of its own
+              any more; it exists purely to own the gesture.
+            */}
+            <div
+              ref={stageRef}
+              // A swipe that nothing announces is a swipe nobody on a desktop
+              // ever finds: the grab cursor is the only affordance the drag
+              // has there, and it is driven by the same `dragging` state the
+              // track is, not by :active, so it holds for the whole gesture —
+              // pointer capture included — and lets go exactly when the
+              // gesture does.
+              className={cn(
+                'absolute inset-0 touch-pan-y select-none',
+                dragging ? 'cursor-grabbing' : 'cursor-grab'
+              )}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerEnd}
+              onPointerCancel={onPointerEnd}
+            />
           </div>
           <button
             type="button"
             aria-label={d.productImageNext}
             onClick={() => goTo(index + 1)}
-            className="group press hidden size-11 shrink-0 items-center justify-center text-mute hover:text-ink md:flex"
+            className="group press relative z-10 hidden size-11 shrink-0 items-center justify-center text-mute hover:text-ink md:flex"
           >
             <Chevron dir="right" />
           </button>
