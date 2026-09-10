@@ -155,17 +155,30 @@ const jsonLd = {
         */}
         {/*
           Reserves a full screen regardless of how tall the carousel's own
-          frame ends up (ProductCarousel.tsx's ceiling caps it well short of
-          this on a tall window) — the CPA disclosure right after this block
+          frame ends up (ProductCarousel.tsx caps it short of this once the
+          photo hits its width) — the CPA disclosure right after this block
           must never peek into view unscrolled, and a min-height is what
           guarantees that independent of the frame's actual size, rather
           than relying on the frame happening to fill the space.
-          `min-h-[calc(100dvh-var(--header-h))]`, not a bare `min-h-dvh`:
-          the sticky header sits above this article, not inside it, so the
-          reservation is the screen *minus* the header, not the whole
-          screen again.
+          Not a bare `min-h-dvh`: the sticky header sits above this article,
+          not inside it, and the article's own `py-8 lg:py-12` sits outside
+          this box, so the reservation is the screen minus both. Getting the
+          padding wrong doesn't show up while the content is top-aligned —
+          the box just runs past the fold and nobody notices — but it lands
+          the moment the content is centred inside it, as lopsided air:
+          everything shifts down by half the overhang.
+
+          `justify-center` is what puts whatever's left over *around* the
+          photo rather than all of it under the band: the reference sets the
+          product with air above and below it, not pinned to the top of the
+          screen with the slack pooled at the bottom. It can't strand
+          anything off-screen the way centred flex content usually can —
+          min-height is a floor, not a cap, so on a window too short for the
+          content the box simply grows past it, there is no free space to
+          distribute, and this lays out exactly as it would without the
+          class.
         */}
-        <div class="min-h-[calc(100dvh-var(--header-h))]">
+        <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col justify-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
           <ProductStage
             client:load
             {locale}
