@@ -35,11 +35,11 @@ interface Props {
 /**
  * The part of `--chrome-h` this component owns, per breakpoint: the fixed
  * 4rem header plus ProductView.astro's 3rem of article padding, plus the
- * marker row (1.5rem) and the gap above it — `mt-8` at the base width,
- * `mt-4` from `sm:` up, which is where the two numbers differ. Re-measure
+ * marker row (1.5rem) and the gap above it — `mt-10` at the base width,
+ * `mt-6` from `sm:` up, which is where the two numbers differ. Re-measure
  * both if either changes.
  */
-const FRAME_CHROME_REM = { base: 10.5, sm: 9.5 }
+const FRAME_CHROME_REM = { base: 11, sm: 10 }
 
 /** Distance (px) a pointer must travel horizontally before the gesture counts
  *  as a swipe rather than the start of a vertical page scroll or a stray
@@ -466,7 +466,7 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
           one cluster rather than a spaced-out row; the button around each is
           16px, close enough to the mark that the tap target doesn't read as
           its own gap between dots. The row also sits further
-          below the photo on a phone (`mt-8`) than from `sm:` up (`mt-4`) —
+          below the photo on a phone (`mt-10`) than from `sm:` up (`mt-6`) —
           air the band under it would otherwise trail as slack, see the pad
           note in ProductStage. Both numbers are in FRAME_CHROME_REM above.
 
@@ -474,7 +474,7 @@ export default function ProductCarousel({ d, fit, fits, initialFit, chromeRem }:
           ("Image 1 de 2") — a marker with no name is the usual way this
           pattern gets shipped broken.
         */}
-        <div className="mt-8 flex items-center justify-center gap-0 sm:mt-4">
+        <div className="mt-10 flex items-center justify-center gap-0 sm:mt-6">
           {activeFit.gallery.map((_, i) => (
             <button
               key={i}

@@ -171,18 +171,23 @@ export default function ProductStage(props: Props) {
     // announcement are rendered by ProductView.astro itself, outside this
     // island, exactly as they were before this redesign; see the note
     // there on why that stays a plain server-rendered heading rather than
-    // moving into slot A. chromeRem is hand-measured from just that
-    // heading + one line of announcement text, with a little cushion —
-    // see ProductCarousel.tsx's frame-sizing comment. Nothing above the
-    // carousel here, so it's all below-frame chrome.
+    // moving into slot A. The same `pt-10 sm:pt-2` pad the commerce-enabled
+    // branch below puts above its carousel, so the photo doesn't sit flush
+    // under the header on either render — chromeRem is bumped by the same
+    // amount to keep the frame's own height budget honest about it.
+    // chromeRem is otherwise hand-measured from that pad plus the heading
+    // and one line of announcement text, with a little cushion — see
+    // ProductCarousel.tsx's frame-sizing comment.
     return (
-      <ProductCarousel
-        d={d}
-        fit={fit}
-        fits={fits}
-        initialFit={initialFit}
-        chromeRem={{ base: 14, sm: 13 }}
-      />
+      <div className="pt-10 sm:pt-2">
+        <ProductCarousel
+          d={d}
+          fit={fit}
+          fits={fits}
+          initialFit={initialFit}
+          chromeRem={{ base: 16.5, sm: 13.5 }}
+        />
+      </div>
     )
   }
 
@@ -205,7 +210,7 @@ export default function ProductStage(props: Props) {
         not by the height budget below, and so leaves real slack — the leftover
         room was splitting evenly and pooling under the collapsed band's `+`,
         which has an empty slot D beneath it besides. Air added above the photo
-        and between it and the marker row (ProductCarousel's own `mt-8 sm:mt-4`)
+        and between it and the marker row (ProductCarousel's own `mt-10 sm:mt-6`)
         comes out of that slack, so the band stops trailing a stretch of nothing.
         Both numbers are part of the column's chrome, hence `chromeRem` below.
       */}
