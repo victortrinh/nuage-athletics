@@ -48,13 +48,14 @@ const initialFit: FitId = (FIT_IDS as readonly string[]).includes(requestedFit ?
   : DEFAULT_FIT
 
 /**
- * The outcome of a no-JS /api/cart submit, folded into the query string by
- * its 303 redirect (`added=1` / `ce=<code>`) — read back here and passed
- * into ProductStage as `initialAdded`/`initialErrorCode` so the server
- * render and the first client render agree, same pattern as
- * SignupForm.tsx's `initialSuccess`/`initialErrorCode`.
+ * The failure half of a no-JS /api/cart submit, folded into the query
+ * string by its 303 redirect (`ce=<code>`) — read back here and passed into
+ * ProductStage as `initialErrorCode` so the server render and the first
+ * client render agree, same pattern as SignupForm.tsx's own
+ * `initialErrorCode`. The success half (`added=1`) is still set by
+ * /api/cart's redirect but isn't read back into anything — the band simply
+ * renders its ordinary idle state, same as a fresh visit.
  */
-const added = Astro.url.searchParams.get('added') === '1'
 const errorCode = Astro.url.searchParams.get('ce') ?? undefined
 
 /**
@@ -267,7 +268,6 @@ const jsonLd = {
             price={formatPrice(live.price, locale)}
             precontractHref={route('precontract', locale)}
             redirectTo={Astro.url.pathname + Astro.url.search}
-            initialAdded={added}
             initialErrorCode={errorCode}
           />
           {/* Images are content, not chrome — the carousel needs JS to page

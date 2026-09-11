@@ -82,12 +82,14 @@
   --radius-3xl: 0;
   --radius-4xl: 0;
   /*
-   * The single exception, and it is a real one: the product carousel's
-   * pagination dots (ProductCarousel.tsx). Everything else on the site is
-   * still unrounded, and this token does not quietly reopen that — a
-   * `rounded-full` anywhere in src/ fails check-guards.sh unless the line
+   * The exceptions, and they are real ones: the product carousel's
+   * pagination dots (ProductCarousel.tsx), and the cart link's confirmation
+   * ring further down this file — both are things that are circles or they
+   * are nothing. Everything else on the site is still unrounded, and this
+   * token does not quietly reopen that — a `rounded-full` or a declared
+   * border-radius anywhere in src/ fails check-guards.sh unless the line
    * carries an explicit `guard-allow-rounded` marker, which today exactly
-   * one line does. Zeroing this instead (as it was) would have meant
+   * two lines do. Zeroing this instead (as it was) would have meant
    * drawing the dots some other way — an arbitrary `rounded-[50%]`, a
    * hand-rolled utility — which is the same exception with none of the
    * paper trail. Tailwind's own value for the class, restored: v4 defines
@@ -484,3 +486,84 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 
 @keyframes prompt-in { from { translate: 0 100%; } to { translate: 0 0; } }
 @keyframes prompt-out { from { translate: 0 0; } to { translate: 0 100%; } }
+
+/* Positioning context for the pulse below. Outside the motion query on
+   purpose — it is structure, not movement, and `relative` with no offsets
+   moves nothing. */
+#cart-link {
+  position: relative;
+}
+
+/*
+ * The header cart link (#cart-link, Base.astro) answers every cart change
+ * the same way wherever it came from — ProductStage.tsx's add and
+ * CartView.astro's steppers both toggle this one class — and it is the
+ * whole visible confirmation left once the button's own "Added" state was
+ * removed (#74). Two parts: the link takes a short scale bump, and a ring
+ * pulses out of it.
+ *
+ * That ring is the focus ring's own stroke (`focus-block` above: 2px of
+ * accent-ink) travelling outward, not a soft glow — this site draws hard
+ * edges, and the WebGL sky washes soft ones out. It expands by animating
+ * outline-offset rather than scale because a scaled outline thickens and
+ * blurs as it grows, while an offset one keeps its 2px stroke the whole
+ * way out — and an outline follows its box's border-radius, so that holds
+ * for the circle here as much as it did for the square this started as.
+ *
+ * A square pseudo-element rather than `inset: 0`: the link is 32px square
+ * today but grows with its count, and a radius on a box wider than it is
+ * tall draws an ellipse, not a circle. Sized off the link's own box rather
+ * than a magic number, so it stays a circle if the header's sizing changes.
+ *
+ * The pseudo-element rests at opacity 0 rather than relying on
+ * animation-fill-mode: the class stays on the element long after the
+ * animation finishes, and a ring that is invisible only because the
+ * animation ended holding it there is one stalled repaint away from being
+ * a permanent outline around the cart.
+ *
+ * Keyframes, not transitions, for the same reason the drawer and prompt
+ * above use them: the script toggles the class off and back on for a rapid
+ * second update, and a transition never restarts from a class that is
+ * already "on".
+ *
+ * Reduced motion drops both parts rather than making them instant — the
+ * count itself still changes, and on the cart page #cart-status announces
+ * it, so nothing is only conveyed by the movement.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  #cart-link.cart-bump {
+    animation: cart-bump 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  #cart-link.cart-bump::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    aspect-ratio: 1;
+    translate: -50% -50%;
+    border-radius: var(--radius-full); /* guard-allow-rounded: the pulse is a ring, see above */
+    opacity: 0;
+    outline: 2px solid var(--color-accent-ink);
+    /* Starts exactly where the focus ring sits (focus-block's own 4px) and
+       travels out from there — which is also what keeps it clear of the
+       icon and its count, both of which sit inside this 32px box. */
+    outline-offset: 4px;
+    /* Outlasts the bump a little, so the ring is still on its way out as
+       the link settles rather than both stopping on the same frame. */
+    animation: cart-ring 520ms ease-out;
+    pointer-events: none;
+  }
+}
+
+@keyframes cart-bump {
+  0% { scale: 1; }
+  40% { scale: 1.25; }
+  100% { scale: 1; }
+}
+
+@keyframes cart-ring {
+  from { opacity: 1; outline-offset: 4px; }
+  to { opacity: 0; outline-offset: 12px; }
+}

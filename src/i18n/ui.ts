@@ -29,9 +29,9 @@ import type { Locale } from './config.ts'
  *     productSelectSizeError — but the buy band's disabled-until-picked
  *     button makes it unreachable, so it was removed rather than left to
  *     rot. See ProductStage.tsx.)
- *   - submitting, successTitle, productAdding, productAdded: progress and
- *     success are announced through a live region, where being understood
- *     on the first hearing beats charm.
+ *   - submitting, successTitle, productAdding, cartUpdated: progress and
+ *     confirmation are announced through a live region, where being
+ *     understood on the first hearing beats charm.
  *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
  *     mailUnsub, mailSubject/mailHeading/mailCta, privacy, terms,
  *     precontract, rights, productOutOfStock, productAddToCart.
@@ -115,11 +115,10 @@ export type Dict = {
   productImageNext: string
   // product buy band (ProductStage.tsx) — sizes are always visible; this is
   // the accessible hint while no size is picked yet, and the add-to-cart
-  // button's three states
+  // button's two states
   productChooseSize: string
   productAddToCart: string
   productAdding: string
-  productAdded: string
   // no-JS fit switch — <noscript> links under the carousel (ProductView.astro)
   productViewFit: string
   errorSoldOut: string
@@ -135,6 +134,10 @@ export type Dict = {
   cartIncrease: string
   cartDecrease: string
   cartRemoveLabel: string
+  // announced after a hydrated stepper swaps the summary in place — the
+  // rewritten rows are new nodes, which a live region never announces on
+  // its own. See CartView.astro's script.
+  cartUpdated: string
   cartFit: string
   cartSize: string
   cartQty: string
@@ -213,7 +216,6 @@ export const UI: Record<Locale, Dict> = {
     productChooseSize: 'Choisir une taille',
     productAddToCart: 'Ajouter au panier',
     productAdding: 'Ajout…',
-    productAdded: 'Ajouté…',
     productViewFit: 'Voir en {fit}',
     errorSoldOut: 'Cette taille est épuisée.',
     cart: 'Panier',
@@ -225,6 +227,7 @@ export const UI: Record<Locale, Dict> = {
     cartIncrease: 'Augmenter la quantité de {label}',
     cartDecrease: 'Diminuer la quantité de {label}',
     cartRemoveLabel: 'Retirer {label} du panier',
+    cartUpdated: 'Panier mis à jour',
     cartFit: 'Coupe',
     cartSize: 'Taille',
     cartQty: 'Qté',
@@ -298,7 +301,6 @@ export const UI: Record<Locale, Dict> = {
     productChooseSize: 'Choose a size',
     productAddToCart: 'Add to cart',
     productAdding: 'Adding…',
-    productAdded: 'Added…',
     productViewFit: 'View in {fit}',
     errorSoldOut: 'That size is sold out.',
     cart: 'Cart',
@@ -310,6 +312,7 @@ export const UI: Record<Locale, Dict> = {
     cartIncrease: 'Increase quantity of {label}',
     cartDecrease: 'Decrease quantity of {label}',
     cartRemoveLabel: 'Remove {label} from cart',
+    cartUpdated: 'Cart updated',
     cartFit: 'Fit',
     cartSize: 'Size',
     cartQty: 'Qty',

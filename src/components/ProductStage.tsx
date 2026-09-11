@@ -4,7 +4,7 @@ import ProductCarousel from './ProductCarousel'
 import { Button } from './ui/button'
 import { RadioGroup, Radio } from './ui/radio-group'
 import { Slot } from './product/Slot'
-import { type Dict } from '../i18n/ui'
+import { fmt, type Dict } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
 import type { FitId, ProductFit } from '../lib/catalogue'
 
@@ -24,6 +24,56 @@ function errorMessage(d: Dict, code: string): string {
   if (code === 'sold_out') return d.errorSoldOut
   if (code === 'no_size') return d.productChooseSize
   return d.errorCartGeneric
+}
+
+/**
+ * The literal cookie name `/api/cart` just set (`CART_COUNT_COOKIE` in
+ * src/lib/cart.ts) rather than an import from there: that module pulls in
+ * `preview.ts`'s server-only db/crypto code through `readCookie`, which has
+ * no business in this island's client bundle. The cookie is deliberately
+ * readable and deliberately display-only — see cart.ts's own comment — so
+ * reading it directly here is exactly the use it was built for.
+ */
+function readCartCount(): number {
+  const match = document.cookie.match(/(?:^|; )na_cart_n=(\d+)/)
+  const n = match ? Number(match[1]) : NaN
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/**
+ * The one visible confirmation an add still gets, now that the button's own
+ * "Added" state is gone (#74): the header cart link (#cart-link, Base.astro)
+ * updates its count in place and briefly scales up (`.cart-bump`,
+ * global.css). Reaches across from this island into the layout's plain
+ * server-rendered markup via a DOM id rather than any shared state — the two
+ * have no common parent to lift state into, same reasoning ProductCarousel
+ * and the old ProductActions once needed a module-level store for (see this
+ * file's own top-of-file note on fit-store.ts's removal).
+ */
+function bumpCartBadge(d: Dict) {
+  const link = document.getElementById('cart-link')
+  if (!link) return
+  const count = readCartCount()
+  link.setAttribute('aria-label', count > 0 ? fmt(d.cartCount, { n: count }) : d.cart)
+  let badge = link.querySelector<HTMLSpanElement>('[data-cart-count]')
+  if (count > 0) {
+    if (!badge) {
+      badge = document.createElement('span')
+      badge.dataset.cartCount = ''
+      badge.setAttribute('aria-hidden', 'true')
+      badge.className = 'font-mono text-[10px] tabular-nums'
+      link.appendChild(badge)
+    }
+    badge.textContent = String(count)
+  } else {
+    badge?.remove()
+  }
+  // Remove-then-reflow-then-add restarts the CSS animation even when a
+  // second add lands while the first bump is still playing — a class that's
+  // already present wouldn't retrigger it.
+  link.classList.remove('cart-bump')
+  void link.offsetWidth
+  link.classList.add('cart-bump')
 }
 
 interface FitOption {
@@ -77,10 +127,9 @@ type Props =
       /**
        * Read out of `Astro.url.searchParams` by the caller and passed
        * straight through, so the server render and the first client render
-       * agree on `added`/`error` from the same props — see SignupForm.tsx's
-       * `initialSuccess`/`initialErrorCode` for the pattern this mirrors.
+       * agree on `error` from the same prop — see SignupForm.tsx's
+       * `initialErrorCode` for the pattern this mirrors.
        */
-      initialAdded?: boolean
       initialErrorCode?: string
     })
 
@@ -115,8 +164,8 @@ const CHROME_REM = { base: 21.03125, sm: 19.03125 }
  * to its own always-open section below the fold (ProductDetails.astro) —
  * nothing left here to disclose into. What's fixed-height now is only the
  * price row (an error can replace it) and the button's own label (idle /
- * "Ajout…" / "Ajouté…"), both `product/Slot.tsx` rollers so neither changes
- * the band's total height.
+ * "Ajout…"), both `product/Slot.tsx` rollers so neither changes the band's
+ * total height.
  */
 export default function ProductStage(props: Props) {
   const { locale, d, productId, productName, fits, initialFit, commerceEnabled } = props
@@ -124,9 +173,6 @@ export default function ProductStage(props: Props) {
   const [fit, setFit] = useState<FitId>(initialFit)
   const [size, setSize] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  // Seeded from the query string /api/cart's no-JS redirect folds the
-  // outcome into — see the props doc on `initialAdded`/`initialErrorCode`.
-  const [added, setAdded] = useState(() => (commerceEnabled && props.initialAdded) ?? false)
   const [error, setError] = useState(() =>
     commerceEnabled && props.initialErrorCode ? errorMessage(d, props.initialErrorCode) : ''
   )
@@ -134,16 +180,17 @@ export default function ProductStage(props: Props) {
   function onSizeChange(value: string) {
     setSize(value)
     setError('')
-    setAdded(false)
   }
 
   /**
    * The band's <form> posts natively to /api/cart with no JS at all — this
-   * only intercepts that once hydrated, to stay on the page and roll the
-   * button's own label instead of taking the 303 round trip. `fit`/`size`
-   * travel exactly as the native submit would send them (RAC's radios are
-   * real named inputs — see the JSX below), so there is nothing here for
-   * the two paths to disagree about.
+   * only intercepts that once hydrated, to stay on the page instead of
+   * taking the 303 round trip. `fit`/`size` travel exactly as the native
+   * submit would send them (RAC's radios are real named inputs — see the
+   * JSX below), so there is nothing here for the two paths to disagree
+   * about. Adding deliberately does not navigate anywhere: someone buying
+   * two fits or three sizes should not have to walk back from the cart
+   * between each one. The header badge is the confirmation.
    */
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     if (!commerceEnabled) return
@@ -168,7 +215,7 @@ export default function ProductStage(props: Props) {
       })
       const data = (await res.json()) as { ok: boolean; code?: string }
       if (data.ok) {
-        setAdded(true)
+        bumpCartBadge(d)
         return
       }
       setError(errorMessage(d, data.code ?? ''))
@@ -200,7 +247,7 @@ export default function ProductStage(props: Props) {
   const selectedVariant = variants.find((v) => v.options?.fit === fit && v.options?.size === size)
 
   const priceSlotIndex = error ? 1 : 0
-  const actionSlotIndex = added ? 2 : loading ? 1 : 0
+  const actionSlotIndex = loading ? 1 : 0
   const sizeHintId = `size-hint-${productId}`
 
   return (
@@ -383,9 +430,6 @@ export default function ProductStage(props: Props) {
             </Button>
             <span role="status" aria-live="polite" className="font-mono text-xs uppercase tracking-label">
               {d.productAdding}
-            </span>
-            <span role="status" aria-live="polite" className="font-mono text-xs uppercase tracking-label">
-              {d.productAdded}
             </span>
           </Slot>
 

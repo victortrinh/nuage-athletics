@@ -227,6 +227,7 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
           {
             canBuy && (
               <a
+                id="cart-link"
                 href={cartHref}
                 aria-label={cartCount > 0 ? fmt(d.cartCount, { n: cartCount }) : d.cart}
                 class={cn(
@@ -237,7 +238,7 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
                 <CartIcon />
                 {
                   cartCount > 0 && (
-                    <span aria-hidden="true" class="font-mono text-[10px] tabular-nums">
+                    <span data-cart-count aria-hidden="true" class="font-mono text-[10px] tabular-nums">
                       {cartCount}
                     </span>
                   )

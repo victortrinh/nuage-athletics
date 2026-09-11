@@ -80,7 +80,12 @@ export default defineConfig({
       // condition sky-motion.e2e.ts exists to assert is NOT the case.
       // mobile-layout.e2e.ts is excluded for the same reason: it needs the
       // 'mobile' project's viewport, not this project's Desktop Chrome one.
-      testIgnore: ['**/sky-motion.e2e.ts', '**/forced-colors.e2e.ts', '**/mobile-layout.e2e.ts'],
+      testIgnore: [
+        '**/sky-motion.e2e.ts',
+        '**/cart-motion.e2e.ts',
+        '**/forced-colors.e2e.ts',
+        '**/mobile-layout.e2e.ts',
+      ],
       use: {
         ...devices['Desktop Chrome'],
         // Playwright's Chromium has WebGL2 via SwiftShader, so without this
@@ -95,7 +100,10 @@ export default defineConfig({
     },
     {
       name: 'a11y-motion',
-      testMatch: '**/sky-motion.e2e.ts',
+      // The only project without reducedMotion: 'reduce', so it is where
+      // every `motion-safe` behaviour on the site gets asserted to actually
+      // happen — the sky's toggle, and the cart link's confirmation pulse.
+      testMatch: ['**/sky-motion.e2e.ts', '**/cart-motion.e2e.ts'],
       use: { ...devices['Desktop Chrome'] },
     },
     {

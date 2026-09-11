@@ -181,10 +181,34 @@ of us to see the real buy flow on the real site before it opens.
   add-to-cart button). Everything in the band is visible on arrival now —
   no `+` to open it, no "Détails" toggle swapping the sizes for a
   description panel. Only the price row and the button's own label
-  ("Ajouter au panier" / "Ajout…" / "Ajouté…") still roll
-  (`product/Slot.tsx`), so an error or the button's progress can't change
-  the band's height. The description and spec list moved out of the band
-  entirely, onto an always-open section below the fold
+  ("Ajouter au panier" / "Ajout…") still roll (`product/Slot.tsx`), so an
+  error or the button's progress can't change the band's height. There is
+  no "Added" state any more — the confirmation moved out of the band
+  entirely: a successful hydrated add (`onSubmit` in `ProductStage.tsx`)
+  bumps the header cart link (`#cart-link`, `Base.astro`) in place — its
+  count and `aria-label` update from the same readable `na_cart_n` cookie
+  `/api/cart` just set, and it answers with `.cart-bump` (`global.css`): a
+  short scale bump plus a circle pulsing out of it. That circle starts at
+  `focus-block`'s own 4px offset in the same 2px accent-ink stroke and
+  travels 8px outward, expanded by animating `outline-offset` rather than
+  `scale` — a scaled outline thickens and blurs as it grows, and an outline
+  follows its box's radius, so the stroke stays hard the whole way out. It
+  is drawn on a square pseudo-element sized off the link's own height, not
+  an `inset: 0` one, since a radius on a box that grows with its count
+  would draw an ellipse. Both
+  parts are reduced-motion-gated and the cart page's steppers reuse the
+  same class, so every cart change answers identically wherever it came
+  from. `e2e/cart-motion.e2e.ts` pins that it fires (and re-fires on a
+  second add) with motion allowed; `behavior.e2e.ts` pins that it doesn't
+  under `reduce` — the count changing is what carries the information.
+  Adding deliberately does **not**
+  navigate to the cart: someone buying two fits or three sizes shouldn't
+  have to walk back from the cart between each one. It was tried the other
+  way and reverted for exactly that reason — don't reintroduce it. The
+  no-JS fallback lands back on the product page too (`added=1`), which the
+  page reads for nothing; it just renders the ordinary idle band. The
+  description and spec list moved out
+  of the band entirely, onto an always-open section below the fold
   (`ProductDetails.astro`, still gated on `commerceEnabled`) — there's
   nothing left to disclose into. The size row is seven identically sized,
   unboxed buttons — they stretch to fill their own grid column and carry no
@@ -218,6 +242,24 @@ of us to see the real buy flow on the real site before it opens.
   `src/pages/en/cart.astro` and `CartView.astro`. Checkout, from the cart
   page, is a redirect to Shopify's own hosted `cart.checkoutUrl`; there is no
   checkout UI in this repo.
+- **The cart page's steppers are progressively enhanced, not an island.**
+  Each `+`/`−`/remove is a native `<form>` POST to `/api/cart` and still is
+  with no JS — the 303 back to the cart page is the whole mechanism there.
+  `CartView.astro`'s own `<script>` intercepts those submits once hydrated
+  and, rather than re-rendering anything itself, lets `fetch` follow that
+  same 303 and swaps `#cart-body` for the one in the response, syncing
+  `#cart-link` from the same document. So prices, the `−` button's flip to
+  `remove` at quantity 1, and the empty-cart state are still rendered
+  exactly once, server-side, by this file — there is no second
+  implementation on the client to drift out of step, and no React on this
+  route. Three things the swap has to keep doing, all asserted in
+  `e2e/behavior.e2e.ts`: focus returns to the control that was pressed (or
+  the `h1`, when a remove took that control away), the announcement goes
+  through `#cart-status` **outside** the swapped region (a live region that
+  was itself just replaced announces nothing), and the whole thing still
+  degrades — the no-JS half of that contract has its own assertions in the
+  JavaScript-disabled test. The checkout form deliberately carries no
+  `data-cart-form`, since it must stay a real navigation to Shopify.
   The Quebec CPA pre-contract disclosure that used to sit in a closed
   `<details>` at the bottom of this page (`CpaDisclosure.astro`) is now its
   own route (`precontract` in `ROUTES`), linked from the footer, the nav
@@ -307,18 +349,22 @@ defer behind; it stays `client:load`.
   `inputVariants`, `labelVariants`, `fieldErrorVariants` from these directly —
   never from the `.tsx` primitives, which pull in `react-aria-components`.
   `scripts/check-guards.sh` (run by `npm run check`) enforces this.
-- **This site has no radii, with exactly one exception.** `--radius-*` are all
+- **This site has no radii, with exactly two exceptions.** `--radius-*` are all
   `0` in `global.css` except `--radius-full`, which is Tailwind's own value
   again so the product carousel's pagination dots can be dots
   (`ProductCarousel.tsx`) — the reference sets them round, and a 6px square
-  reads as grit. That token is not a general reopening: `check-guards.sh`
-  fails the build on any `rounded` utility in a `class`/`className` attribute
-  *or* in a quoted string in a `.tsx`/`.astro` file (which is how a
-  multi-line `cn()` call carries one), unless the line also carries the
-  marker `guard-allow-rounded`. Exactly one line does today. Adding a second
-  is a design decision that has to be written next to the class and shows up
-  in a diff as one; a circle drawn some other way to dodge the grep is the
-  regression this is here to catch.
+  reads as grit — and so the cart link's confirmation ring can be a ring
+  (`#cart-link.cart-bump::after`, same file). Both are things that are
+  circles or they are nothing. That token is not a general reopening:
+  `check-guards.sh` fails the build on any `rounded` utility in a
+  `class`/`className` attribute, in a quoted string in a `.tsx`/`.astro`
+  file (which is how a multi-line `cn()` call carries one), *or* as a
+  declared non-zero `border-radius` anywhere in `src/` — CSS included —
+  unless the line also carries the marker `guard-allow-rounded`. Exactly
+  two lines do today. Adding a third is a design decision that has to be
+  written next to the declaration and shows up in a diff as one; a circle
+  drawn some other way to dodge the grep is the regression this is here to
+  catch.
 - **Focus is a hard offset outline, not a ring** (the WebGL sky washes soft
   rings out). Defined once as the `focus-block` utility in `global.css`, applied
   to native `:focus-visible` and to RAC's `data-[focus-visible]` attribute

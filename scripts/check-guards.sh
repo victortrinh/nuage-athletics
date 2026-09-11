@@ -33,14 +33,20 @@ if grep -rnE "['\"][^'\"]*\brounded-[a-zA-Z0-9[]" src/ --include=*.tsx --include
   fail=1
 fi
 
-# Same rule, inline styles. Outbound email (src/lib/email.ts) can't use
+# Same rule, declared radii. Outbound email (src/lib/email.ts) can't use
 # Tailwind classes at all, so the check above can't see it — this catches a
-# hand-written `style="border-radius:4px"` slipping into the shell. Two
-# passes rather than one lookahead regex: -P isn't available in every grep
-# this runs under (notably BSD grep, plain -E only), so this lists every
-# declaration and then subtracts the "0" / "0px" ones a plain ERE can match
-# directly.
-if grep -rnE 'border-radius:\s*[^;]+;' src/ | grep -vE 'border-radius:\s*0(px)?\s*;'; then
+# hand-written `style="border-radius:4px"` slipping into the shell, and a
+# rule in global.css doing the same. Two passes rather than one lookahead
+# regex: -P isn't available in every grep this runs under (notably BSD grep,
+# plain -E only), so this lists every declaration and then subtracts the
+# "0" / "0px" ones a plain ERE can match directly.
+#
+# The marker excuses a line here too, on the same terms as the two checks
+# above: a radius may exist, but only where someone wrote down next to it
+# why. Without this the rule would be stricter in CSS than in markup, which
+# would push a deliberate exception toward being drawn some other way to
+# dodge the grep — precisely the regression these checks exist to catch.
+if grep -rnE 'border-radius:\s*[^;]+;' src/ | grep -vE 'border-radius:\s*0(px)?\s*;' | grep -v "$ALLOW_ROUNDED"; then
   echo "✘ found a non-zero inline border-radius — this site has no radii (see global.css)" >&2
   fail=1
 fi

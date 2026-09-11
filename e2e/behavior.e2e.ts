@@ -307,8 +307,15 @@ test('a mis-tap on the add-to-cart button before a size is picked shows an error
   // Picking a size afterwards still works — the earlier mis-tap didn't
   // leave the band in some stuck state.
   await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
-  await button.click()
-  await expect(page.getByText('Ajouté…')).toBeVisible()
+  const [response] = await Promise.all([
+    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+    button.click(),
+  ])
+  expect(response.ok()).toBe(true)
+  // No "Added" state and no navigation: the band rolls back to its ordinary
+  // idle button and the visitor stays put, free to add another size.
+  await expect(button).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 })
 
 /**
@@ -822,15 +829,18 @@ test.describe('founder preview', () => {
   })
 
   /**
-   * The real multi-item cart (#33): adding a size stays on the product
-   * page (the band rolls to "Ajouté…" via the hydrated fetch to
-   * /api/cart), the header picks up a cart link once there's a line in it,
-   * and the cart page itself shows that line and hands checkout off to
-   * Shopify's hosted page — asserted against the storefront stub's own
-   * host (STUB_CHECKOUT_HOST) rather than following the redirect, since
-   * there's no real Shopify checkout to land on in this suite.
+   * The real multi-item cart (#33), and its confirmation (#74): an add
+   * bumps the header cart badge in place — no reload needed for the
+   * count/aria-label to update, since ProductStage.tsx reads the same
+   * `na_cart_n` cookie /api/cart just set — and the page stays put, so a
+   * second size can go in without walking back from anywhere. Only then,
+   * on the visitor's own click, does the cart page show the lines and hand
+   * checkout off to Shopify's hosted page. Checkout is asserted against the
+   * storefront stub's own host (STUB_CHECKOUT_HOST) rather than following
+   * the redirect, since there's no real Shopify checkout to land on in this
+   * suite.
    */
-  test('adding a size stays on the page, and the cart carries it through to checkout', async ({
+  test('adding sizes bumps the cart badge without leaving the page, and the cart carries them through to checkout', async ({
     browser,
   }) => {
     const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
@@ -844,25 +854,44 @@ test.describe('founder preview', () => {
     const cartLink = page.getByRole('link', { name: 'Panier', exact: true })
     await expect(cartLink).toBeVisible()
 
-    await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+    const sizes = page.getByRole('radiogroup', { name: 'Taille' })
     const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
-    await button.click()
 
-    // The button's own label rolls to confirm the add — no redirect, no
-    // navigation away from the product page.
-    await expect(page.getByText('Ajouté…')).toBeVisible()
+    async function add(size: string) {
+      await sizes.locator('label').filter({ hasText: size }).first().click()
+      const [response] = await Promise.all([
+        page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+        button.click(),
+      ])
+      expect(response.ok()).toBe(true)
+    }
+
+    await add('M')
+    // The badge updates in place — no reload, unlike the header's own first
+    // render, which reads the cookie server-side.
+    await expect(page.getByRole('link', { name: /Panier \(1\)/ })).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 
-    // The header link's count reads straight off the cookie /api/cart just
-    // set (src/layouts/Base.astro) — server-rendered, so it only reflects
-    // the add on the next render, not the in-place client update above.
-    await page.reload()
-    const cartLinkWithCount = page.getByRole('link', { name: /Panier \(1\)/ })
-    await expect(cartLinkWithCount).toBeVisible()
-    await cartLinkWithCount.click()
+    // This project runs under reducedMotion: 'reduce', so the confirmation
+    // pulse is marked but never animates — the count still changed, which is
+    // the part that carries the information. cart-motion.e2e.ts holds the
+    // other half: that it does animate when motion is allowed.
+    const link = page.locator('#cart-link')
+    await expect(link).toHaveClass(/cart-bump/)
+    expect(
+      await link.evaluate((el) => el.getAnimations({ subtree: true }).length)
+    ).toBe(0)
 
+    // The whole point of not navigating: a second size goes in from right
+    // here, and the badge keeps count.
+    await add('L')
+    const cartLinkWithCount = page.getByRole('link', { name: /Panier \(2\)/ })
+    await expect(cartLinkWithCount).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
+
+    await cartLinkWithCount.click()
     await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
-    await expect(page.getByText(/Classique/)).toBeVisible()
+    await expect(page.getByText(/Classique/).first()).toBeVisible()
 
     // The stub's checkout host isn't a real, resolvable store, so this reads
     // /api/cart's own 303 response rather than letting the browser actually
@@ -890,8 +919,13 @@ test.describe('founder preview', () => {
    * order-summary redesign replaced it with steppers. `−` at quantity 1
    * removes the line rather than going to 0, which this asserts explicitly
    * since it's the one place the two steppers don't mirror each other.
+   *
+   * Hydrated, those submits no longer reload the document: CartView.astro's
+   * script posts the same form and swaps `#cart-body` for the server's own
+   * next render. The marker below is how that's asserted — a variable set
+   * on `window` survives a DOM swap and would not survive a navigation.
    */
-  test('the cart page steppers update quantity, and stepping down from 1 removes the line', async ({
+  test('the cart page steppers update quantity in place, and stepping down from 1 removes the line', async ({
     browser,
   }) => {
     const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
@@ -899,13 +933,18 @@ test.describe('founder preview', () => {
     await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
     await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
-    await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click()
-    await expect(page.getByText('Ajouté…')).toBeVisible()
+    const [response] = await Promise.all([
+      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+      page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click(),
+    ])
+    expect(response.ok()).toBe(true)
 
     await page.goto(ROUTES.cart['fr-CA'])
-    // The one line on the page — scoped by aria-live rather than by text, so
-    // this doesn't also match a price or a size elsewhere in the row.
-    const qty = page.locator('[aria-live="polite"]')
+    await page.evaluate(() => ((window as unknown as Record<string, unknown>).naNoReload = true))
+
+    // The one line on the page — scoped by its own data hook rather than by
+    // text, so this doesn't also match a price or a size elsewhere in the row.
+    const qty = page.locator('[data-cart-qty]')
     await expect(qty).toHaveText('1')
 
     const increase = page.getByRole('button', { name: /^Augmenter la quantité/ })
@@ -913,6 +952,8 @@ test.describe('founder preview', () => {
 
     await increase.click()
     await expect(qty).toHaveText('2')
+    // The header count follows the same response, with no reload of its own.
+    await expect(page.getByRole('link', { name: /Panier \(2\)/ })).toBeVisible()
 
     await decrease.click()
     await expect(qty).toHaveText('1')
@@ -922,6 +963,11 @@ test.describe('founder preview', () => {
     const remove = page.getByRole('button', { name: /^Retirer/ })
     await remove.click()
     await expect(page.getByText(/Votre panier est vide/)).toBeVisible()
+
+    // Three mutations, still the same document.
+    expect(
+      await page.evaluate(() => (window as unknown as Record<string, unknown>).naNoReload)
+    ).toBe(true)
 
     await context.close()
   })
@@ -956,11 +1002,26 @@ test.describe('founder preview', () => {
       .click({ force: true })
     await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click({ force: true })
 
-    // The native POST 303s back here with added=1 — ProductView.astro reads
-    // it server-side into ProductStage's initialAdded prop, so the button's
-    // "Ajouté…" label is in the very first (and, with no JS, only) render.
+    // The native POST 303s back here with added=1 — /api/cart still sets it,
+    // but ProductView.astro no longer reads it into anything: the button's
+    // ordinary idle label is in the very first (and, with no JS, only)
+    // render, same as a fresh visit.
     await expect(page).toHaveURL(/\?added=1$/)
-    await expect(page.getByText('Ajouté…')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toBeVisible()
+
+    // And the cart page's own steppers degrade the same way: with no script
+    // to intercept them, `+` is the plain form POST it has always been, and
+    // /api/cart's 303 lands back on the cart with the new quantity rendered.
+    // This is the half CartView.astro's script must never break.
+    await page.goto(ROUTES.cart['fr-CA'])
+    await expect(page.locator('[data-cart-qty]')).toHaveText('1')
+    await page.getByRole('button', { name: /^Augmenter la quantité/ }).click({ force: true })
+
+    // `added=1` because /api/cart's form responder folds every success into
+    // that one param (src/lib/form-endpoint.ts), whichever intent it was;
+    // the cart page reads nothing out of it.
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}\\?added=1$`))
+    await expect(page.locator('[data-cart-qty]')).toHaveText('2')
 
     await context.close()
   })
