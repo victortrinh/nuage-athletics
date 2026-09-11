@@ -171,10 +171,14 @@ of us to see the real buy flow on the real site before it opens.
   bumps the header cart link (`#cart-link`, `Base.astro`) in place — its
   count and `aria-label` update from the same readable `na_cart_n` cookie
   `/api/cart` just set, and it answers with `.cart-bump` (`global.css`): a
-  short scale bump plus a ring pulsing out of it. That ring is the
-  `focus-block` focus ring's own geometry travelling outward — a 2px
-  accent-ink outline, expanded by animating `outline-offset` rather than
-  `scale`, since a scaled outline thickens and blurs as it grows. Both
+  short scale bump plus a circle pulsing out of it. That circle starts at
+  `focus-block`'s own 4px offset in the same 2px accent-ink stroke and
+  travels 8px outward, expanded by animating `outline-offset` rather than
+  `scale` — a scaled outline thickens and blurs as it grows, and an outline
+  follows its box's radius, so the stroke stays hard the whole way out. It
+  is drawn on a square pseudo-element sized off the link's own height, not
+  an `inset: 0` one, since a radius on a box that grows with its count
+  would draw an ellipse. Both
   parts are reduced-motion-gated and the cart page's steppers reuse the
   same class, so every cart change answers identically wherever it came
   from. `e2e/cart-motion.e2e.ts` pins that it fires (and re-fires on a
@@ -328,18 +332,22 @@ defer behind; it stays `client:load`.
   `inputVariants`, `labelVariants`, `fieldErrorVariants` from these directly —
   never from the `.tsx` primitives, which pull in `react-aria-components`.
   `scripts/check-guards.sh` (run by `npm run check`) enforces this.
-- **This site has no radii, with exactly one exception.** `--radius-*` are all
+- **This site has no radii, with exactly two exceptions.** `--radius-*` are all
   `0` in `global.css` except `--radius-full`, which is Tailwind's own value
   again so the product carousel's pagination dots can be dots
   (`ProductCarousel.tsx`) — the reference sets them round, and a 6px square
-  reads as grit. That token is not a general reopening: `check-guards.sh`
-  fails the build on any `rounded` utility in a `class`/`className` attribute
-  *or* in a quoted string in a `.tsx`/`.astro` file (which is how a
-  multi-line `cn()` call carries one), unless the line also carries the
-  marker `guard-allow-rounded`. Exactly one line does today. Adding a second
-  is a design decision that has to be written next to the class and shows up
-  in a diff as one; a circle drawn some other way to dodge the grep is the
-  regression this is here to catch.
+  reads as grit — and so the cart link's confirmation ring can be a ring
+  (`#cart-link.cart-bump::after`, same file). Both are things that are
+  circles or they are nothing. That token is not a general reopening:
+  `check-guards.sh` fails the build on any `rounded` utility in a
+  `class`/`className` attribute, in a quoted string in a `.tsx`/`.astro`
+  file (which is how a multi-line `cn()` call carries one), *or* as a
+  declared non-zero `border-radius` anywhere in `src/` — CSS included —
+  unless the line also carries the marker `guard-allow-rounded`. Exactly
+  two lines do today. Adding a third is a design decision that has to be
+  written next to the declaration and shows up in a diff as one; a circle
+  drawn some other way to dodge the grep is the regression this is here to
+  catch.
 - **Focus is a hard offset outline, not a ring** (the WebGL sky washes soft
   rings out). Defined once as the `focus-block` utility in `global.css`, applied
   to native `:focus-visible` and to RAC's `data-[focus-visible]` attribute
