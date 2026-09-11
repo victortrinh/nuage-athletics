@@ -2,6 +2,7 @@ import type { Locale } from '../../i18n/config'
 // Explicit extension: scripts/shopify-check.ts imports this file under plain
 // node, which resolves nothing for you.
 import { getCatalogueProduct } from '../catalogue.ts'
+import { hmacBase64, timingSafeEqual } from '../crypto.ts'
 import type { Cart, CartLine, Money, Product, ProductVariant } from './types'
 
 /**
@@ -13,9 +14,9 @@ import type { Cart, CartLine, Money, Product, ProductVariant } from './types'
  * joined here by SKU, which is why the size rename had to land before Shopify
  * inventory was loaded: the SKU is the join key.
  *
- * Raw `fetch` against GraphQL rather than `@shopify/storefront-api-client`,
- * for the same reason `stripe.ts` skips the Stripe SDK: it would need a custom
- * HTTP client to run on Workers, and this file uses one query.
+ * Raw `fetch` against GraphQL rather than `@shopify/storefront-api-client`:
+ * that client would need a custom HTTP client to run on Workers, and this
+ * file uses one query.
  */
 
 /**
@@ -253,10 +254,34 @@ async function inventoryFor(config: StorefrontConfig): Promise<Inventory> {
   return pending
 }
 
-/** Test seam — the module-level cache outlives a single test otherwise. */
+/**
+ * Drops the cached price/availability read so the next request re-fetches
+ * from Shopify instead of serving up to CACHE_TTL_MS of staleness.
+ *
+ * Two callers: the `orders/paid` webhook route, which invalidates the moment
+ * an order confirms so a size that just sold out stops reading as available
+ * on the very next request; and tests, where the module-level cache would
+ * otherwise outlive a single test.
+ */
 export function resetStorefrontCache(): void {
   cache.clear()
   inFlight.clear()
+}
+
+/**
+ * Verifies Shopify's webhook signature — base64 HMAC-SHA256 over the raw
+ * request body, carried in `X-Shopify-Hmac-Sha256` — a different scheme from
+ * Stripe's hex `t=`/`v1=` header, hence the separate `hmacBase64` helper in
+ * crypto.ts rather than reusing `hmacHex`.
+ */
+export async function verifyShopifyWebhook(
+  secret: string,
+  payload: string,
+  header: string | null
+): Promise<boolean> {
+  if (!header) return false
+  const expected = await hmacBase64(secret, payload)
+  return timingSafeEqual(expected, header)
 }
 
 /**

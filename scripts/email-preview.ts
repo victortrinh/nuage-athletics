@@ -20,7 +20,6 @@ import {
   renderEmailText,
   styleMarkdownHtml,
   confirmationBodyHtml,
-  orderConfirmedBodyHtml,
 } from '../src/lib/email.ts'
 import { UI } from '../src/i18n/ui.ts'
 
@@ -55,20 +54,6 @@ for (const locale of LOCALES) {
     unsubUrl,
   })
   write(`confirmation-${locale}`, confirmationHtml, confirmationText)
-
-  const total = new Intl.NumberFormat(locale, { style: 'currency', currency: 'cad' }).format(65)
-  const orderHtml = renderEmailShell({
-    locale,
-    siteUrl: SITE_URL,
-    heading: d.orderConfirmedTitle,
-    preheader: d.orderConfirmedBody,
-    bodyHtml: orderConfirmedBodyHtml(d, total),
-  })
-  const orderText = renderEmailText({
-    heading: d.orderConfirmedTitle,
-    bodyText: `${d.orderConfirmedBody}\n\n${total}`,
-  })
-  write(`order-confirmed-${locale}`, orderHtml, orderText)
 }
 
 const broadcastFile = process.argv[2]

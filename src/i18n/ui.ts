@@ -33,8 +33,8 @@ import type { Locale } from './config.ts'
  *     success are announced through a live region, where being understood
  *     on the first hearing beats charm.
  *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
- *     mailUnsub, mailSubject/mailHeading/mailCta, orderCancelled*, privacy,
- *     terms, precontract, rights, productOutOfStock, productAddToCart.
+ *     mailUnsub, mailSubject/mailHeading/mailCta, privacy, terms,
+ *     precontract, rights, productOutOfStock, productAddToCart.
  *   - dropAnnounceAvailability most of the rest: it is the only place the site
  *     tells a shopper when they can buy, on a page anyone can now reach. A
  *     stated availability date is a representation, so it says a real date
@@ -146,10 +146,6 @@ export type Dict = {
   cartDeferred: string
   cartCheckout: string
   errorCartGeneric: string
-  orderConfirmedTitle: string
-  orderConfirmedBody: string
-  orderCancelledTitle: string
-  orderCancelledBody: string
   // background sky effect
   skyPause: string
   skyResume: string
@@ -240,11 +236,6 @@ export const UI: Record<Locale, Dict> = {
     cartDeferred: 'Calculé à la caisse',
     cartCheckout: 'Passer à la caisse',
     errorCartGeneric: "Le panier n'a pas pu être mis à jour. Réessayez dans un moment.",
-    orderConfirmedTitle: 'Commande confirmée',
-    orderConfirmedBody:
-      'Merci. Un courriel de confirmation est en route.',
-    orderCancelledTitle: 'Commande annulée',
-    orderCancelledBody: "Votre commande n'a pas été complétée. Aucun montant n'a été prélevé.",
     skyPause: 'Figer le ciel',
     skyResume: 'Animer le ciel',
     promptLabel: 'Recevez nos actualités',
@@ -330,10 +321,6 @@ export const UI: Record<Locale, Dict> = {
     cartDeferred: 'Calculated at checkout',
     cartCheckout: 'Checkout',
     errorCartGeneric: 'The cart could not be updated. Try again in a moment.',
-    orderConfirmedTitle: 'Order confirmed',
-    orderConfirmedBody: 'Thanks. A confirmation email is on its way.',
-    orderCancelledTitle: 'Order cancelled',
-    orderCancelledBody: 'Your order was not completed. You have not been charged.',
     skyPause: 'Pause the sky',
     skyResume: 'Animate the sky',
     promptLabel: 'Get our updates',

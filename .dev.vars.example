@@ -3,8 +3,6 @@
 # Careful: vitest reads this file too (via the Cloudflare pool), so anything
 # set here also applies to the test suite.
 RESEND_API_KEY=re_xxxxxxxxxxxx
-STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
-STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
 
 # Shopify Storefront API. The price and the sold-out state on the product page
 # come from here and nowhere else, so without this the buy band never renders —
@@ -12,6 +10,11 @@ STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
 # store it belongs to is SHOPIFY_STORE_DOMAIN in wrangler.toml's [vars], which
 # is where the domain lives now (it is not a credential).
 SHOPIFY_STOREFRONT_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Signs the order-paid webhook (src/pages/api/webhooks/shopify.ts). Must match
+# the signing secret Shopify shows when the webhook subscription is created in
+# the admin.
+SHOPIFY_WEBHOOK_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Founder preview. With this set, `/?preview=let-me-in` against `wrangler dev`
 # turns on prices and the buy flow for your browser only; `/?preview=` (empty)

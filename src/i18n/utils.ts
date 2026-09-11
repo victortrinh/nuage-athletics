@@ -21,8 +21,6 @@ export const ROUTES = {
   },
   confirmed: { 'fr-CA': '/inscription-confirmee/', 'en-CA': '/en/confirmed/' },
   unsubscribed: { 'fr-CA': '/desabonnement/', 'en-CA': '/en/unsubscribed/' },
-  orderConfirmed: { 'fr-CA': '/commande-confirmee/', 'en-CA': '/en/order-confirmed/' },
-  orderCancelled: { 'fr-CA': '/commande-annulee/', 'en-CA': '/en/order-cancelled/' },
   cart: { 'fr-CA': '/panier/', 'en-CA': '/en/cart/' },
 } as const
 
@@ -58,13 +56,10 @@ export const INDEXABLE: Record<RouteId, boolean> = {
   privacy: false,
   terms: false,
   precontract: false,
-  // Dead ends reached from an email link or a checkout return. Nothing on
-  // them is worth ranking, and confirmed/unsubscribed leak an intent we have
-  // no business publishing.
+  // Dead ends reached only from an email link. Nothing on them is worth
+  // ranking, and they leak an intent we have no business publishing.
   confirmed: false,
   unsubscribed: false,
-  orderConfirmed: false,
-  orderCancelled: false,
   // A visitor's own working cart — nothing on it is worth ranking, and the
   // same reasoning INDEXABLE gives confirmed/unsubscribed applies here too.
   cart: false,
@@ -80,9 +75,9 @@ export const INDEXABLE: Record<RouteId, boolean> = {
  * `Record<RouteId, boolean>` for the same reason INDEXABLE is one: a route
  * added to ROUTES is a type error here until someone decides.
  *
- * Off for the three dead ends reached only from an email link or a checkout
- * return: offering a signup to someone who just subscribed, or just
- * unsubscribed, is a CASL-flavoured problem, not only a UX one.
+ * Off for the two dead ends reached only from an email link: offering a
+ * signup to someone who just subscribed, or just unsubscribed, is a
+ * CASL-flavoured problem, not only a UX one.
  */
 export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   home: true,
@@ -91,8 +86,6 @@ export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   precontract: true,
   confirmed: false,
   unsubscribed: false,
-  orderConfirmed: false,
-  orderCancelled: true,
   // The visitor is already mid-purchase-decision on this page; a signup
   // prompt competing with the checkout button for attention is the wrong
   // moment for it.

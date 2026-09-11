@@ -4,7 +4,6 @@ import {
   renderEmailShell,
   renderEmailText,
   sendConfirmationEmail,
-  sendOrderConfirmationEmail,
   styleMarkdownHtml,
 } from '../src/lib/email'
 import { SENDER_IDENTITY } from '../src/lib/consent'
@@ -17,21 +16,6 @@ describe('sendConfirmationEmail', () => {
       locale: 'fr-CA',
       siteUrl: 'https://nuageathletics.com',
       token: 'deadbeef',
-    })
-    expect(res.ok).toBe(false)
-    expect(res.error).toMatch(/RESEND_API_KEY/)
-  })
-})
-
-describe('sendOrderConfirmationEmail', () => {
-  it('fails instead of pretending to send when no API key is configured', async () => {
-    const res = await sendOrderConfirmationEmail({
-      apiKey: undefined,
-      to: 'someone@example.com',
-      locale: 'fr-CA',
-      siteUrl: 'https://nuageathletics.com',
-      amountTotal: 12000,
-      currency: 'cad',
     })
     expect(res.ok).toBe(false)
     expect(res.error).toMatch(/RESEND_API_KEY/)

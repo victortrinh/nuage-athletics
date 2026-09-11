@@ -70,9 +70,9 @@ function escapeHtml(s: string): string {
  * identification, a physical mailing address, and an unsubscribe mechanism in
  * every *commercial* email — this is the one place that renders all three, so
  * every commercial call site (confirmation emails, broadcasts) gets them
- * automatically. Order confirmations are transactional, not commercial, so
- * CASL doesn't require an unsubscribe link on them — unsubUrl is optional and
- * that line is simply omitted when there's nothing to unsubscribe from.
+ * automatically. A transactional email doesn't require an unsubscribe link
+ * under CASL — unsubUrl is optional here and that line is simply omitted
+ * when there's nothing to unsubscribe from.
  *
  * Table-based layout, not divs: Outlook's Word rendering engine ignores
  * max-width on a div but honours a fixed-width <table>, and the MSO
@@ -321,88 +321,6 @@ export async function sendConfirmationEmail({
       html,
       text,
       headers: { 'List-Unsubscribe': `<${unsubUrl}>` },
-    }),
-  })
-
-  if (!res.ok) {
-    return { ok: false, error: `resend ${res.status}: ${await res.text()}` }
-  }
-  return { ok: true }
-}
-
-interface OrderEmailArgs {
-  apiKey: string | undefined
-  to: string
-  locale: Locale
-  siteUrl: string
-  amountTotal: number
-  currency: string
-}
-
-/**
- * The order confirmation's body markup — see confirmationBodyHtml's doc
- * comment for why this is pulled out rather than inlined.
- */
-export function orderConfirmedBodyHtml(d: Dict, total: string): string {
-  const t = EMAIL_THEME
-  return `
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};text-align:center;">${d.orderConfirmedBody}</p>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;font-weight:600;color:${t.ink};text-align:center;">${total}</p>`
-}
-
-/**
- * Order confirmation — transactional, sent from the Stripe webhook once a
- * payment actually succeeds. Bill 96 requires this in the buyer's language
- * just as much as any marketing page; it isn't exempt just for being a
- * receipt.
- */
-export async function sendOrderConfirmationEmail({
-  apiKey,
-  to,
-  locale,
-  siteUrl,
-  amountTotal,
-  currency,
-}: OrderEmailArgs): Promise<{ ok: boolean; error?: string }> {
-  const d = UI[locale]
-  const total = new Intl.NumberFormat(locale, { style: 'currency', currency }).format(
-    amountTotal / 100
-  )
-
-  const html = renderEmailShell({
-    locale,
-    siteUrl,
-    heading: d.orderConfirmedTitle,
-    preheader: d.orderConfirmedBody,
-    bodyHtml: orderConfirmedBodyHtml(d, total),
-  })
-  const text = renderEmailText({
-    heading: d.orderConfirmedTitle,
-    bodyText: `${d.orderConfirmedBody}\n\n${total}`,
-  })
-
-  // Same rule as the confirmation email: log in dev, never report a send that
-  // did not happen. The Stripe webhook logs this and still returns 200, so a
-  // missing receipt cannot trigger a retry and reprocess the order.
-  if (!apiKey) {
-    if (import.meta.env?.DEV) {
-      console.log(`[email:dev] order confirmation for ${to} -> ${total}`)
-    }
-    return { ok: false, error: 'RESEND_API_KEY is not configured' }
-  }
-
-  const res = await fetch(RESEND_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: `${SENDER_IDENTITY.name} <${SENDER_IDENTITY.email}>`,
-      to: [to],
-      subject: d.orderConfirmedTitle,
-      html,
-      text,
     }),
   })
 
