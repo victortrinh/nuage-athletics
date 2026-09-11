@@ -66,6 +66,15 @@ export interface CheckoutInput {
 export interface CartLine {
   id: string
   merchandiseId: string
+  /**
+   * The catalogue's own join key — `''` when Shopify's variant carries none.
+   * `CartView.astro` uses it to look the line back up in `catalogue.ts` for a
+   * thumbnail, fit and size; a line that doesn't join still renders from
+   * `label`/`unitPrice`/`linePrice` alone. See non-negotiable 5.5: this is a
+   * lookup key, not a price, so there is no failure mode here for that rule
+   * to guard against.
+   */
+  sku: string
   label: string
   quantity: number
   unitPrice: Money
@@ -76,6 +85,22 @@ export interface Cart {
   id: string
   lines: CartLine[]
   subtotal: Money
+  /**
+   * Shopify's own grand total (`cost.totalAmount`) — rendered as-is, never
+   * computed from `subtotal` here, so a store that later adds shipping or
+   * tax can't silently disagree with what this page shows. Today, with
+   * neither configured, it equals `subtotal`.
+   */
+  total: Money
+  /**
+   * `null` when Shopify has no tax registration to quote from yet (true for
+   * the first drop) — distinct from a real $0 so the render can say
+   * "calculated at checkout" instead of a number that would otherwise read
+   * as a considered answer. See non-negotiable 5.5's reasoning: an
+   * advertised total is one a Quebec merchant is expected to honour, and a
+   * silently-omitted tax is not an honest total.
+   */
+  tax: Money | null
   /** Shopify's hosted checkout for this cart — where "Buy" hands off to. */
   checkoutUrl: string
 }

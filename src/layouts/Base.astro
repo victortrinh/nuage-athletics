@@ -6,6 +6,7 @@ import Sky from '../components/Sky.astro'
 import Logo from '../components/Logo.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import NavIcon from '../components/NavIcon.astro'
+import CartIcon from '../components/CartIcon.astro'
 import SignupPrompt from '../components/SignupPrompt.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, SHOWS_SIGNUP_PROMPT, SIGNUP_PROMPT_ENABLED, type RouteId } from '../i18n/utils'
@@ -227,10 +228,20 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
             canBuy && (
               <a
                 href={cartHref}
-                class="press underline-sweep text-xs uppercase tracking-label hover:text-accent-ink"
                 aria-label={cartCount > 0 ? fmt(d.cartCount, { n: cartCount }) : d.cart}
+                class={cn(
+                  buttonVariants({ variant: 'quiet' }),
+                  'group flex h-8 min-w-8 items-center justify-center gap-1'
+                )}
               >
-                {cartCount > 0 ? `${d.cart} (${cartCount})` : d.cart}
+                <CartIcon />
+                {
+                  cartCount > 0 && (
+                    <span aria-hidden="true" class="font-mono text-[10px] tabular-nums">
+                      {cartCount}
+                    </span>
+                  )
+                }
               </a>
             )
           }

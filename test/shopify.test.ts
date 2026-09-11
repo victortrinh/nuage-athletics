@@ -285,21 +285,40 @@ function rawCartLine(
   merchandiseId: string,
   quantity: number,
   unitAmount = '65.00',
-  totalAmount?: string
+  totalAmount?: string,
+  sku = SKUS[0]
 ) {
   return {
     id,
     quantity,
     cost: { totalAmount: { amount: totalAmount ?? (Number(unitAmount) * quantity).toFixed(2), currencyCode: 'CAD' } },
-    merchandise: { id: merchandiseId, title: 'Classique / M', price: { amount: unitAmount, currencyCode: 'CAD' } },
+    merchandise: {
+      id: merchandiseId,
+      sku,
+      title: 'Classique / M',
+      price: { amount: unitAmount, currencyCode: 'CAD' },
+    },
   }
 }
 
-function rawCart(id: string, lines: ReturnType<typeof rawCartLine>[], subtotalAmount = '65.00') {
+function rawCart(
+  id: string,
+  lines: ReturnType<typeof rawCartLine>[],
+  subtotalAmount = '65.00',
+  totalAmount = subtotalAmount,
+  totalTaxAmount?: string
+) {
   return {
     id,
     checkoutUrl: `https://nuage-test.myshopify.com/cart/c/${id.split('/').pop()}`,
-    cost: { subtotalAmount: { amount: subtotalAmount, currencyCode: 'CAD' } },
+    cost: {
+      subtotalAmount: { amount: subtotalAmount, currencyCode: 'CAD' },
+      totalAmount: { amount: totalAmount, currencyCode: 'CAD' },
+      // Absent by default, same as a store with no tax registration
+      // configured — parseCart is expected to read that as `tax: null`,
+      // not as an unparseable $0.
+      ...(totalTaxAmount ? { totalTaxAmount: { amount: totalTaxAmount, currencyCode: 'CAD' } } : {}),
+    },
     lines: { nodes: lines },
   }
 }
@@ -342,10 +361,13 @@ describe('cart operations', () => {
       id: CART_ID,
       checkoutUrl: `https://nuage-test.myshopify.com/cart/c/c1`,
       subtotal: { amount: 6500, currency: 'CAD' },
+      total: { amount: 6500, currency: 'CAD' },
+      tax: null,
       lines: [
         {
           id: 'gid://shopify/CartLine/1',
           merchandiseId: MERCH_ID,
+          sku: SKUS[0],
           label: 'Classique / M',
           quantity: 1,
           unitPrice: { amount: 6500, currency: 'CAD' },
@@ -466,6 +488,16 @@ describe('cart operations', () => {
     expect(cart).toBeNull()
     expect(reason).toBe('unreachable')
     expect(detail).toBe('status=500')
+  })
+
+  it('reads a real tax amount when Shopify quotes one, instead of forcing $0', async () => {
+    const line = rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 1)
+    stubStorefront(() => cartQueryResponse(rawCart(CART_ID, [line], '65.00', '69.75', '4.75')))
+
+    const { cart } = await readCart(ENV, CART_ID)
+
+    expect(cart?.total).toEqual({ amount: 6975, currency: 'CAD' })
+    expect(cart?.tax).toEqual({ amount: 475, currency: 'CAD' })
   })
 
   it('joins the live product with each variant’s Shopify merchandise id', async () => {

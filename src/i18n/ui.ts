@@ -123,19 +123,27 @@ export type Dict = {
   // no-JS fit switch — <noscript> links under the carousel (ProductView.astro)
   productViewFit: string
   errorSoldOut: string
-  // cart (src/pages/panier.astro, src/pages/en/cart.astro, /api/cart.ts)
+  // cart (src/components/CartView.astro, /api/cart.ts)
   cart: string
   cartTitle: string
+  cartSummary: string
   cartEmpty: string
   cartEmptyCta: string
   cartCount: string
-  cartQuantity: string
-  cartUpdate: string
-  cartRemove: string
+  // stepper accessible names — no separate remove button; "−" at quantity 1
+  // removes the line, so cartRemoveLabel is that button's name at that point
+  cartIncrease: string
+  cartDecrease: string
   cartRemoveLabel: string
+  cartFit: string
+  cartSize: string
+  cartQty: string
   cartLineTotal: string
   cartSubtotal: string
-  cartSubtotalNote: string
+  cartShipping: string
+  cartTaxes: string
+  cartTotal: string
+  cartDeferred: string
   cartCheckout: string
   errorCartGeneric: string
   orderConfirmedTitle: string
@@ -214,16 +222,22 @@ export const UI: Record<Locale, Dict> = {
     errorSoldOut: 'Cette taille est épuisée.',
     cart: 'Panier',
     cartTitle: 'Votre panier',
+    cartSummary: 'Sommaire de la commande',
     cartEmpty: 'Votre panier est vide.',
     cartEmptyCta: 'Voir le produit',
     cartCount: 'Panier ({n})',
-    cartQuantity: 'Quantité',
-    cartUpdate: 'Mettre à jour',
-    cartRemove: 'Retirer',
+    cartIncrease: 'Augmenter la quantité de {label}',
+    cartDecrease: 'Diminuer la quantité de {label}',
     cartRemoveLabel: 'Retirer {label} du panier',
+    cartFit: 'Coupe',
+    cartSize: 'Taille',
+    cartQty: 'Qté',
     cartLineTotal: 'Total de la ligne',
     cartSubtotal: 'Sous-total',
-    cartSubtotalNote: 'Livraison et taxes calculées à la caisse.',
+    cartShipping: 'Livraison',
+    cartTaxes: 'Taxes',
+    cartTotal: 'Total',
+    cartDeferred: 'Calculé à la caisse',
     cartCheckout: 'Passer à la caisse',
     errorCartGeneric: "Le panier n'a pas pu être mis à jour. Réessayez dans un moment.",
     orderConfirmedTitle: 'Commande confirmée',
@@ -298,16 +312,22 @@ export const UI: Record<Locale, Dict> = {
     errorSoldOut: 'That size is sold out.',
     cart: 'Cart',
     cartTitle: 'Your cart',
+    cartSummary: 'Order summary',
     cartEmpty: 'Your cart is empty.',
     cartEmptyCta: 'View the product',
     cartCount: 'Cart ({n})',
-    cartQuantity: 'Quantity',
-    cartUpdate: 'Update',
-    cartRemove: 'Remove',
+    cartIncrease: 'Increase quantity of {label}',
+    cartDecrease: 'Decrease quantity of {label}',
     cartRemoveLabel: 'Remove {label} from cart',
+    cartFit: 'Fit',
+    cartSize: 'Size',
+    cartQty: 'Qty',
     cartLineTotal: 'Line total',
     cartSubtotal: 'Subtotal',
-    cartSubtotalNote: 'Shipping and taxes calculated at checkout.',
+    cartShipping: 'Shipping',
+    cartTaxes: 'Taxes',
+    cartTotal: 'Total',
+    cartDeferred: 'Calculated at checkout',
     cartCheckout: 'Checkout',
     errorCartGeneric: 'The cart could not be updated. Try again in a moment.',
     orderConfirmedTitle: 'Order confirmed',

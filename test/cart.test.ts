@@ -37,19 +37,23 @@ function rawCartLine(id: string, merchandiseId: string, quantity: number) {
     id,
     quantity,
     cost: { totalAmount: { amount: (quantity * 65).toFixed(2), currencyCode: 'CAD' } },
-    merchandise: { id: merchandiseId, title: VARIANT.label, price: { amount: '65.00', currencyCode: 'CAD' } },
+    merchandise: {
+      id: merchandiseId,
+      sku: VARIANT.sku,
+      title: VARIANT.label,
+      price: { amount: '65.00', currencyCode: 'CAD' },
+    },
   }
 }
 
 function rawCart(lines: ReturnType<typeof rawCartLine>[]) {
+  const amount = lines.reduce((sum, l) => sum + l.quantity * 65, 0).toFixed(2)
   return {
     id: CART_ID,
     checkoutUrl: 'https://nuage-test.myshopify.com/cart/c/test-cart',
     cost: {
-      subtotalAmount: {
-        amount: lines.reduce((sum, l) => sum + l.quantity * 65, 0).toFixed(2),
-        currencyCode: 'CAD',
-      },
+      subtotalAmount: { amount, currencyCode: 'CAD' },
+      totalAmount: { amount, currencyCode: 'CAD' },
     },
     lines: { nodes: lines },
   }

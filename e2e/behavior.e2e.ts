@@ -884,6 +884,49 @@ test.describe('founder preview', () => {
   })
 
   /**
+   * The cart page's own controls: two native forms per line (`+` / `−`),
+   * each a plain submit against `/api/cart`'s existing `update`/`remove`
+   * intents — there is no select-and-submit control left to test since the
+   * order-summary redesign replaced it with steppers. `−` at quantity 1
+   * removes the line rather than going to 0, which this asserts explicitly
+   * since it's the one place the two steppers don't mirror each other.
+   */
+  test('the cart page steppers update quantity, and stepping down from 1 removes the line', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
+    const page = await context.newPage()
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+    await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click()
+    await expect(page.getByText('Ajouté…')).toBeVisible()
+
+    await page.goto(ROUTES.cart['fr-CA'])
+    // The one line on the page — scoped by aria-live rather than by text, so
+    // this doesn't also match a price or a size elsewhere in the row.
+    const qty = page.locator('[aria-live="polite"]')
+    await expect(qty).toHaveText('1')
+
+    const increase = page.getByRole('button', { name: /^Augmenter la quantité/ })
+    const decrease = page.getByRole('button', { name: /^Diminuer la quantité/ })
+
+    await increase.click()
+    await expect(qty).toHaveText('2')
+
+    await decrease.click()
+    await expect(qty).toHaveText('1')
+
+    // At quantity 1 the same-position button's intent flips from `update`
+    // to `remove` (CartView.astro) — same submit, no separate control.
+    const remove = page.getByRole('button', { name: /^Retirer/ })
+    await remove.click()
+    await expect(page.getByText(/Votre panier est vide/)).toBeVisible()
+
+    await context.close()
+  })
+
+  /**
    * The one path #33's AC 2 is actually about: adding to cart with no
    * JavaScript at all, via the plain `<form>` ProductStage.tsx renders and
    * /api/cart's native-POST fallback (src/lib/form-endpoint.ts) — same

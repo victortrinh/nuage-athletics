@@ -104,14 +104,15 @@ function nextLineId(): string {
 
 function rawCart(cart: StubCart) {
   const price = Number(STUB_PRICE)
+  const amount = (cart.lines.reduce((sum, l) => sum + l.quantity, 0) * price).toFixed(2)
   return {
     id: cart.id,
     checkoutUrl: `https://${STUB_CHECKOUT_HOST}/cart/c/${cart.id}`,
+    // No totalTaxAmount — same as the real store today, so the e2e suite
+    // exercises the deferred-tax render rather than a fabricated number.
     cost: {
-      subtotalAmount: {
-        amount: (cart.lines.reduce((sum, l) => sum + l.quantity, 0) * price).toFixed(2),
-        currencyCode: 'CAD',
-      },
+      subtotalAmount: { amount, currencyCode: 'CAD' },
+      totalAmount: { amount, currencyCode: 'CAD' },
     },
     lines: {
       nodes: cart.lines.map((l) => ({
@@ -120,6 +121,7 @@ function rawCart(cart: StubCart) {
         cost: { totalAmount: { amount: (l.quantity * price).toFixed(2), currencyCode: 'CAD' } },
         merchandise: {
           id: l.merchandiseId,
+          sku: skuFromMerchandiseId(l.merchandiseId),
           title: labelFor(l.merchandiseId),
           price: { amount: STUB_PRICE, currencyCode: 'CAD' },
         },

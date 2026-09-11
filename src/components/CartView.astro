@@ -1,0 +1,206 @@
+---
+import { t, fmt } from '../i18n/ui.ts'
+import { route } from '../i18n/utils.ts'
+import { buttonVariants } from './ui/button-variants.ts'
+import { formatPrice, catalogueVariantBySku, editorialFor } from '../lib/catalogue.ts'
+import { cn } from './ui/cn.ts'
+import type { Locale } from '../i18n/config'
+import type { Cart, CartLine, Money } from '../lib/commerce/types'
+
+/**
+ * The cart body, shared by `src/pages/panier.astro` and
+ * `src/pages/en/cart.astro` — an order summary rendered in this site's own
+ * mono/uppercase type rather than the generic list the two page files used
+ * to render inline. Still zero client JS: every quantity change and removal
+ * is a native `<form>` submit against `/api/cart.ts`'s existing `update` /
+ * `remove` intents — nothing about the endpoint changed for this.
+ *
+ * Takes the cart and the failure code as props rather than reading them
+ * itself — the page files already do that read (they need the result to set
+ * `Cache-Control` and the `X-Storefront` diagnostic on their own response),
+ * so this stays a pure render of what they found.
+ */
+
+interface Props {
+  locale: Locale
+  cart: Cart | null
+  errorCode?: string
+}
+
+const { locale, cart, errorCode } = Astro.props
+const d = t(locale)
+
+const errorMessage = errorCode === 'sold_out' ? d.errorSoldOut : errorCode ? d.errorCartGeneric : null
+
+const cartPath = route('cart', locale)
+const productPath = route('home', locale)
+
+/** Shopify caps a line at whatever inventory allows; 10 matches the cap `/api/cart.ts`'s zod schema enforces on both `add` and `update`. */
+const MAX_QUANTITY = 10
+
+/**
+ * A cart line, resolved back to the catalogue by SKU for its thumbnail, fit
+ * and size — or not, when the SKU is blank or doesn't join, in which case
+ * the row falls back to Shopify's own line label with no photo and no
+ * fit/size rows. Not an error either way: see the note on `CartLine.sku`.
+ */
+function lineDisplay(line: CartLine) {
+  const match = line.sku ? catalogueVariantBySku(line.sku, locale) : null
+  if (!match) return { code: line.label, fitLabel: null, sizeLabel: null, thumb: null }
+
+  const { product, variant } = match
+  const fitId = variant.options?.fit
+  const sizeLabel = variant.options?.size ?? null
+  const fit = fitId ? editorialFor(product.id, locale).fits.find((f) => f.id === fitId) : undefined
+
+  return {
+    code: product.id.toUpperCase(),
+    fitLabel: fit?.label ?? null,
+    sizeLabel,
+    thumb: fit?.gallery[0] ?? null,
+  }
+}
+
+/** The accessible name for this line's stepper and remove buttons — the fit/size pair when known, Shopify's own label otherwise. */
+function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisplay>): string {
+  return display.fitLabel && display.sizeLabel ? `${display.fitLabel} · ${display.sizeLabel}` : line.label
+}
+
+/** "Calculé à la caisse" for a total Shopify hasn't quoted yet, rather than a fabricated $0 — see the note on `Cart.tax`. */
+function money(amount: Money | null, deferred: string): string {
+  return amount ? formatPrice(amount, locale) : deferred
+}
+---
+
+<section class="mx-auto max-w-xl py-16">
+  <h1 class="text-center font-mono text-xs uppercase tracking-label">{d.cartTitle}</h1>
+
+  {
+    errorMessage && (
+      <p role="alert" class="mt-4 text-center text-sm text-danger">
+        {errorMessage}
+      </p>
+    )
+  }
+
+  {
+    !cart || cart.lines.length === 0 ? (
+      <div class="mt-10 text-center">
+        <p class="text-sm text-mute">{d.cartEmpty}</p>
+        <a href={productPath} class={cn(buttonVariants({ variant: 'text' }), 'mt-4 inline-block')}>
+          {d.cartEmptyCta}
+        </a>
+      </div>
+    ) : (
+      <>
+        <p class="mt-10 font-mono text-[11px] uppercase tracking-label text-mute">{d.cartSummary}</p>
+
+        <ul class="mt-4 divide-y divide-line border-y border-line font-mono text-xs uppercase tracking-label">
+          {cart.lines.map((line) => {
+            const display = lineDisplay(line)
+            const label = lineAccessibleLabel(line, display)
+            const atFloor = line.quantity <= 1
+            return (
+              <li class="flex gap-4 py-5">
+                {display.thumb && (
+                  <img
+                    src={display.thumb.src}
+                    width={display.thumb.width}
+                    height={display.thumb.height}
+                    alt={display.thumb.alt}
+                    loading="lazy"
+                    decoding="async"
+                    class="w-24 shrink-0 border border-line object-contain"
+                  />
+                )}
+                <div class="min-w-0 flex-1 space-y-1.5">
+                  <div class="flex items-baseline justify-between gap-3">
+                    <span class="truncate">{display.code}</span>
+                    <span class="shrink-0 tabular-nums">
+                      <span class="sr-only">{d.cartLineTotal}: </span>
+                      {formatPrice(line.linePrice, locale)}
+                    </span>
+                  </div>
+                  {display.fitLabel && (
+                    <div class="flex justify-between text-mute">
+                      <span>{d.cartFit}</span>
+                      <span>{display.fitLabel}</span>
+                    </div>
+                  )}
+                  {display.sizeLabel && (
+                    <div class="flex justify-between text-mute">
+                      <span>{d.cartSize}</span>
+                      <span>{display.sizeLabel}</span>
+                    </div>
+                  )}
+                  <div class="flex items-center justify-between">
+                    <span class="text-mute">{d.cartQty}</span>
+                    <div class="flex items-center gap-3">
+                      <form method="POST" action="/api/cart">
+                        <input type="hidden" name="intent" value={atFloor ? 'remove' : 'update'} />
+                        <input type="hidden" name="lineId" value={line.id} />
+                        {!atFloor && <input type="hidden" name="quantity" value={line.quantity - 1} />}
+                        <input type="hidden" name="redirect" value={cartPath} />
+                        <button
+                          type="submit"
+                          aria-label={fmt(atFloor ? d.cartRemoveLabel : d.cartDecrease, { label })}
+                          class={cn(buttonVariants({ variant: 'text' }), 'w-6 normal-case')}
+                        >
+                          −
+                        </button>
+                      </form>
+                      <span class="tabular-nums" aria-live="polite">
+                        {line.quantity}
+                      </span>
+                      <form method="POST" action="/api/cart">
+                        <input type="hidden" name="intent" value="update" />
+                        <input type="hidden" name="lineId" value={line.id} />
+                        <input type="hidden" name="quantity" value={line.quantity + 1} />
+                        <input type="hidden" name="redirect" value={cartPath} />
+                        <button
+                          type="submit"
+                          disabled={line.quantity >= MAX_QUANTITY}
+                          aria-label={fmt(d.cartIncrease, { label })}
+                          class={cn(buttonVariants({ variant: 'text' }), 'w-6 normal-case')}
+                        >
+                          +
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+
+        <dl class="mt-6 space-y-1.5 font-mono text-xs uppercase tracking-label">
+          <div class="flex justify-between">
+            <dt>{d.cartSubtotal}</dt>
+            <dd class="tabular-nums">{formatPrice(cart.subtotal, locale)}</dd>
+          </div>
+          <div class="flex justify-between text-mute">
+            <dt>{d.cartShipping}</dt>
+            <dd>{d.cartDeferred}</dd>
+          </div>
+          <div class="flex justify-between text-mute">
+            <dt>{d.cartTaxes}</dt>
+            <dd>{money(cart.tax, d.cartDeferred)}</dd>
+          </div>
+          <div class="flex justify-between border-t border-line pt-1.5 text-sm normal-case">
+            <dt>{d.cartTotal}</dt>
+            <dd class="tabular-nums">{formatPrice(cart.total, locale)}</dd>
+          </div>
+        </dl>
+
+        <form method="POST" action="/api/cart" class="mt-6">
+          <input type="hidden" name="intent" value="checkout" />
+          <input type="hidden" name="redirect" value={cartPath} />
+          <button type="submit" class={buttonVariants({ variant: 'solid' })}>
+            {d.cartCheckout}
+          </button>
+        </form>
+      </>
+    )
+  }
+</section>

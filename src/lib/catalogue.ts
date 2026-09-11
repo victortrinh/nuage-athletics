@@ -246,6 +246,27 @@ export function getCatalogueProduct(slug: string, locale: Locale): CatalogueProd
   return CATALOGUE[locale].find((p) => p.slug === slug) ?? null
 }
 
+/**
+ * The reverse of the SKU join `./commerce/shopify.ts` uses to price a
+ * variant: given a SKU a cart line came back with, find the catalogue
+ * product and variant it names. Used by `CartView.astro` to render a line's
+ * thumbnail, fit and size from data this file already owns, rather than
+ * carrying photography through the Storefront round trip. Null for a SKU
+ * that doesn't match anything here — not an error, since a cart line renders
+ * fine from its own Shopify-supplied label and price with no catalogue
+ * match at all (see the note on `CartLine.sku`).
+ */
+export function catalogueVariantBySku(
+  sku: string,
+  locale: Locale
+): { product: CatalogueProduct; variant: CatalogueVariant } | null {
+  for (const product of CATALOGUE[locale]) {
+    const variant = product.variants.find((v) => v.sku === sku)
+    if (variant) return { product, variant }
+  }
+  return null
+}
+
 export function featuredProduct(locale: Locale): CatalogueProduct {
   const product = CATALOGUE[locale].find((p) => p.id === FEATURED_ID)
   if (!product) throw new Error(`featured product ${FEATURED_ID} missing from ${locale} catalogue`)

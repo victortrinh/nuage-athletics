@@ -273,7 +273,11 @@ export function resetStorefrontCache(): void {
 const CART_FRAGMENT = `fragment NuageCart on Cart {
   id
   checkoutUrl
-  cost { subtotalAmount { amount currencyCode } }
+  cost {
+    subtotalAmount { amount currencyCode }
+    totalAmount { amount currencyCode }
+    totalTaxAmount { amount currencyCode }
+  }
   lines(first: ${MAX_VARIANTS}) {
     nodes {
       id
@@ -282,6 +286,7 @@ const CART_FRAGMENT = `fragment NuageCart on Cart {
       merchandise {
         ... on ProductVariant {
           id
+          sku
           title
           price { amount currencyCode }
         }
@@ -330,13 +335,27 @@ query NuageCartQuery($cartId: ID!) {
 interface RawCart {
   id: string
   checkoutUrl: string
-  cost?: { subtotalAmount?: { amount?: string; currencyCode?: string } }
+  cost?: {
+    subtotalAmount?: { amount?: string; currencyCode?: string }
+    totalAmount?: { amount?: string; currencyCode?: string }
+    // Absent (not merely zero) whenever Shopify has no tax registration to
+    // quote from yet — the first drop ships with none configured. `money()`
+    // needs a string to parse, so this stays undefined rather than a string,
+    // and parseCart checks for that directly instead of forcing a `money()`
+    // call that would render it as a confident $0.00.
+    totalTaxAmount?: { amount?: string; currencyCode?: string } | null
+  }
   lines?: {
     nodes?: {
       id: string
       quantity: number
       cost?: { totalAmount?: { amount?: string; currencyCode?: string } }
-      merchandise?: { id?: string; title?: string; price?: { amount?: string; currencyCode?: string } }
+      merchandise?: {
+        id?: string
+        sku?: string | null
+        title?: string
+        price?: { amount?: string; currencyCode?: string }
+      }
     }[]
   }
 }
@@ -376,6 +395,12 @@ function parseCart(raw: RawCart): Cart {
     lines.push({
       id: line.id,
       merchandiseId,
+      // Blank rather than dropped when Shopify's own variant has no SKU set
+      // (shouldn't happen for this catalogue, but nothing here enforces it)
+      // — the catalogue join in CartView.astro treats an empty SKU the same
+      // way it treats one that simply doesn't match: falls back to the
+      // Shopify-only render for that line.
+      sku: line.merchandise?.sku?.trim() ?? '',
       label: line.merchandise?.title ?? '',
       quantity: line.quantity,
       unitPrice: {
@@ -392,6 +417,13 @@ function parseCart(raw: RawCart): Cart {
     id: raw.id,
     checkoutUrl: raw.checkoutUrl,
     subtotal: { amount: money(raw.cost?.subtotalAmount?.amount, `cart ${raw.id} subtotal`), currency: 'CAD' },
+    total: { amount: money(raw.cost?.totalAmount?.amount, `cart ${raw.id} total`), currency: 'CAD' },
+    // Not run through money(): an absent totalTaxAmount means "no tax
+    // registration yet", which is a fact to display ("calculated at
+    // checkout"), not a price that failed to parse and should log as one.
+    tax: raw.cost?.totalTaxAmount?.amount
+      ? { amount: money(raw.cost.totalTaxAmount.amount, `cart ${raw.id} tax`), currency: 'CAD' }
+      : null,
     lines,
   }
 }
