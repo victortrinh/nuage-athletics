@@ -34,6 +34,23 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    only evidence of what they agreed to. Bump `CONSENT_VERSION` in
    `src/lib/consent.ts` when wording changes; leave old rows alone.
 
+   A Shopify checkout opt-in is a *different* wording than the site's own
+   signup form, so it gets its own version rather than sharing
+   `CONSENT_VERSION` — `SHOPIFY_CONSENT_VERSION` and `SHOPIFY_CHECKOUT_CONSENT`
+   in `src/lib/consent.ts`, one version label mapping to exactly one wording.
+   `src/pages/api/webhooks/shopify.ts` reconciles these opt-ins into
+   `subscribers` on `customers/create` / `customers/update` — see that route's
+   comment for why those topics and not the more obviously-named
+   `customers/email_marketing_consent/update` (issue #35). Rows it inserts
+   carry `source = 'shopify-checkout'` and land pre-`confirmed` (checkout
+   consent is express consent, so there's no double opt-in to wait on); the
+   insert's `ON CONFLICT(email) DO NOTHING` means it can never touch a row
+   that already exists under any status. This is a webhook, not a script or a
+   cron: there is deliberately no tool to backfill opt-ins that predate the
+   webhook subscription — building one would need a `read_customers` Admin
+   API token (reads every customer's PII) to import what is currently zero
+   rows. If a backfill is ever actually needed, write it then.
+
 5. **Nothing under `src/pages` imports a commerce provider directly.** Commerce
    goes through the storefront seam in `src/lib/commerce/index.ts`
    (`getLiveProduct`, `readCart`, `mutateCart`), backed today by Shopify's
