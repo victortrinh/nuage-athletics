@@ -164,37 +164,28 @@ const jsonLd = live
       */
       <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col items-center justify-center text-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
         {/*
-          `d.tagline` — reused, not rewritten: it already exists for
-          `<title>`/og:title (Seo.astro) and was, until now, never rendered
-          on the page itself. It's the plainest statement of what the brand
-          is, which is exactly what belongs above the news of when it
-          arrives. text-mute rather than text-sm's default ink: this is
-          context for the announcement below it, not the announcement
-          itself. (text-mute on the sky is a pre-existing site-wide
-          question — see global.css's note on sky-fallback — not one this
-          line introduces; e2e/a11y.e2e.ts flattens the gradient before
-          checking contrast, same as everywhere else this token is used.)
-        */}
-        <p class="max-w-xs text-sm leading-relaxed text-mute">{d.tagline}</p>
+          Three lines, one h1, one voice: what's dropping, what the brand
+          is, when. `d.tagline` sits between the two drop-announcement
+          strings rather than above them in its own paragraph — the earlier
+          version, with tagline muted and set apart — because all three are
+          the same kind of statement (short, flat, declarative) and reading
+          them as three facts in one notice beat reading them as a caption
+          plus a separate announcement.
 
-        {/*
-          The drop announcement, and the page's one heading — what a visitor
-          gets instead of a buy band, and what replaced the pre-launch
-          password screen as the answer to "what is this site for right
-          now".
-
-          Not a separate brand-name heading above it: the header's own logo
-          link already carries `aria-label={d.brand}` (Base.astro), so an
-          h1 repeating "Nuage Athletics" here would be the same fact said
-          twice on every render, not a heading for this page's own content.
-          This is that content — the availability statement, so the old
-          bordered "coming soon" badge went with it too: a badge saying the
-          drop is ahead sitting above a line naming the season is the same
-          sentence twice. Monospace, uppercase and tracked out — this is a
-          notice, not prose, and it should read as one at a glance.
+          Not a separate brand-name heading above it either: the header's
+          own logo link already carries `aria-label={d.brand}` (Base.astro),
+          so an h1 repeating "Nuage Athletics" here would be the same fact
+          said twice on every render, not a heading for this page's own
+          content. `tagline` is reused rather than rewritten for the same
+          reason it was pulled in at all — it already exists for
+          `<title>`/og:title (Seo.astro) and needs no new translation.
+          Monospace, uppercase and tracked out for all three lines — this is
+          a notice, not prose, and it should read as one at a glance.
         */}
-        <h1 class="mt-4 font-mono text-xs uppercase leading-loose tracking-label">
+        <h1 class="font-mono text-xs uppercase leading-loose tracking-label">
           {d.dropAnnounceFirst}
+          <br />
+          {d.tagline}
           <br />
           {d.dropAnnounceAvailability}
         </h1>

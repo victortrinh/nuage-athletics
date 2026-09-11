@@ -176,15 +176,16 @@ of us to see the real buy flow on the real site before it opens.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
 - **The garment isn't final, so the public pre-drop page shows no
   photography at all** — not the carousel, not a static image, nothing under
-  `public/img/ls-01-*`. `ProductView.astro`'s `!live` branch is `d.tagline`
-  plus the drop announcement, and nothing else: `dropAnnounceFirst`/
-  `dropAnnounceAvailability` (`src/i18n/ui.ts`) *is* the page's one `<h1>`,
-  centred over the sky, generic on purpose ("first drop", not which one —
-  naming the garment would be a label with nothing to label without a
-  photo). `tagline` above it is reused rather than new copy — it already
-  exists for `<title>`/og:title (`Seo.astro`) and was never rendered on the
-  page itself before this. There's no separate brand-name heading above
-  it — the header's own logo link already carries `aria-label={d.brand}`
+  `public/img/ls-01-*`. `ProductView.astro`'s `!live` branch is three lines
+  in one `<h1>` and nothing else, centred over the sky: `dropAnnounceFirst`,
+  `d.tagline`, `dropAnnounceAvailability` (`src/i18n/ui.ts`) — what's
+  dropping, what the brand is, when. `dropAnnounceFirst` is generic on
+  purpose ("first drop", not which one — naming the garment would be a
+  label with nothing to label without a photo). `tagline` in the middle is
+  reused rather than new copy — it already exists for `<title>`/og:title
+  (`Seo.astro`) and was never rendered on the page itself before this.
+  There's no separate brand-name heading above the three lines — the
+  header's own logo link already carries `aria-label={d.brand}`
   (`Base.astro`), so repeating "Nuage Athletics" here would say the same
   fact twice on every render rather than heading this page's own content.
   `ProductStage.tsx` (carousel, fit picker, buy band) only ever mounts
