@@ -59,59 +59,81 @@ const initialFit: FitId = (FIT_IDS as readonly string[]).includes(requestedFit ?
 const errorCode = Astro.url.searchParams.get('ce') ?? undefined
 
 /**
- * No price is rendered while commerce is off, and the price is left out of the
- * structured data for the same reason: an advertised price is one a Quebec
- * merchant is expected to honour, and until Shopify answers there is no price
- * to honour — there is no local number to fall back on any more. Availability
- * says PreOrder so the omission reads as deliberate.
+ * No price is rendered while commerce is off, and structured data follows
+ * the same rule: Product markup with an `Offer` is a claim that the thing is
+ * for sale at a stated price, and until Shopify answers there is no price to
+ * make that claim with. An `Offer` with `availability` but no `price` used to
+ * be emitted here for the pre-drop case — that's an invalid Offer per
+ * schema.org/Google's Merchant listing rules (price or priceSpecification.price
+ * is required whenever `offers` is present), which is exactly the "critical"
+ * Search Console error this replaced. So: no live price, no Product markup at
+ * all. Same principle as ProductView taking a nullable `Product` instead of a
+ * `commerceEnabled` boolean (see the Props doc above) — there is no code path
+ * that emits an Offer without a Shopify price behind it either.
  */
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Product',
-  '@id': `${productUrl}#product`,
-  url: productUrl,
-  name: product.name,
-  description: product.description,
-  image: product.images.map((src) => new URL(src, Astro.site).href),
-  /**
-   * A reference, not a copy. This used to be an inline
-   * `{'@type': 'Brand', name}`, which is a second, unrelated entity that
-   * happens to share a string with the Organization in Seo.astro — a
-   * consumer has no way to tell those are the same company. Pointing at that
-   * node's @id says it outright. See organizationId() in src/lib/brand.ts.
-   */
-  brand: { '@id': organizationId(site) },
-  material: editorial.specs[0]?.value,
-  /**
-   * schema.org's countryOfOrigin means country of manufacture, same as a
-   * garment tag — it is not the brand's home country or where it was
-   * designed. This garment is made in China; catalogue.ts's spec list says
-   * so too, split from the separate "Conception"/"Design" row for Quebec so
-   * neither fact is stated in a way that could be misread as the other. A
-   * shopping engine or answer engine reading `countryOfOrigin: 'Canada'`
-   * here — which an earlier version of this field said — would be reading a
-   * false Made-in-Canada claim, not a stylistic choice.
-   */
-  countryOfOrigin: { '@type': 'Country', name: 'China' },
-  inLanguage: HTML_LANG[locale],
-  ...(live
-    ? {
-        offers: {
-          '@type': 'Offer',
-          priceCurrency: live.price.currency,
-          price: (live.price.amount / 100).toFixed(2),
-          // Real availability, not a constant: a drop that has sold through
-          // every size shouldn't keep telling shopping engines it's in stock.
-          availability: live.variants.some((v) => v.inStock)
-            ? 'https://schema.org/InStock'
-            : 'https://schema.org/SoldOut',
-        },
-      }
-    : { offers: { '@type': 'Offer', availability: 'https://schema.org/PreOrder' } }),
-}
+const jsonLd = live
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      '@id': `${productUrl}#product`,
+      url: productUrl,
+      name: product.name,
+      description: product.description,
+      image: product.images.map((src) => new URL(src, Astro.site).href),
+      /**
+       * A reference, not a copy — but with `@type` repeated inline. This used
+       * to be a bare `{'@id': organizationId(site)}`: a reference to the
+       * Organization node Seo.astro emits in its own <script> tag, so a
+       * consumer that resolves @id across a page's JSON-LD sees one company.
+       * Google's Merchant listing validator apparently doesn't do that
+       * resolution — it flagged this as "Invalid object type for field
+       * 'brand'" even though the reference is valid schema.org. Repeating
+       * `@type` here costs nothing (it's still the same node once @id is
+       * resolved) and satisfies a parser that only looks at this object.
+       */
+      brand: { '@type': 'Organization', '@id': organizationId(site) },
+      material: editorial.specs[0]?.value,
+      /**
+       * schema.org's countryOfOrigin means country of manufacture, same as a
+       * garment tag — it is not the brand's home country or where it was
+       * designed. This garment is made in China; catalogue.ts's spec list says
+       * so too, split from the separate "Conception"/"Design" row for Quebec so
+       * neither fact is stated in a way that could be misread as the other. A
+       * shopping engine or answer engine reading `countryOfOrigin: 'Canada'`
+       * here — which an earlier version of this field said — would be reading a
+       * false Made-in-Canada claim, not a stylistic choice.
+       */
+      countryOfOrigin: { '@type': 'Country', name: 'China' },
+      inLanguage: HTML_LANG[locale],
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: live.price.currency,
+        price: (live.price.amount / 100).toFixed(2),
+        // Real availability, not a constant: a drop that has sold through
+        // every size shouldn't keep telling shopping engines it's in stock.
+        availability: live.variants.some((v) => v.inStock)
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/SoldOut',
+        /**
+         * shippingDetails and hasMerchantReturnPolicy are Search Console's
+         * remaining non-critical asks here. Deliberately not added: the only
+         * shipping/return terms this site states anywhere are the draft CPA
+         * disclosure (informations-precontractuelles.astro /
+         * pre-contract-information.astro), which is marked "Draft, pending
+         * legal review. May not reflect the final text." and doesn't even
+         * commit to a return policy. Structured data is a claim a shopping
+         * engine will show verbatim; publishing invented numbers (a return
+         * window, a free-shipping threshold) to silence a non-critical
+         * warning would be the same mistake 5.5 in CLAUDE.md guards against
+         * for price, just aimed at a different field. Add these once real,
+         * legally-reviewed terms exist to source them from.
+         */
+      },
+    }
+  : null
 ---
 
-<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+{jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
 
 {/*
   A single centred column at every breakpoint — no sticky right-hand buy
