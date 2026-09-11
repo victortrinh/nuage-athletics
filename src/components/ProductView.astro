@@ -267,7 +267,6 @@ const jsonLd = {
             variants={live.variants}
             price={formatPrice(live.price, locale)}
             precontractHref={route('precontract', locale)}
-            cartHref={route('cart', locale)}
             redirectTo={Astro.url.pathname + Astro.url.search}
             initialErrorCode={errorCode}
           />

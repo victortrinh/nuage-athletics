@@ -171,12 +171,13 @@ of us to see the real buy flow on the real site before it opens.
   bumps the header cart link (`#cart-link`, `Base.astro`) in place — its
   count and `aria-label` update from the same readable `na_cart_n` cookie
   `/api/cart` just set, and it scales up briefly (`.cart-bump`,
-  `global.css`, reduced-motion-gated) — then hands off to the cart page
-  itself (`cartHref`) shortly after, so the confirmation is "you're looking
-  at your cart," not a label on a button that's no longer on screen. The
-  no-JS fallback doesn't get this: a native submit still 303s back to the
-  product page (`added=1`), same as before — there's no way to show the
-  bump first over a full redirect. The description and spec list moved out
+  `global.css`, reduced-motion-gated). Adding deliberately does **not**
+  navigate to the cart: someone buying two fits or three sizes shouldn't
+  have to walk back from the cart between each one. It was tried the other
+  way and reverted for exactly that reason — don't reintroduce it. The
+  no-JS fallback lands back on the product page too (`added=1`), which the
+  page reads for nothing; it just renders the ordinary idle band. The
+  description and spec list moved out
   of the band entirely, onto an always-open section below the fold
   (`ProductDetails.astro`, still gated on `commerceEnabled`) — there's
   nothing left to disclose into. The size row is seven identically sized,

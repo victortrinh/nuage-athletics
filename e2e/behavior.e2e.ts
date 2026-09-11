@@ -312,9 +312,10 @@ test('a mis-tap on the add-to-cart button before a size is picked shows an error
     button.click(),
   ])
   expect(response.ok()).toBe(true)
-  // A real add now hands off to the cart page a beat later — see the
-  // dedicated test below for the bump/handoff itself.
-  await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
+  // No "Added" state and no navigation: the band rolls back to its ordinary
+  // idle button and the visitor stays put, free to add another size.
+  await expect(button).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 })
 
 /**
@@ -828,17 +829,18 @@ test.describe('founder preview', () => {
   })
 
   /**
-   * The real multi-item cart (#33), and its confirmation (#74): a
-   * successful add bumps the header cart badge in place — no page reload
-   * needed for the count/aria-label to update, since ProductStage.tsx reads
-   * the same `na_cart_n` cookie /api/cart just set — then hands off to the
-   * cart page itself a beat later, which shows the line and hands checkout
-   * off to Shopify's hosted page. Checkout is asserted against the
+   * The real multi-item cart (#33), and its confirmation (#74): an add
+   * bumps the header cart badge in place — no reload needed for the
+   * count/aria-label to update, since ProductStage.tsx reads the same
+   * `na_cart_n` cookie /api/cart just set — and the page stays put, so a
+   * second size can go in without walking back from anywhere. Only then,
+   * on the visitor's own click, does the cart page show the lines and hand
+   * checkout off to Shopify's hosted page. Checkout is asserted against the
    * storefront stub's own host (STUB_CHECKOUT_HOST) rather than following
    * the redirect, since there's no real Shopify checkout to land on in this
    * suite.
    */
-  test('adding a size bumps the cart badge and hands off to the cart, which carries it through to checkout', async ({
+  test('adding sizes bumps the cart badge without leaving the page, and the cart carries them through to checkout', async ({
     browser,
   }) => {
     const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
@@ -852,22 +854,34 @@ test.describe('founder preview', () => {
     const cartLink = page.getByRole('link', { name: 'Panier', exact: true })
     await expect(cartLink).toBeVisible()
 
-    await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+    const sizes = page.getByRole('radiogroup', { name: 'Taille' })
     const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
-    const [response] = await Promise.all([
-      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
-      button.click(),
-    ])
-    expect(response.ok()).toBe(true)
 
-    // The badge updates in place, before the navigation below ever fires —
-    // no reload needed to see it, unlike the header's own first render.
-    const cartLinkWithCount = page.getByRole('link', { name: /Panier \(1\)/ })
+    async function add(size: string) {
+      await sizes.locator('label').filter({ hasText: size }).first().click()
+      const [response] = await Promise.all([
+        page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+        button.click(),
+      ])
+      expect(response.ok()).toBe(true)
+    }
+
+    await add('M')
+    // The badge updates in place — no reload, unlike the header's own first
+    // render, which reads the cookie server-side.
+    await expect(page.getByRole('link', { name: /Panier \(1\)/ })).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
+
+    // The whole point of not navigating: a second size goes in from right
+    // here, and the badge keeps count.
+    await add('L')
+    const cartLinkWithCount = page.getByRole('link', { name: /Panier \(2\)/ })
     await expect(cartLinkWithCount).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 
-    // And a beat later, the page moves on to the cart by itself.
+    await cartLinkWithCount.click()
     await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
-    await expect(page.getByText(/Classique/)).toBeVisible()
+    await expect(page.getByText(/Classique/).first()).toBeVisible()
 
     // The stub's checkout host isn't a real, resolvable store, so this reads
     // /api/cart's own 303 response rather than letting the browser actually

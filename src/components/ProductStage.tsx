@@ -116,12 +116,6 @@ type Props =
        *  `i18n/utils` stay server-side, same reason `price` arrives
        *  pre-formatted rather than this island importing `formatPrice`. */
       precontractHref: string
-      /** Resolved server-side the same way as `precontractHref` above — where
-       *  the hydrated path sends the visitor shortly after a successful add
-       *  (see `onSubmit`'s success branch below). The no-JS fallback doesn't
-       *  use this: a native submit still returns to `redirectTo`, since a
-       *  303 there has no way to show the bump animation first. */
-      cartHref: string
       /**
        * The page this island lives on, including any query string — carried
        * as the form's hidden `redirect` field for the no-JS fallback, same
@@ -190,14 +184,13 @@ export default function ProductStage(props: Props) {
 
   /**
    * The band's <form> posts natively to /api/cart with no JS at all — this
-   * only intercepts that once hydrated, to fetch() in place instead of
+   * only intercepts that once hydrated, to stay on the page instead of
    * taking the 303 round trip. `fit`/`size` travel exactly as the native
    * submit would send them (RAC's radios are real named inputs — see the
    * JSX below), so there is nothing here for the two paths to disagree
-   * about. On success the hydrated path bumps the header cart badge and
-   * moves on to the cart itself a beat later (see the success branch
-   * below); the no-JS fallback stays on this page, same as it always has —
-   * a 303 has no way to show the bump first.
+   * about. Adding deliberately does not navigate anywhere: someone buying
+   * two fits or three sizes should not have to walk back from the cart
+   * between each one. The header badge is the confirmation.
    */
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     if (!commerceEnabled) return
@@ -223,10 +216,6 @@ export default function ProductStage(props: Props) {
       const data = (await res.json()) as { ok: boolean; code?: string }
       if (data.ok) {
         bumpCartBadge(d)
-        // Long enough to see the badge bump (420ms, global.css) land before
-        // the page unloads — short enough that this still reads as one
-        // continuous action, not a separate step.
-        window.setTimeout(() => window.location.assign(props.cartHref), 550)
         return
       }
       setError(errorMessage(d, data.code ?? ''))
