@@ -131,6 +131,84 @@ export async function insertSubscriber(
   return { id, token }
 }
 
+export interface ShopifyOptIn {
+  email: string
+  locale: Locale
+  consentText: string
+  consentVersion: string
+  consentedAt: number
+}
+
+/**
+ * Insert a subscriber sourced from a Shopify checkout marketing opt-in
+ * (src/pages/api/webhooks/shopify.ts), pre-confirmed — checkout consent is
+ * express consent under CASL, so there is no double opt-in step to wait on.
+ *
+ * `ON CONFLICT(email) DO NOTHING` is the entire guarantee behind "never
+ * touching an existing row": an address already in the ledger — confirmed
+ * from a site signup, still pending, or unsubscribed — is left exactly as it
+ * is. In particular, someone who unsubscribed from us stays unsubscribed no
+ * matter what Shopify reports.
+ *
+ * Returns whether a row was actually written, so the caller can log the
+ * common no-op case (most customer webhook events are unrelated profile
+ * edits, not new consent) without a second query.
+ */
+export async function insertShopifySubscriber(
+  db: D1Database,
+  input: ShopifyOptIn
+): Promise<boolean> {
+  const id = crypto.randomUUID()
+  const token = crypto.randomUUID().replace(/-/g, '')
+  // consented_at/confirmed_at record when Shopify says the customer opted in;
+  // created_at records when this row landed in our ledger — the two can
+  // differ when a webhook is retried or arrives late.
+  const now = Date.now()
+
+  const result = await db
+    .prepare(
+      `INSERT INTO subscribers
+        (id, email, locale, status, token, consent_text, consent_version,
+         consented_at, confirmed_at, ip, user_agent, source, created_at, token_expires_at)
+       VALUES (?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, NULL, NULL, 'shopify-checkout', ?, NULL)
+       ON CONFLICT(email) DO NOTHING`
+    )
+    .bind(
+      id,
+      input.email,
+      input.locale,
+      token,
+      input.consentText,
+      input.consentVersion,
+      input.consentedAt,
+      input.consentedAt,
+      now
+    )
+    .run()
+
+  return result.meta.changes > 0
+}
+
+/**
+ * Honour a marketing-consent withdrawal reported by Shopify. Scoped to rows
+ * this same import created (source = 'shopify-checkout') — a change to an
+ * unrelated Shopify profile field must never unsubscribe someone who opted in
+ * on the site directly. Touches status/unsubscribed_at only: consent_text and
+ * consent_version are left alone, same as the site's own unsubscribe path.
+ */
+export async function withdrawShopifyConsent(db: D1Database, email: string): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE subscribers
+          SET status = 'unsubscribed', unsubscribed_at = ?
+        WHERE email = ? AND source = 'shopify-checkout' AND status != 'unsubscribed'`
+    )
+    .bind(Date.now(), email)
+    .run()
+
+  return result.meta.changes > 0
+}
+
 export interface OptInRestart {
   email: string
   locale: Locale
