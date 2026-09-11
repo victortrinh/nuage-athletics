@@ -1,11 +1,12 @@
 import type { Locale } from '../../i18n/config'
 
 /**
- * Everything commerce-related goes through this interface.
- *
- * Phase 1 ships StripeAdapter only. If Lightspeed later earns its place
- * (retail, POS, real inventory), implement LightspeedAdapter and swap the
- * export in ./index.ts. Nothing in src/pages should import Stripe directly.
+ * Shared commerce types. Shopify is the only provider — `./shopify.ts`
+ * implements `StorefrontSource` via the Storefront API, and `./index.ts`'s
+ * `getLiveProduct`/`readCart`/`mutateCart` are the seam every page and route
+ * goes through. Nothing under src/pages should import a provider directly
+ * (CLAUDE.md non-negotiable 5): a future provider swap means a new
+ * `StorefrontSource` implementation and a one-line change in ./index.ts.
  */
 
 export interface Money {
@@ -48,18 +49,6 @@ export interface Product {
   price: Money
   images: string[]
   variants: ProductVariant[]
-}
-
-export interface CheckoutLine {
-  variantId: string
-  quantity: number
-}
-
-export interface CheckoutInput {
-  lines: CheckoutLine[]
-  locale: Locale
-  successUrl: string
-  cancelUrl: string
 }
 
 /** One line in a cart — a variant, the quantity of it, and what that quantity costs. */
@@ -105,42 +94,4 @@ export interface Cart {
   tax: Money | null
   /** Shopify's hosted checkout for this cart — where "Buy" hands off to. */
   checkoutUrl: string
-}
-
-export type OrderStatus = 'pending' | 'paid' | 'fulfilled' | 'cancelled' | 'refunded'
-
-export interface Order {
-  id: string
-  status: OrderStatus
-  total: Money
-  email: string | null
-  createdAt: number
-}
-
-/**
- * A normalized webhook event, decoupled from any one provider's payload
- * shape or signature scheme. `raw` is kept for auditing but nothing under
- * src/pages should need to read provider-specific fields off it directly.
- */
-export interface WebhookEvent {
-  orderId: string
-  status: OrderStatus
-  email: string | null
-  locale: Locale
-  total: Money
-  raw: unknown
-}
-
-export interface CommerceAdapter {
-  readonly name: string
-  getProduct(slug: string, locale: Locale): Promise<Product | null>
-  createCheckout(input: CheckoutInput): Promise<{ url: string }>
-  getOrder(id: string): Promise<Order | null>
-  /**
-   * Verifies the webhook signature and, if valid and relevant, normalizes it
-   * into a WebhookEvent. Returns null for an invalid signature or an event
-   * type this app doesn't act on (e.g. Stripe sends many event types; only
-   * checkout completion matters here).
-   */
-  verifyWebhook(payload: string, signatureHeader: string | null): Promise<WebhookEvent | null>
 }

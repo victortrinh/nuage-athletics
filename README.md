@@ -4,7 +4,7 @@ Landing page + email capture for the fall 2026 drop. Commerce is stubbed behind 
 adapter interface and not wired to any page yet.
 
 **Stack:** Astro 7 (static + SSR endpoints) · React islands · Tailwind 4 ·
-Cloudflare Workers · D1 · Resend · Stripe (phase 2)
+Cloudflare Workers · D1 · Resend · Shopify (headless, Storefront API)
 
 ---
 
@@ -24,9 +24,11 @@ burden of proof on the sender. `subscribers` stores the verbatim wording shown,
 its version, timestamp, IP and user agent. Never drop those columns, and never
 backfill `consent_version`.
 
-**Commerce sits behind `CommerceAdapter`.** Stripe is the only implementation.
-If Lightspeed ever earns its place, implement the interface and change one line
-in `src/lib/commerce/index.ts`. Nothing under `src/pages` imports Stripe directly.
+**Commerce sits behind the storefront seam in `src/lib/commerce/index.ts`.**
+Shopify is the only implementation (`src/lib/commerce/shopify.ts`), reached
+through `getLiveProduct`/`readCart`/`mutateCart`. A future provider swap means
+a new `StorefrontSource` implementation and a one-line change in that file.
+Nothing under `src/pages` imports a provider directly.
 
 ---
 
@@ -102,7 +104,7 @@ src/
 │   ├── consent.ts CASL consent version + sender identity
 │   ├── db.ts      D1 queries
 │   ├── email.ts   Resend double opt-in
-│   └── commerce/  adapter interface + Stripe impl (phase 2)
+│   └── commerce/  storefront seam + Shopify impl
 └── pages/
     ├── *.astro    French routes at root
     ├── en/        English routes
@@ -121,6 +123,6 @@ src/
 ## Before selling
 
 - [ ] GST/HST registration (CRA); QST, BC PST, SK PST, MB RST as applicable
-- [ ] Enable Stripe Tax for the registrations you actually hold
+- [ ] Enable tax collection in Shopify admin for the registrations you actually hold
 - [ ] Quebec *Loi sur la protection du consommateur* distance-contract disclosures
 - [ ] Flat-rate shipping decided, covering the territories

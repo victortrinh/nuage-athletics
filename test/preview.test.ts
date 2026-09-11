@@ -19,7 +19,7 @@ const PASSWORD = 'test-preview-password'
 /**
  * applyPreview is called the way src/middleware.ts calls it, rather than
  * through a server: a context and a `next` that stands in for the rendered
- * page. Same discipline as test/webhooks-stripe.test.ts calling the route's
+ * page. Same discipline as test/webhooks-shopify.test.ts calling the route's
  * POST directly.
  */
 let seq = 0

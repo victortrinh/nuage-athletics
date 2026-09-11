@@ -9,7 +9,8 @@ fall 2026. Commerce is scaffolded behind an adapter but not wired to any page.
 
 **Stack:** Astro 7 (static output + SSR endpoints) · React islands (shadcn/ui on
 React Aria Components) · Tailwind 4 · Cloudflare Workers · D1 · Resend ·
-Shopify Storefront API (price + availability) · Stripe (phase 2)
+Shopify (headless — Storefront API for price/availability/cart, one webhook
+for order-paid)
 
 ## Non-negotiables
 
@@ -33,12 +34,14 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    only evidence of what they agreed to. Bump `CONSENT_VERSION` in
    `src/lib/consent.ts` when wording changes; leave old rows alone.
 
-5. **Nothing under `src/pages` imports Stripe directly.** Commerce goes through
-   `CommerceAdapter` (`src/lib/commerce/`). Lightspeed may replace Stripe later;
-   the swap should be one line in `src/lib/commerce/index.ts`. Product *copy*
-   lives in `src/lib/catalogue.ts`, which imports no payment provider — pages
-   read it directly, and both adapters read it too. Price and availability are
-   not copy; see 5.5.
+5. **Nothing under `src/pages` imports a commerce provider directly.** Commerce
+   goes through the storefront seam in `src/lib/commerce/index.ts`
+   (`getLiveProduct`, `readCart`, `mutateCart`), backed today by Shopify's
+   `StorefrontSource` (`src/lib/commerce/shopify.ts`). A future provider swap
+   means a new `StorefrontSource` implementation and a one-line change in
+   `index.ts`. Product *copy* lives in `src/lib/catalogue.ts`, which imports no
+   commerce provider — pages read it directly, and the adapter reads it too.
+   Price and availability are not copy; see 5.5.
 
 5.5 **The price comes from Shopify or it does not exist.** `catalogue.ts`
    holds no price at all — `PLACEHOLDER_PRICE_CENTS` is gone, and putting a
@@ -53,8 +56,11 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    takes that nullable product rather than a `commerceEnabled` boolean, so a
    Storefront outage renders the pre-drop page (no price, no buy band) and
    there is no code path that renders a band without a Shopify price behind
-   it. Stripe checkout prices its line items from the same read, so what was
-   rendered and what is charged cannot disagree.
+   it. Adding a line re-resolves the variant from this same read
+   (`resolveMerchandiseId()` in `src/pages/api/cart.ts`) rather than trusting
+   whatever id the request carried, and checkout is a redirect to Shopify's
+   own hosted `cart.checkoutUrl` — so what was rendered and what ends up in
+   the cart cannot disagree.
 
    The cost of that design is that every failure looks like an ordinary
    pre-drop page. So the two silent ones say so in the Worker log (an
@@ -190,15 +196,17 @@ of us to see the real buy flow on the real site before it opens.
   it is absolutely positioned, so the band's fixed height is untouched
   whether it shows or not. Hover lives on a wrapper because a disabled
   Radio has `pointer-events-none` and no hover of its own.
-  The buy button still redirects straight to Stripe's hosted checkout, same
-  as before — there is no cart behind "Ajouter au panier" yet. That's a
-  known, deliberate gap in the label, not an oversight.
+  "Ajouter au panier" adds a real line to a Shopify cart (`/api/cart`,
+  `intent=add`) rather than buying now — see `src/pages/panier.astro` /
+  `src/pages/en/cart.astro` and `CartView.astro`. Checkout, from the cart
+  page, is a redirect to Shopify's own hosted `cart.checkoutUrl`; there is no
+  checkout UI in this repo.
   The Quebec CPA pre-contract disclosure that used to sit in a closed
   `<details>` at the bottom of this page (`CpaDisclosure.astro`) is now its
   own route (`precontract` in `ROUTES`), linked from the footer, the nav
   drawer, and a line directly under the buy button — that last link matters
   for CPA s. 54.4, which wants the disclosure presented before the distance
-  contract forms, and checkout jumps straight to Stripe from here.
+  contract forms, and checkout hands off to Shopify's hosted page from here.
   The frame still sizes and caps the photo itself — none of that math
   changed — but the slide is clipped to the page's width, not the frame's:
   `ProductCarousel.tsx` measures the page and centres a wider clip layer
@@ -327,7 +335,7 @@ defer behind; it stays `client:load`.
 
 ## Accessibility
 
-`npm run test:a11y` runs `@axe-core/playwright` across all 16 routes plus
+`npm run test:a11y` runs `@axe-core/playwright` across all 14 routes plus
 behavioural assertions in `e2e/`, wired into CI (`.github/workflows/ci.yml`).
 Two things worth knowing before touching it:
 

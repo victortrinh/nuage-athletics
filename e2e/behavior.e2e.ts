@@ -1036,7 +1036,7 @@ test('product details render below the fold when commerce is on, and are absent 
  * The CPA pre-contract disclosure (CLAUDE.md's Non-negotiables) moved off
  * the product page onto its own route — reachable from the footer, the nav
  * drawer, and directly under the buy control, since that link is the last
- * surface the site controls before checkout hands off to Stripe.
+ * surface the site controls before checkout hands off to Shopify.
  */
 test('the pre-contract information page is reachable from the footer, the nav drawer, and the buy band', async ({
   page,

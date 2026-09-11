@@ -1,10 +1,10 @@
 /**
- * HMAC-SHA256 over Web Crypto, shared by the Stripe webhook verifier and the
- * password gate. Both need exactly this and the stripe-node SDK isn't usable
- * on Workers, so it lives here rather than being written twice.
+ * HMAC-SHA256 over Web Crypto, shared by the Shopify webhook verifier and the
+ * password gate. Both need exactly this and neither provider's Node SDK is
+ * usable on Workers, so it lives here rather than being written twice.
  */
 
-export async function hmacHex(secret: string, payload: string): Promise<string> {
+async function sign(secret: string, payload: string): Promise<ArrayBuffer> {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -12,8 +12,22 @@ export async function hmacHex(secret: string, payload: string): Promise<string> 
     false,
     ['sign']
   )
-  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
+  return crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
+}
+
+export async function hmacHex(secret: string, payload: string): Promise<string> {
+  const signature = await sign(secret, payload)
   return [...new Uint8Array(signature)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Shopify signs its webhooks as base64 HMAC-SHA256 (`X-Shopify-Hmac-Sha256`),
+ * not Stripe's hex `t=`/`v1=` scheme — a sibling to hmacHex rather than a
+ * second copy of the signing logic above.
+ */
+export async function hmacBase64(secret: string, payload: string): Promise<string> {
+  const signature = await sign(secret, payload)
+  return btoa(String.fromCharCode(...new Uint8Array(signature)))
 }
 
 /**

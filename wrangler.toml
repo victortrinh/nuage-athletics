@@ -33,10 +33,9 @@ COMMERCE_ENABLED = "false"
 
 # Secrets — set with `wrangler secret put <NAME>`, never commit:
 #   RESEND_API_KEY
-#   STRIPE_SECRET_KEY
-#   STRIPE_WEBHOOK_SECRET
 #   PREVIEW_PASSWORD
 #   SHOPIFY_STOREFRONT_TOKEN  (Storefront API access token, read scopes)
+#   SHOPIFY_WEBHOOK_SECRET    (order-paid webhook signing secret, from the Shopify admin subscription)
 #
 # SHOPIFY_STORE_DOMAIN is a [vars] entry above, not a secret. If one was ever
 # set with `wrangler secret put`, delete it (`wrangler secret delete

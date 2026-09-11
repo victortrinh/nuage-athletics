@@ -1,8 +1,7 @@
 import type { Locale } from '../../i18n/config'
 import { previewActive } from '../preview'
 import { createShopifyStorefront, StorefrontError } from './shopify'
-import { createStripeAdapter } from './stripe'
-import type { Cart, CommerceAdapter, Product } from './types'
+import type { Cart, Product } from './types'
 
 export type * from './types'
 
@@ -171,28 +170,6 @@ export function mutateCart(env: StorefrontEnv, op: CartOp): Promise<LiveCart> {
         return source.removeLine(op.cartId, op.lineId)
     }
   })
-}
-
-/**
- * Single place where the backend is chosen. To move to Lightspeed later,
- * implement LightspeedAdapter with the same interface and change this function.
- */
-export function getCommerce(
-  env: StorefrontEnv & {
-    STRIPE_SECRET_KEY?: string
-    STRIPE_WEBHOOK_SECRET?: string
-  }
-): CommerceAdapter {
-  if (!env.STRIPE_SECRET_KEY) {
-    throw new Error('STRIPE_SECRET_KEY is not configured')
-  }
-  // Stripe still takes the payment; it no longer decides what to charge.
-  // The line item is priced from the same `getLiveProduct` read the page
-  // rendered from, so "the price you saw is the price you pay" holds by
-  // construction rather than by two files agreeing on a constant.
-  return createStripeAdapter(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET, async (slug, locale) =>
-    (await getLiveProduct(env, slug, locale)).product
-  )
 }
 
 /**

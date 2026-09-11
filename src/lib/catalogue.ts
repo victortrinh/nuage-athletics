@@ -5,13 +5,13 @@ import type { Money, Product, ProductVariant } from './commerce/types'
  * The catalogue, deliberately free of any commerce backend.
  *
  * This used to live inside the Stripe adapter, which made it unreachable
- * whenever Stripe wasn't configured — `getCommerce()` throws without a secret
- * key. The homepage now renders the product while commerce is still switched
- * off, so product data has to exist independently of who eventually sells it.
+ * whenever Stripe wasn't configured. The homepage now renders the product
+ * while commerce is still switched off, so product data has to exist
+ * independently of who eventually sells it.
  *
- * Nothing here imports Stripe. `src/lib/commerce/stripe.ts` reads *from* this
- * file, which keeps CLAUDE.md's rule intact: pages can import the catalogue
- * without gaining a path to a payment provider.
+ * Nothing here imports a payment provider. `src/lib/commerce/shopify.ts`
+ * reads *from* this file, which keeps CLAUDE.md's rule intact: pages can
+ * import the catalogue without gaining a path to a provider.
  */
 
 export const SLUGS: Record<string, Record<Locale, string>> = {
@@ -64,11 +64,11 @@ const FIT_NAMES: Record<Locale, Record<FitId, string>> = {
 
 /**
  * Fit × size = 14 variants, fit-major. `label` composes the fit and size name
- * (e.g. "Crop · M") and is what ends up on the Stripe line item and receipt —
- * see `stripe.ts`, which reads `variant.label` directly and needed no changes
- * for this. `options` carries the same two facts as ids, for `ProductStage`
- * to resolve a variant from a (fit, size) selection without re-deriving the
- * id scheme in a second file.
+ * (e.g. "Crop · M") and is what ends up on the cart line and Shopify's own
+ * order/receipt — `CartView.astro` reads `variant.label` directly. `options`
+ * carries the same two facts as ids, for `ProductStage` to resolve a variant
+ * from a (fit, size) selection without re-deriving the id scheme in a second
+ * file.
  */
 function variants(productId: string, skuBase: string, locale: Locale): CatalogueVariant[] {
   return FIT_IDS.flatMap((fit) =>
@@ -280,12 +280,11 @@ export function editorialFor(id: string, locale: Locale): ProductEditorial {
 }
 
 /**
- * Same formatting `sendOrderConfirmationEmail` (src/lib/email.ts) already
- * does for a receipt — locale-aware via `Intl.NumberFormat`'s own currency
- * symbol/spacing rules (e.g. "65,00 $" vs "$65.00"), rather than a hand-built
- * string. Called server-side only (ProductView.astro), and only ever on a
- * `Money` that came back from Shopify — this file has no number of its own
- * to format. See non-negotiable 5.5 in CLAUDE.md.
+ * Locale-aware via `Intl.NumberFormat`'s own currency symbol/spacing rules
+ * (e.g. "65,00 $" vs "$65.00"), rather than a hand-built string. Called
+ * server-side only (ProductView.astro), and only ever on a `Money` that came
+ * back from Shopify — this file has no number of its own to format. See
+ * non-negotiable 5.5 in CLAUDE.md.
  */
 export function formatPrice(price: Money, locale: Locale): string {
   return new Intl.NumberFormat(locale, { style: 'currency', currency: price.currency }).format(

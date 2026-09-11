@@ -12,10 +12,9 @@ export default defineConfig({
       miniflare: {
         bindings: {
           TEST_MIGRATIONS: migrations,
-          // Fixed test-only values so webhook tests can generate valid
-          // Stripe signatures without hitting the real API.
-          STRIPE_SECRET_KEY: 'sk_test_not_a_real_key',
-          STRIPE_WEBHOOK_SECRET: 'whsec_test_not_a_real_secret',
+          // Fixed test-only value so webhook tests can generate valid
+          // Shopify signatures without hitting the real API.
+          SHOPIFY_WEBHOOK_SECRET: 'whsec_test_not_a_real_secret',
           // Fixed test-only value so the Resend path runs instead of the
           // no-key dev branch. test/stub-resend.ts intercepts the request.
           RESEND_API_KEY: 're_test_not_a_real_key',
@@ -23,10 +22,9 @@ export default defineConfig({
           PREVIEW_PASSWORD: 'test-preview-password',
           // Fixed test-only value so cart tests (test/cart.test.ts) can
           // exercise the real commerceEnabled → getLiveProduct → cart path
-          // with a stubbed fetch, the same reasoning STRIPE_SECRET_KEY above
-          // follows. COMMERCE_ENABLED stays 'false' (from wrangler.toml) —
-          // these tests carry a preview cookie instead, same as the real
-          // founder-preview path.
+          // with a stubbed fetch. COMMERCE_ENABLED stays 'false' (from
+          // wrangler.toml) — these tests carry a preview cookie instead,
+          // same as the real founder-preview path.
           SHOPIFY_STOREFRONT_TOKEN: 'storefront-vitest-token',
         },
       },

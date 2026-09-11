@@ -19,18 +19,20 @@ declare namespace Cloudflare {
     // The founder-preview password. A secret, never a [vars] entry — a
     // password committed to wrangler.toml is a password in the git history.
     PREVIEW_PASSWORD?: string
-    STRIPE_SECRET_KEY?: string
-    STRIPE_WEBHOOK_SECRET?: string
     // Shopify Storefront API — with the store domain in [vars] below, this
     // token is the only source of a customer-visible price and of
     // per-variant availability (src/lib/commerce/shopify.ts). Unset means no
     // price and no buy band, whatever COMMERCE_ENABLED says.
     SHOPIFY_STOREFRONT_TOKEN?: string
+    // Verifies the order-paid webhook's X-Shopify-Hmac-Sha256 signature
+    // (src/pages/api/webhooks/shopify.ts). Set in the Shopify admin webhook
+    // subscription and here — the two must match.
+    SHOPIFY_WEBHOOK_SECRET?: string
 
     // [vars] in wrangler.toml
     PUBLIC_SITE_URL?: string
     // "true" to show prices and the buy flow to everyone. While it is unset
-    // only a visitor carrying the preview cookie sees them, and /api/checkout
+    // only a visitor carrying the preview cookie sees them, and /api/cart
     // returns 404 for everyone else — see src/lib/commerce/index.ts.
     COMMERCE_ENABLED?: string
     // The Shopify store, host only — no scheme, no path. A var rather than a
