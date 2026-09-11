@@ -164,6 +164,20 @@ const jsonLd = live
       */
       <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col items-center justify-center text-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
         {/*
+          `d.tagline` — reused, not rewritten: it already exists for
+          `<title>`/og:title (Seo.astro) and was, until now, never rendered
+          on the page itself. It's the plainest statement of what the brand
+          is, which is exactly what belongs above the news of when it
+          arrives. text-mute rather than text-sm's default ink: this is
+          context for the announcement below it, not the announcement
+          itself. (text-mute on the sky is a pre-existing site-wide
+          question — see global.css's note on sky-fallback — not one this
+          line introduces; e2e/a11y.e2e.ts flattens the gradient before
+          checking contrast, same as everywhere else this token is used.)
+        */}
+        <p class="max-w-xs text-sm leading-relaxed text-mute">{d.tagline}</p>
+
+        {/*
           The drop announcement, and the page's one heading — what a visitor
           gets instead of a buy band, and what replaced the pre-launch
           password screen as the answer to "what is this site for right
@@ -179,7 +193,7 @@ const jsonLd = live
           sentence twice. Monospace, uppercase and tracked out — this is a
           notice, not prose, and it should read as one at a glance.
         */}
-        <h1 class="font-mono text-xs uppercase leading-loose tracking-label">
+        <h1 class="mt-4 font-mono text-xs uppercase leading-loose tracking-label">
           {d.dropAnnounceFirst}
           <br />
           {d.dropAnnounceAvailability}
