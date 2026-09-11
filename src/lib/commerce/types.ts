@@ -94,11 +94,13 @@ export interface Cart {
   total: Money
   /**
    * `null` when Shopify has no tax registration to quote from yet (true for
-   * the first drop) — distinct from a real $0 so the render can say
-   * "calculated at checkout" instead of a number that would otherwise read
-   * as a considered answer. See non-negotiable 5.5's reasoning: an
-   * advertised total is one a Quebec merchant is expected to honour, and a
-   * silently-omitted tax is not an honest total.
+   * the first drop) — distinct from a real $0 so a fabricated number never
+   * gets rendered as a considered answer. Unlike shipping, this isn't
+   * "unknown until checkout": with no registration the tax owed genuinely is
+   * zero (see #64), so `CartView.astro` simply omits the row rather than
+   * claiming a tax is still to be calculated. See non-negotiable 5.5's
+   * reasoning: an advertised total is one a Quebec merchant is expected to
+   * honour, and a silently-omitted tax is not an honest total.
    */
   tax: Money | null
   /** Shopify's hosted checkout for this cart — where "Buy" hands off to. */

@@ -5,7 +5,7 @@ import { buttonVariants } from './ui/button-variants.ts'
 import { formatPrice, catalogueVariantBySku, editorialFor } from '../lib/catalogue.ts'
 import { cn } from './ui/cn.ts'
 import type { Locale } from '../i18n/config'
-import type { Cart, CartLine, Money } from '../lib/commerce/types'
+import type { Cart, CartLine } from '../lib/commerce/types'
 
 /**
  * The cart body, shared by `src/pages/panier.astro` and
@@ -66,10 +66,6 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
   return display.fitLabel && display.sizeLabel ? `${display.fitLabel} · ${display.sizeLabel}` : line.label
 }
 
-/** "Calculé à la caisse" for a total Shopify hasn't quoted yet, rather than a fabricated $0 — see the note on `Cart.tax`. */
-function money(amount: Money | null, deferred: string): string {
-  return amount ? formatPrice(amount, locale) : deferred
-}
 ---
 
 <section class="mx-auto max-w-xl py-16">
@@ -183,10 +179,14 @@ function money(amount: Money | null, deferred: string): string {
             <dt>{d.cartShipping}</dt>
             <dd>{d.cartDeferred}</dd>
           </div>
-          <div class="flex justify-between text-mute">
-            <dt>{d.cartTaxes}</dt>
-            <dd>{money(cart.tax, d.cartDeferred)}</dd>
-          </div>
+          {
+            cart.tax && (
+              <div class="flex justify-between text-mute">
+                <dt>{d.cartTaxes}</dt>
+                <dd class="tabular-nums">{formatPrice(cart.tax, locale)}</dd>
+              </div>
+            )
+          }
           <div class="flex justify-between border-t border-line pt-1.5 text-sm normal-case">
             <dt>{d.cartTotal}</dt>
             <dd class="tabular-nums">{formatPrice(cart.total, locale)}</dd>
