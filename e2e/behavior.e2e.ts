@@ -895,8 +895,13 @@ test.describe('founder preview', () => {
    * order-summary redesign replaced it with steppers. `−` at quantity 1
    * removes the line rather than going to 0, which this asserts explicitly
    * since it's the one place the two steppers don't mirror each other.
+   *
+   * Hydrated, those submits no longer reload the document: CartView.astro's
+   * script posts the same form and swaps `#cart-body` for the server's own
+   * next render. The marker below is how that's asserted — a variable set
+   * on `window` survives a DOM swap and would not survive a navigation.
    */
-  test('the cart page steppers update quantity, and stepping down from 1 removes the line', async ({
+  test('the cart page steppers update quantity in place, and stepping down from 1 removes the line', async ({
     browser,
   }) => {
     const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
@@ -911,9 +916,11 @@ test.describe('founder preview', () => {
     expect(response.ok()).toBe(true)
 
     await page.goto(ROUTES.cart['fr-CA'])
-    // The one line on the page — scoped by aria-live rather than by text, so
-    // this doesn't also match a price or a size elsewhere in the row.
-    const qty = page.locator('[aria-live="polite"]')
+    await page.evaluate(() => ((window as unknown as Record<string, unknown>).naNoReload = true))
+
+    // The one line on the page — scoped by its own data hook rather than by
+    // text, so this doesn't also match a price or a size elsewhere in the row.
+    const qty = page.locator('[data-cart-qty]')
     await expect(qty).toHaveText('1')
 
     const increase = page.getByRole('button', { name: /^Augmenter la quantité/ })
@@ -921,6 +928,8 @@ test.describe('founder preview', () => {
 
     await increase.click()
     await expect(qty).toHaveText('2')
+    // The header count follows the same response, with no reload of its own.
+    await expect(page.getByRole('link', { name: /Panier \(2\)/ })).toBeVisible()
 
     await decrease.click()
     await expect(qty).toHaveText('1')
@@ -930,6 +939,11 @@ test.describe('founder preview', () => {
     const remove = page.getByRole('button', { name: /^Retirer/ })
     await remove.click()
     await expect(page.getByText(/Votre panier est vide/)).toBeVisible()
+
+    // Three mutations, still the same document.
+    expect(
+      await page.evaluate(() => (window as unknown as Record<string, unknown>).naNoReload)
+    ).toBe(true)
 
     await context.close()
   })
@@ -970,6 +984,20 @@ test.describe('founder preview', () => {
     // render, same as a fresh visit.
     await expect(page).toHaveURL(/\?added=1$/)
     await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toBeVisible()
+
+    // And the cart page's own steppers degrade the same way: with no script
+    // to intercept them, `+` is the plain form POST it has always been, and
+    // /api/cart's 303 lands back on the cart with the new quantity rendered.
+    // This is the half CartView.astro's script must never break.
+    await page.goto(ROUTES.cart['fr-CA'])
+    await expect(page.locator('[data-cart-qty]')).toHaveText('1')
+    await page.getByRole('button', { name: /^Augmenter la quantité/ }).click({ force: true })
+
+    // `added=1` because /api/cart's form responder folds every success into
+    // that one param (src/lib/form-endpoint.ts), whichever intent it was;
+    // the cart page reads nothing out of it.
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}\\?added=1$`))
+    await expect(page.locator('[data-cart-qty]')).toHaveText('2')
 
     await context.close()
   })

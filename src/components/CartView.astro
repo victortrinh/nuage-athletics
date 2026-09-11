@@ -11,9 +11,13 @@ import type { Cart, CartLine } from '../lib/commerce/types'
  * The cart body, shared by `src/pages/panier.astro` and
  * `src/pages/en/cart.astro` — an order summary rendered in this site's own
  * mono/uppercase type rather than the generic list the two page files used
- * to render inline. Still zero client JS: every quantity change and removal
- * is a native `<form>` submit against `/api/cart.ts`'s existing `update` /
- * `remove` intents — nothing about the endpoint changed for this.
+ * to render inline. Every quantity change and removal is a native `<form>`
+ * submit against `/api/cart.ts`'s existing `update` / `remove` intents —
+ * nothing about the endpoint changed for this, and with no JS that submit
+ * is still the whole mechanism. The script at the bottom of this file only
+ * intercepts it once hydrated, to swap `#cart-body` for the server's own
+ * next render instead of reloading the document for two numbers; no React,
+ * and no second implementation of any of the rendering below.
  *
  * Takes the cart and the failure code as props rather than reading them
  * itself — the page files already do that read (they need the result to set
@@ -69,138 +73,274 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
 ---
 
 <section class="mx-auto max-w-xl py-16">
-  <h1 class="text-center font-mono text-xs uppercase tracking-label">{d.cartTitle}</h1>
+  {/* tabindex so the script below has somewhere to put focus when the
+      control that was focused (a "−" that removed the last line) is gone
+      from the rewritten summary. */}
+  <h1 id="cart-title" tabindex="-1" class="text-center font-mono text-xs uppercase tracking-label">
+    {d.cartTitle}
+  </h1>
 
-  {
-    errorMessage && (
-      <p role="alert" class="mt-4 text-center text-sm text-danger">
-        {errorMessage}
-      </p>
-    )
-  }
+  {/*
+    Deliberately outside #cart-body: everything inside that div is replaced
+    wholesale on a hydrated stepper submit, and a live region that was just
+    inserted is not one a screen reader announces. This node survives every
+    swap, so setting its text is the one announcement that actually lands.
+  */}
+  <p id="cart-status" role="status" aria-live="polite" data-label={d.cartUpdated} class="sr-only"></p>
 
-  {
-    !cart || cart.lines.length === 0 ? (
-      <div class="mt-10 text-center">
-        <p class="text-sm text-mute">{d.cartEmpty}</p>
-        <a href={productPath} class={cn(buttonVariants({ variant: 'text' }), 'mt-4 inline-block')}>
-          {d.cartEmptyCta}
-        </a>
-      </div>
-    ) : (
-      <>
-        <p class="mt-10 font-mono text-[11px] uppercase tracking-label text-mute">{d.cartSummary}</p>
+  <div id="cart-body">
+    {
+      errorMessage && (
+        <p role="alert" class="mt-4 text-center text-sm text-danger">
+          {errorMessage}
+        </p>
+      )
+    }
 
-        <ul class="mt-4 divide-y divide-line border-y border-line font-mono text-xs uppercase tracking-label">
-          {cart.lines.map((line) => {
-            const display = lineDisplay(line)
-            const label = lineAccessibleLabel(line, display)
-            const atFloor = line.quantity <= 1
-            return (
-              <li class="flex gap-4 py-5">
-                {display.thumb && (
-                  <img
-                    src={display.thumb.src}
-                    width={display.thumb.width}
-                    height={display.thumb.height}
-                    alt={display.thumb.alt}
-                    loading="lazy"
-                    decoding="async"
-                    class="w-24 shrink-0 border border-line object-contain"
-                  />
-                )}
-                <div class="min-w-0 flex-1 space-y-1.5">
-                  <div class="flex items-baseline justify-between gap-3">
-                    <span class="truncate">{display.code}</span>
-                    <span class="shrink-0 tabular-nums">
-                      <span class="sr-only">{d.cartLineTotal}: </span>
-                      {formatPrice(line.linePrice, locale)}
-                    </span>
-                  </div>
-                  {display.fitLabel && (
-                    <div class="flex justify-between text-mute">
-                      <span>{d.cartFit}</span>
-                      <span>{display.fitLabel}</span>
-                    </div>
+    {
+      !cart || cart.lines.length === 0 ? (
+        <div class="mt-10 text-center">
+          <p class="text-sm text-mute">{d.cartEmpty}</p>
+          <a href={productPath} class={cn(buttonVariants({ variant: 'text' }), 'mt-4 inline-block')}>
+            {d.cartEmptyCta}
+          </a>
+        </div>
+      ) : (
+        <>
+          <p class="mt-10 font-mono text-[11px] uppercase tracking-label text-mute">{d.cartSummary}</p>
+
+          <ul class="mt-4 divide-y divide-line border-y border-line font-mono text-xs uppercase tracking-label">
+            {cart.lines.map((line) => {
+              const display = lineDisplay(line)
+              const label = lineAccessibleLabel(line, display)
+              const atFloor = line.quantity <= 1
+              return (
+                <li class="flex gap-4 py-5">
+                  {display.thumb && (
+                    <img
+                      src={display.thumb.src}
+                      width={display.thumb.width}
+                      height={display.thumb.height}
+                      alt={display.thumb.alt}
+                      loading="lazy"
+                      decoding="async"
+                      class="w-24 shrink-0 border border-line object-contain"
+                    />
                   )}
-                  {display.sizeLabel && (
-                    <div class="flex justify-between text-mute">
-                      <span>{d.cartSize}</span>
-                      <span>{display.sizeLabel}</span>
-                    </div>
-                  )}
-                  <div class="flex items-center justify-between">
-                    <span class="text-mute">{d.cartQty}</span>
-                    <div class="flex items-center gap-3">
-                      <form method="POST" action="/api/cart">
-                        <input type="hidden" name="intent" value={atFloor ? 'remove' : 'update'} />
-                        <input type="hidden" name="lineId" value={line.id} />
-                        {!atFloor && <input type="hidden" name="quantity" value={line.quantity - 1} />}
-                        <input type="hidden" name="redirect" value={cartPath} />
-                        <button
-                          type="submit"
-                          aria-label={fmt(atFloor ? d.cartRemoveLabel : d.cartDecrease, { label })}
-                          class={cn(buttonVariants({ variant: 'text' }), 'w-6 normal-case')}
-                        >
-                          −
-                        </button>
-                      </form>
-                      <span class="tabular-nums" aria-live="polite">
-                        {line.quantity}
+                  <div class="min-w-0 flex-1 space-y-1.5">
+                    <div class="flex items-baseline justify-between gap-3">
+                      <span class="truncate">{display.code}</span>
+                      <span class="shrink-0 tabular-nums">
+                        <span class="sr-only">{d.cartLineTotal}: </span>
+                        {formatPrice(line.linePrice, locale)}
                       </span>
-                      <form method="POST" action="/api/cart">
-                        <input type="hidden" name="intent" value="update" />
-                        <input type="hidden" name="lineId" value={line.id} />
-                        <input type="hidden" name="quantity" value={line.quantity + 1} />
-                        <input type="hidden" name="redirect" value={cartPath} />
-                        <button
-                          type="submit"
-                          disabled={line.quantity >= MAX_QUANTITY}
-                          aria-label={fmt(d.cartIncrease, { label })}
-                          class={cn(buttonVariants({ variant: 'text' }), 'w-6 normal-case')}
-                        >
-                          +
-                        </button>
-                      </form>
+                    </div>
+                    {display.fitLabel && (
+                      <div class="flex justify-between text-mute">
+                        <span>{d.cartFit}</span>
+                        <span>{display.fitLabel}</span>
+                      </div>
+                    )}
+                    {display.sizeLabel && (
+                      <div class="flex justify-between text-mute">
+                        <span>{d.cartSize}</span>
+                        <span>{display.sizeLabel}</span>
+                      </div>
+                    )}
+                    <div class="flex items-center justify-between">
+                      <span class="text-mute">{d.cartQty}</span>
+                      <div class="flex items-center gap-3">
+                        {/*
+                          data-cart-form is what the script below binds to —
+                          the checkout form deliberately carries none, since
+                          that one has to stay a real navigation to Shopify's
+                          hosted page. data-line/data-step let it put focus
+                          back on the same control after the swap.
+                        */}
+                        <form method="POST" action="/api/cart" data-cart-form data-line={line.id} data-step="down">
+                          <input type="hidden" name="intent" value={atFloor ? 'remove' : 'update'} />
+                          <input type="hidden" name="lineId" value={line.id} />
+                          {!atFloor && <input type="hidden" name="quantity" value={line.quantity - 1} />}
+                          <input type="hidden" name="redirect" value={cartPath} />
+                          <button
+                            type="submit"
+                            aria-label={fmt(atFloor ? d.cartRemoveLabel : d.cartDecrease, { label })}
+                            class={cn(buttonVariants({ variant: 'text' }), 'w-6 normal-case')}
+                          >
+                            −
+                          </button>
+                        </form>
+                        {/*
+                          No aria-live here any more: this node is replaced
+                          wholesale on every hydrated update, and a live
+                          region that was just inserted announces nothing.
+                          #cart-status above is the one that survives, and
+                          it's what the script announces through.
+                        */}
+                        <span data-cart-qty class="tabular-nums">
+                          {line.quantity}
+                        </span>
+                        <form method="POST" action="/api/cart" data-cart-form data-line={line.id} data-step="up">
+                          <input type="hidden" name="intent" value="update" />
+                          <input type="hidden" name="lineId" value={line.id} />
+                          <input type="hidden" name="quantity" value={line.quantity + 1} />
+                          <input type="hidden" name="redirect" value={cartPath} />
+                          <button
+                            type="submit"
+                            disabled={line.quantity >= MAX_QUANTITY}
+                            aria-label={fmt(d.cartIncrease, { label })}
+                            class={cn(buttonVariants({ variant: 'text' }), 'w-6 normal-case')}
+                          >
+                            +
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+                </li>
+              )
+            })}
+          </ul>
 
-        <dl class="mt-6 space-y-1.5 font-mono text-xs uppercase tracking-label">
-          <div class="flex justify-between">
-            <dt>{d.cartSubtotal}</dt>
-            <dd class="tabular-nums">{formatPrice(cart.subtotal, locale)}</dd>
-          </div>
-          <div class="flex justify-between text-mute">
-            <dt>{d.cartShipping}</dt>
-            <dd>{d.cartDeferred}</dd>
-          </div>
-          {
-            cart.tax && (
+          <dl class="mt-6 space-y-1.5 font-mono text-xs uppercase tracking-label">
+            <div class="flex justify-between">
+              <dt>{d.cartSubtotal}</dt>
+              <dd class="tabular-nums">{formatPrice(cart.subtotal, locale)}</dd>
+            </div>
+            <div class="flex justify-between text-mute">
+              <dt>{d.cartShipping}</dt>
+              <dd>{d.cartDeferred}</dd>
+            </div>
+            {cart.tax && (
               <div class="flex justify-between text-mute">
                 <dt>{d.cartTaxes}</dt>
                 <dd class="tabular-nums">{formatPrice(cart.tax, locale)}</dd>
               </div>
-            )
-          }
-          <div class="flex justify-between border-t border-line pt-1.5 text-sm normal-case">
-            <dt>{d.cartTotal}</dt>
-            <dd class="tabular-nums">{formatPrice(cart.total, locale)}</dd>
-          </div>
-        </dl>
+            )}
+            <div class="flex justify-between border-t border-line pt-1.5 text-sm normal-case">
+              <dt>{d.cartTotal}</dt>
+              <dd class="tabular-nums">{formatPrice(cart.total, locale)}</dd>
+            </div>
+          </dl>
 
-        <form method="POST" action="/api/cart" class="mt-6">
-          <input type="hidden" name="intent" value="checkout" />
-          <input type="hidden" name="redirect" value={cartPath} />
-          <button type="submit" class={buttonVariants({ variant: 'solid' })}>
-            {d.cartCheckout}
-          </button>
-        </form>
-      </>
-    )
-  }
+          <form method="POST" action="/api/cart" class="mt-6">
+            <input type="hidden" name="intent" value="checkout" />
+            <input type="hidden" name="redirect" value={cartPath} />
+            <button type="submit" class={buttonVariants({ variant: 'solid' })}>
+              {d.cartCheckout}
+            </button>
+          </form>
+        </>
+      )
+    }
+  </div>
 </section>
+
+<script>
+  /*
+   * The steppers stay native <form> POSTs — that is still the whole of how
+   * they work with no JS, and /api/cart's 303 back to this page is
+   * unchanged. This only intercepts them once hydrated, so a quantity
+   * change stops costing a full document load (which re-runs the sky's
+   * WebGL setup and drops scroll position for the sake of two numbers).
+   *
+   * What it does NOT do is re-render the summary itself. The POST's own 303
+   * is followed by fetch(), so the response body is this page as the server
+   * would have drawn it anyway — the script swaps #cart-body for the one in
+   * that response and syncs the header link from the same document. Every
+   * price, every stepper's new intent at quantity 1, the empty-cart state:
+   * all still rendered once, server-side, by CartView.astro. There is no
+   * second implementation of any of it here to drift.
+   */
+  const status = document.getElementById('cart-status')
+  const body = document.getElementById('cart-body')
+
+  // One at a time: each form carries the quantity it computed from what was
+  // rendered (line.quantity ± 1), so two in flight together would both post
+  // the same number and the second would silently undo the first.
+  let pending = false
+
+  function stepperFor(line: string | undefined, step: string | undefined) {
+    if (!line || !step) return null
+    const forms = document.querySelectorAll<HTMLFormElement>('form[data-cart-form]')
+    for (const form of forms) {
+      if (form.dataset.line === line && form.dataset.step === step) {
+        return form.querySelector('button')
+      }
+    }
+    return null
+  }
+
+  /** Header count and label, lifted from the same response — no second read of the cookie, and it bumps exactly as an add from the product page does. */
+  function syncCartLink(next: Document) {
+    const link = document.getElementById('cart-link')
+    const nextLink = next.getElementById('cart-link')
+    if (!link || !nextLink) return
+    link.setAttribute('aria-label', nextLink.getAttribute('aria-label') ?? '')
+    link.innerHTML = nextLink.innerHTML
+    link.classList.remove('cart-bump')
+    void link.offsetWidth
+    link.classList.add('cart-bump')
+  }
+
+  /** Cleared first, set on the next frame: the message is the same every time, and a live region whose text didn't actually change is one a screen reader is free to stay quiet about. */
+  function announce() {
+    if (!status) return
+    status.textContent = ''
+    requestAnimationFrame(() => {
+      status.textContent = status.dataset.label ?? ''
+    })
+  }
+
+  document.addEventListener('submit', async (event) => {
+    const target = event.target
+    if (!(target instanceof HTMLFormElement) || !target.matches('form[data-cart-form]')) return
+    event.preventDefault()
+    if (pending || !body) return
+    pending = true
+    body.setAttribute('aria-busy', 'true')
+    const { line, step } = target.dataset
+
+    let next: Document | null = null
+    try {
+      // URLSearchParams, not the FormData itself: FormData would send
+      // multipart, and /api/cart routes on a form-encoded Content-Type to
+      // tell a native submit from the JSON one ProductStage.tsx sends.
+      const entries = [...new FormData(target)].map(([key, value]) => [key, String(value)])
+      const res = await fetch(target.action, {
+        method: 'POST',
+        body: new URLSearchParams(entries),
+      })
+      // fetch follows the 303 itself, so this is already this page as the
+      // server would have drawn it after the mutation.
+      next = new DOMParser().parseFromString(await res.text(), 'text/html')
+    } catch {
+      next = null
+    } finally {
+      pending = false
+      body.removeAttribute('aria-busy')
+    }
+
+    const nextBody = next?.getElementById('cart-body')
+    // Anything unexpected in that response (an origin check, a 500, a
+    // login wall someone adds later) and this hands the submit back to the
+    // browser rather than guessing — same POST, full navigation, the no-JS
+    // path exactly. Nothing has been touched yet at this point, so the form
+    // is still attached and still submittable.
+    if (!next || !nextBody) {
+      target.submit()
+      return
+    }
+
+    body.innerHTML = nextBody.innerHTML
+    syncCartLink(next)
+    announce()
+
+    // Focus follows the control that was pressed. When it's gone — a "−"
+    // that removed the line — the heading takes it, so focus never falls
+    // back to the top of the document.
+    const restored = stepperFor(line, step)
+    if (restored && !restored.disabled) restored.focus()
+    else document.getElementById('cart-title')?.focus()
+  })
+</script>

@@ -29,8 +29,9 @@ import type { Locale } from './config.ts'
  *     productSelectSizeError — but the buy band's disabled-until-picked
  *     button makes it unreachable, so it was removed rather than left to
  *     rot. See ProductStage.tsx.)
- *   - submitting, successTitle, productAdding: progress is announced through
- *     a live region, where being understood on the first hearing beats charm.
+ *   - submitting, successTitle, productAdding, cartUpdated: progress and
+ *     confirmation are announced through a live region, where being
+ *     understood on the first hearing beats charm.
  *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
  *     mailUnsub, mailSubject/mailHeading/mailCta, privacy, terms,
  *     precontract, rights, productOutOfStock, productAddToCart.
@@ -133,6 +134,10 @@ export type Dict = {
   cartIncrease: string
   cartDecrease: string
   cartRemoveLabel: string
+  // announced after a hydrated stepper swaps the summary in place — the
+  // rewritten rows are new nodes, which a live region never announces on
+  // its own. See CartView.astro's script.
+  cartUpdated: string
   cartFit: string
   cartSize: string
   cartQty: string
@@ -222,6 +227,7 @@ export const UI: Record<Locale, Dict> = {
     cartIncrease: 'Augmenter la quantité de {label}',
     cartDecrease: 'Diminuer la quantité de {label}',
     cartRemoveLabel: 'Retirer {label} du panier',
+    cartUpdated: 'Panier mis à jour',
     cartFit: 'Coupe',
     cartSize: 'Taille',
     cartQty: 'Qté',
@@ -306,6 +312,7 @@ export const UI: Record<Locale, Dict> = {
     cartIncrease: 'Increase quantity of {label}',
     cartDecrease: 'Decrease quantity of {label}',
     cartRemoveLabel: 'Remove {label} from cart',
+    cartUpdated: 'Cart updated',
     cartFit: 'Fit',
     cartSize: 'Size',
     cartQty: 'Qty',

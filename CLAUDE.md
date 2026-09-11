@@ -211,6 +211,24 @@ of us to see the real buy flow on the real site before it opens.
   `src/pages/en/cart.astro` and `CartView.astro`. Checkout, from the cart
   page, is a redirect to Shopify's own hosted `cart.checkoutUrl`; there is no
   checkout UI in this repo.
+- **The cart page's steppers are progressively enhanced, not an island.**
+  Each `+`/`−`/remove is a native `<form>` POST to `/api/cart` and still is
+  with no JS — the 303 back to the cart page is the whole mechanism there.
+  `CartView.astro`'s own `<script>` intercepts those submits once hydrated
+  and, rather than re-rendering anything itself, lets `fetch` follow that
+  same 303 and swaps `#cart-body` for the one in the response, syncing
+  `#cart-link` from the same document. So prices, the `−` button's flip to
+  `remove` at quantity 1, and the empty-cart state are still rendered
+  exactly once, server-side, by this file — there is no second
+  implementation on the client to drift out of step, and no React on this
+  route. Three things the swap has to keep doing, all asserted in
+  `e2e/behavior.e2e.ts`: focus returns to the control that was pressed (or
+  the `h1`, when a remove took that control away), the announcement goes
+  through `#cart-status` **outside** the swapped region (a live region that
+  was itself just replaced announces nothing), and the whole thing still
+  degrades — the no-JS half of that contract has its own assertions in the
+  JavaScript-disabled test. The checkout form deliberately carries no
+  `data-cart-form`, since it must stay a real navigation to Shopify.
   The Quebec CPA pre-contract disclosure that used to sit in a closed
   `<details>` at the bottom of this page (`CpaDisclosure.astro`) is now its
   own route (`precontract` in `ROUTES`), linked from the footer, the nav
