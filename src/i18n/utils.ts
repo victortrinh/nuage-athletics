@@ -99,6 +99,17 @@ export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   cart: false,
 }
 
+/**
+ * Kill switch for the prompt above, independent of the per-route table:
+ * every outbound email — the double opt-in confirmation included — renders
+ * `SENDER_IDENTITY.address` (src/lib/consent.ts) into its footer, and that's
+ * still the CASL-non-compliant placeholder string. Collecting an address the
+ * confirmation email can't legally reach is worse than not asking yet, so
+ * this stays false until the real mailing address lands. Flip it back to
+ * true then — see https://github.com/victortrinh/nuage-athletics/issues/67.
+ */
+export const SIGNUP_PROMPT_ENABLED = false
+
 /** Every indexable route's path, in every locale — the sitemap's allowlist. */
 export const INDEXABLE_PATHS: readonly string[] = (Object.keys(ROUTES) as RouteId[])
   .filter((id) => INDEXABLE[id])

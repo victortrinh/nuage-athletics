@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { ROUTES } from '../src/i18n/utils'
+import { ROUTES, SIGNUP_PROMPT_ENABLED } from '../src/i18n/utils'
 import { E2E_PREVIEW_PASSWORD, NUDGE_DISMISSED } from '../playwright.config'
 import { SOLD_OUT, STUB_PRICE, STUB_CHECKOUT_HOST } from './storefront-stub'
 import { LOCALES } from '../src/i18n/config'
@@ -42,6 +42,7 @@ async function openSignupPrompt(page: Page) {
  */
 for (const locale of LOCALES) {
   test(`consent checkbox is unchecked on load (${locale})`, async ({ page }) => {
+    test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
     await page.goto(ROUTES.home[locale])
     await openSignupPrompt(page)
     const consent = page.getByRole('checkbox')
@@ -60,6 +61,7 @@ test('skip link is the first focus stop and targets #content', async ({ page }) 
 test('consent checkbox toggles by keyboard, and a bad email wires aria-invalid', async ({
   page,
 }) => {
+  test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
   await page.goto(ROUTES.home['fr-CA'])
   await openSignupPrompt(page)
 
@@ -79,6 +81,7 @@ test('consent checkbox toggles by keyboard, and a bad email wires aria-invalid',
 })
 
 test('focus moves into the success panel, and the live region announces it', async ({ page }) => {
+  test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
   await page.goto(ROUTES.home['fr-CA'])
 
   // The real endpoint always returns email_failed without RESEND_API_KEY
@@ -112,6 +115,7 @@ test('focus moves into the success panel, and the live region announces it', asy
  * test noticing.
  */
 test('a hydrated submit resolves in place, without navigating', async ({ page }) => {
+  test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
   await page.goto(ROUTES.home['fr-CA'])
 
   await page.route('**/api/subscribe', (route) =>
@@ -142,6 +146,7 @@ test.describe('signup form works before hydration (no JS)', () => {
   test.use({ javaScriptEnabled: false })
 
   test('a native form POST redirects to the confirmation state on success', async ({ page }) => {
+    test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
     // The real endpoint always returns email_failed without RESEND_API_KEY
     // configured (see README) — stub the redirect it would issue on success,
     // the same shape /api/subscribe itself produces for a form-encoded POST.
@@ -166,6 +171,7 @@ test.describe('signup form works before hydration (no JS)', () => {
   test('submitting with consent unchecked bounces back with the French error, prompt forced open', async ({
     page,
   }) => {
+    test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
     await page.goto(ROUTES.home['fr-CA'])
     await expect(page.getByRole('checkbox')).toBeVisible()
 
