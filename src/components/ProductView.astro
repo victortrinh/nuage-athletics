@@ -163,32 +163,27 @@ const jsonLd = live
         a top-aligned scrap, whether or not there's a product underneath.
       */
       <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col items-center justify-center text-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
-        {/* Display scale, same treatment as the wordmark in the header
-            (.wordmark, global.css) — there's no band here to roll this into
-            and no photograph competing for attention. The brand name, not
-            the product's: with no photo, naming the garment ("Long Sleeve
-            01") would be a label with nothing to label, so the announcement
-            below stays generic on purpose too — "first drop", not which
-            one. */}
-        <h1 class="wordmark text-4xl sm:text-5xl">{d.brand}</h1>
-
         {/*
-          The drop announcement — what a visitor gets instead of a buy band,
-          and what replaced the pre-launch password screen as the answer to
-          "what is this site for right now".
+          The drop announcement, and the page's one heading — what a visitor
+          gets instead of a buy band, and what replaced the pre-launch
+          password screen as the answer to "what is this site for right
+          now".
 
-          It is the availability statement, so the old bordered "coming
-          soon" badge went with it: a badge saying the drop is ahead sitting
-          above a line naming the season is the same sentence twice.
-          Monospace, uppercase and tracked out, set apart from the display
-          heading above — this is a notice, not prose, and it should read as
-          one at a glance.
+          Not a separate brand-name heading above it: the header's own logo
+          link already carries `aria-label={d.brand}` (Base.astro), so an
+          h1 repeating "Nuage Athletics" here would be the same fact said
+          twice on every render, not a heading for this page's own content.
+          This is that content — the availability statement, so the old
+          bordered "coming soon" badge went with it too: a badge saying the
+          drop is ahead sitting above a line naming the season is the same
+          sentence twice. Monospace, uppercase and tracked out — this is a
+          notice, not prose, and it should read as one at a glance.
         */}
-        <p class="mt-6 font-mono text-xs uppercase leading-loose tracking-label">
+        <h1 class="font-mono text-xs uppercase leading-loose tracking-label">
           {d.dropAnnounceFirst}
           <br />
           {d.dropAnnounceAvailability}
-        </p>
+        </h1>
       </div>
     ) : (
       <>

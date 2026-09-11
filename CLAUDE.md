@@ -176,13 +176,17 @@ of us to see the real buy flow on the real site before it opens.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
 - **The garment isn't final, so the public pre-drop page shows no
   photography at all** — not the carousel, not a static image, nothing under
-  `public/img/ls-01-*`. `ProductView.astro`'s `!live` branch is a
-  display-scale announcement instead: the brand name set in `.wordmark`
-  (`global.css`) — not the garment's, which would be a label with nothing to
-  label — with `dropAnnounceFirst`/`dropAnnounceAvailability` underneath,
-  generic on purpose for the same reason ("first drop", not which one),
-  centred over the sky. `ProductStage.tsx` (carousel, fit
-  picker, buy band) only ever mounts inside the `live` branch now, so its
+  `public/img/ls-01-*`. `ProductView.astro`'s `!live` branch is the drop
+  announcement instead, and nothing else: `dropAnnounceFirst`/
+  `dropAnnounceAvailability` (`src/i18n/ui.ts`) *is* the page's one `<h1>`,
+  centred over the sky, generic on purpose ("first drop", not which one —
+  naming the garment would be a label with nothing to label without a
+  photo). There's no separate brand-name heading above it — the header's
+  own logo link already carries `aria-label={d.brand}` (`Base.astro`), so
+  repeating "Nuage Athletics" here would say the same fact twice on every
+  render rather than heading this page's own content. `ProductStage.tsx`
+  (carousel, fit picker, buy band) only ever mounts inside the `live` branch
+  now, so its
   `Props` are plainly required — there's no `commerceEnabled: false` arm to
   keep in sync any more, and no code path constructs the island without a
   real Shopify price and real photography behind it. Founder preview is the
