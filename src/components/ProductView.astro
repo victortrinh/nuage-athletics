@@ -165,10 +165,12 @@ const jsonLd = live
       <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col items-center justify-center text-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
         {/* Display scale, same treatment as the wordmark in the header
             (.wordmark, global.css) — there's no band here to roll this into
-            and no photograph competing for attention, so the product name
-            can be the loudest thing on the page instead of matching a buy
-            band's own small mono name row. */}
-        <h1 class="wordmark text-4xl sm:text-5xl">{product.name}</h1>
+            and no photograph competing for attention. The brand name, not
+            the product's: with no photo, naming the garment ("Long Sleeve
+            01") would be a label with nothing to label, so the announcement
+            below stays generic on purpose too — "first drop", not which
+            one. */}
+        <h1 class="wordmark text-4xl sm:text-5xl">{d.brand}</h1>
 
         {/*
           The drop announcement — what a visitor gets instead of a buy band,
@@ -183,7 +185,7 @@ const jsonLd = live
           one at a glance.
         */}
         <p class="mt-6 font-mono text-xs uppercase leading-loose tracking-label">
-          {fmt(d.dropAnnounceProduct, { product: product.name })}
+          {d.dropAnnounceFirst}
           <br />
           {d.dropAnnounceAvailability}
         </p>

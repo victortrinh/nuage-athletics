@@ -145,7 +145,7 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 ## Founder preview
 
 The pre-launch password gate is gone; the home page is public and announces the
-drop instead (`dropAnnounceProduct` / `dropAnnounceAvailability` in
+drop instead (`dropAnnounceFirst` / `dropAnnounceAvailability` in
 `src/i18n/ui.ts` — the availability line is the one string per locale to change
 when the date firms up). What replaced the gate is narrower: a way for the four
 of us to see the real buy flow on the real site before it opens.
@@ -177,9 +177,11 @@ of us to see the real buy flow on the real site before it opens.
 - **The garment isn't final, so the public pre-drop page shows no
   photography at all** — not the carousel, not a static image, nothing under
   `public/img/ls-01-*`. `ProductView.astro`'s `!live` branch is a
-  display-scale announcement instead: the product name set in `.wordmark`
-  (`global.css`), with `dropAnnounceProduct`/`dropAnnounceAvailability`
-  underneath, centred over the sky. `ProductStage.tsx` (carousel, fit
+  display-scale announcement instead: the brand name set in `.wordmark`
+  (`global.css`) — not the garment's, which would be a label with nothing to
+  label — with `dropAnnounceFirst`/`dropAnnounceAvailability` underneath,
+  generic on purpose for the same reason ("first drop", not which one),
+  centred over the sky. `ProductStage.tsx` (carousel, fit
   picker, buy band) only ever mounts inside the `live` branch now, so its
   `Props` are plainly required — there's no `commerceEnabled: false` arm to
   keep in sync any more, and no code path constructs the island without a
