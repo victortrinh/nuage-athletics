@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { ROUTES } from '../src/i18n/utils'
+import { ROUTES, SIGNUP_PROMPT_ENABLED } from '../src/i18n/utils'
 import { E2E_PREVIEW_PASSWORD } from '../playwright.config'
 
 /**
@@ -16,6 +16,7 @@ test.use({ contextOptions: { forcedColors: 'active', reducedMotion: 'reduce' } }
 test('consent checkbox stays visually distinct checked vs unchecked in forced-colors', async ({
   page,
 }) => {
+  test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
   await page.goto(ROUTES.home['fr-CA'])
   // SignupForm now lives only inside the bottom-anchored SignupPrompt
   // (SignupPrompt.astro), which reveals itself for real ~6s after load —
