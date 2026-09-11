@@ -21,6 +21,13 @@ export default defineConfig({
           RESEND_API_KEY: 're_test_not_a_real_key',
           // Fixed test-only value so preview tests can mint valid tokens.
           PREVIEW_PASSWORD: 'test-preview-password',
+          // Fixed test-only value so cart tests (test/cart.test.ts) can
+          // exercise the real commerceEnabled → getLiveProduct → cart path
+          // with a stubbed fetch, the same reasoning STRIPE_SECRET_KEY above
+          // follows. COMMERCE_ENABLED stays 'false' (from wrangler.toml) —
+          // these tests carry a preview cookie instead, same as the real
+          // founder-preview path.
+          SHOPIFY_STOREFRONT_TOKEN: 'storefront-vitest-token',
         },
       },
     }),

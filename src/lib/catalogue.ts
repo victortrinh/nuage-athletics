@@ -32,8 +32,12 @@ export const SLUGS: Record<string, Record<Locale, string>> = {
  * report `inStock: true` unconditionally, which is a claim this file has no
  * way to make good on; Shopify's `availableForSale` is the only answer, and
  * leaving the field off the type means nothing can render the old lie.
+ *
+ * `merchandiseId` is missing for the same reason again: it's Shopify's GID
+ * for the variant, and this file has no way to know it either — only the
+ * live join in `./commerce/shopify.ts` does.
  */
-export type CatalogueVariant = Omit<ProductVariant, 'inStock'>
+export type CatalogueVariant = Omit<ProductVariant, 'inStock' | 'merchandiseId'>
 export type CatalogueProduct = Omit<Product, 'price' | 'variants'> & {
   variants: CatalogueVariant[]
 }

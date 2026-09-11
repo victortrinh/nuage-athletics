@@ -120,6 +120,24 @@ export type Dict = {
   productAddToCart: string
   productAdding: string
   productAdded: string
+  // no-JS fit switch — <noscript> links under the carousel (ProductView.astro)
+  productViewFit: string
+  errorSoldOut: string
+  // cart (src/pages/panier.astro, src/pages/en/cart.astro, /api/cart.ts)
+  cart: string
+  cartTitle: string
+  cartEmpty: string
+  cartEmptyCta: string
+  cartCount: string
+  cartQuantity: string
+  cartUpdate: string
+  cartRemove: string
+  cartRemoveLabel: string
+  cartLineTotal: string
+  cartSubtotal: string
+  cartSubtotalNote: string
+  cartCheckout: string
+  errorCartGeneric: string
   orderConfirmedTitle: string
   orderConfirmedBody: string
   orderCancelledTitle: string
@@ -192,6 +210,22 @@ export const UI: Record<Locale, Dict> = {
     productAddToCart: 'Ajouter au panier',
     productAdding: 'Ajout…',
     productAdded: 'Ajouté…',
+    productViewFit: 'Voir en {fit}',
+    errorSoldOut: 'Cette taille est épuisée.',
+    cart: 'Panier',
+    cartTitle: 'Votre panier',
+    cartEmpty: 'Votre panier est vide.',
+    cartEmptyCta: 'Voir le produit',
+    cartCount: 'Panier ({n})',
+    cartQuantity: 'Quantité',
+    cartUpdate: 'Mettre à jour',
+    cartRemove: 'Retirer',
+    cartRemoveLabel: 'Retirer {label} du panier',
+    cartLineTotal: 'Total de la ligne',
+    cartSubtotal: 'Sous-total',
+    cartSubtotalNote: 'Livraison et taxes calculées à la caisse.',
+    cartCheckout: 'Passer à la caisse',
+    errorCartGeneric: "Le panier n'a pas pu être mis à jour. Réessayez dans un moment.",
     orderConfirmedTitle: 'Commande confirmée',
     orderConfirmedBody:
       'Merci. Un courriel de confirmation est en route.',
@@ -260,6 +294,22 @@ export const UI: Record<Locale, Dict> = {
     productAddToCart: 'Add to cart',
     productAdding: 'Adding…',
     productAdded: 'Added…',
+    productViewFit: 'View in {fit}',
+    errorSoldOut: 'That size is sold out.',
+    cart: 'Cart',
+    cartTitle: 'Your cart',
+    cartEmpty: 'Your cart is empty.',
+    cartEmptyCta: 'View the product',
+    cartCount: 'Cart ({n})',
+    cartQuantity: 'Quantity',
+    cartUpdate: 'Update',
+    cartRemove: 'Remove',
+    cartRemoveLabel: 'Remove {label} from cart',
+    cartLineTotal: 'Line total',
+    cartSubtotal: 'Subtotal',
+    cartSubtotalNote: 'Shipping and taxes calculated at checkout.',
+    cartCheckout: 'Checkout',
+    errorCartGeneric: 'The cart could not be updated. Try again in a moment.',
     orderConfirmedTitle: 'Order confirmed',
     orderConfirmedBody: 'Thanks. A confirmation email is on its way.',
     orderCancelledTitle: 'Order cancelled',

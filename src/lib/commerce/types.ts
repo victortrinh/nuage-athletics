@@ -27,6 +27,15 @@ export interface ProductVariant {
    * Optional so a single-axis product needs none.
    */
   options?: Record<string, string>
+  /**
+   * The provider's own id for this exact variant — a Shopify variant GID,
+   * opaque to everything outside `./shopify.ts`. `catalogue.ts`'s own `id`
+   * (`ls-01-classic-m`) is this site's stable identifier for the variant and
+   * is never enough on its own to add a line to a cart: Shopify's cart
+   * mutations take its GID, not ours. Optional and absent whenever the
+   * catalogue has no live join for this SKU — see `getLiveProduct`.
+   */
+  merchandiseId?: string
 }
 
 export interface Product {
@@ -51,6 +60,24 @@ export interface CheckoutInput {
   locale: Locale
   successUrl: string
   cancelUrl: string
+}
+
+/** One line in a cart — a variant, the quantity of it, and what that quantity costs. */
+export interface CartLine {
+  id: string
+  merchandiseId: string
+  label: string
+  quantity: number
+  unitPrice: Money
+  linePrice: Money
+}
+
+export interface Cart {
+  id: string
+  lines: CartLine[]
+  subtotal: Money
+  /** Shopify's hosted checkout for this cart — where "Buy" hands off to. */
+  checkoutUrl: string
 }
 
 export type OrderStatus = 'pending' | 'paid' | 'fulfilled' | 'cancelled' | 'refunded'

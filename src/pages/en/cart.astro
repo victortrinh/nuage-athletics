@@ -1,0 +1,151 @@
+---
+import { env } from 'cloudflare:workers'
+import Base from '../../layouts/Base.astro'
+import { t, fmt } from '../../i18n/ui.ts'
+import { route } from '../../i18n/utils.ts'
+import { commerceEnabled, readCart } from '../../lib/commerce/index.ts'
+import { readCartId } from '../../lib/cart.ts'
+import { buttonVariants } from '../../components/ui/button-variants.ts'
+import { inputVariants } from '../../components/ui/field-variants.ts'
+import { formatPrice } from '../../lib/catalogue.ts'
+import { cn } from '../../components/ui/cn.ts'
+
+/**
+ * The cart, server-rendered as plain HTML with one native `<form>` per
+ * control — no island, no hydration, nothing added to
+ * `scripts/check-bundle.sh`'s budget. "Cart add/update/remove works with
+ * JavaScript disabled" (#33's AC 2) holds by construction here rather than
+ * by a degrade path that has to be kept working: there is no other path.
+ * Every form posts to `src/pages/api/cart.ts`, which 303s back to this same
+ * page with the outcome folded into `?ce=<code>` on failure.
+ */
+
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
+export const prerender = false
+
+const locale = 'en-CA' as const
+const d = t(locale)
+
+// Per-visitor by definition, same reasoning as applyPreview()'s own
+// Cache-Control note in src/lib/preview.ts — nothing else in the codebase
+// sets this header outside a preview render, and a cart is nobody else's to
+// see cached.
+Astro.response.headers.set('Cache-Control', 'private, no-store')
+
+const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
+const cartId = canBuy ? readCartId(Astro.request.headers.get('Cookie')) : undefined
+const live = cartId ? await readCart(env, cartId) : null
+const cart = live?.cart ?? null
+
+// Same diagnostic header index.astro sets — a real Storefront failure (not
+// merely "no cart cookie yet") shouldn't look identical to an empty cart
+// from the outside.
+if (live && live.reason !== 'ok') {
+  Astro.response.headers.set(
+    'X-Storefront',
+    live.detail ? `${live.reason};${live.detail}` : live.reason
+  )
+}
+
+const errorCode = Astro.url.searchParams.get('ce') ?? undefined
+const errorMessage = errorCode === 'sold_out' ? d.errorSoldOut : errorCode ? d.errorCartGeneric : null
+
+const cartPath = route('cart', locale)
+const productPath = route('home', locale)
+
+/** Shopify caps a line at whatever inventory allows; 10 matches the same cap `/api/cart.ts`'s zod schema enforces. */
+const QUANTITIES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+---
+
+<Base {locale} routeId="cart" title={d.cartTitle} description={d.cartTitle}>
+  <section class="mx-auto max-w-xl py-16">
+    <h1 class="text-center font-mono text-xs uppercase tracking-label">{d.cartTitle}</h1>
+
+    {
+      errorMessage && (
+        <p role="alert" class="mt-4 text-center text-sm text-danger">
+          {errorMessage}
+        </p>
+      )
+    }
+
+    {
+      !cart || cart.lines.length === 0 ? (
+        <div class="mt-10 text-center">
+          <p class="text-sm text-mute">{d.cartEmpty}</p>
+          <a href={productPath} class={cn(buttonVariants({ variant: 'text' }), 'mt-4 inline-block')}>
+            {d.cartEmptyCta}
+          </a>
+        </div>
+      ) : (
+        <>
+          <ul class="mt-10 divide-y divide-line border-y border-line">
+            {cart.lines.map((line) => (
+              <li class="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p class="text-sm">{line.label}</p>
+                  <p class="mt-1 font-mono text-xs text-mute">
+                    {formatPrice(line.unitPrice, locale)} × {line.quantity}
+                  </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-4">
+                  <span class="font-mono text-xs">
+                    <span class="sr-only">{d.cartLineTotal}: </span>
+                    {formatPrice(line.linePrice, locale)}
+                  </span>
+
+                  <form method="POST" action="/api/cart" class="flex items-center gap-2">
+                    <input type="hidden" name="intent" value="update" />
+                    <input type="hidden" name="lineId" value={line.id} />
+                    <input type="hidden" name="redirect" value={cartPath} />
+                    <label class="flex items-center gap-2">
+                      <span class="sr-only">{d.cartQuantity}</span>
+                      <select name="quantity" class={inputVariants()}>
+                        {QUANTITIES.map((n) => (
+                          <option value={n} selected={n === line.quantity}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button type="submit" class={buttonVariants({ variant: 'text' })}>
+                      {d.cartUpdate}
+                    </button>
+                  </form>
+
+                  <form method="POST" action="/api/cart">
+                    <input type="hidden" name="intent" value="remove" />
+                    <input type="hidden" name="lineId" value={line.id} />
+                    <input type="hidden" name="redirect" value={cartPath} />
+                    <button
+                      type="submit"
+                      class={buttonVariants({ variant: 'text' })}
+                      aria-label={fmt(d.cartRemoveLabel, { label: line.label })}
+                    >
+                      {d.cartRemove}
+                    </button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div class="mt-8 flex items-center justify-between border-t border-ink/15 pt-5">
+            <span class="text-sm">{d.cartSubtotal}</span>
+            <span class="font-mono text-sm">{formatPrice(cart.subtotal, locale)}</span>
+          </div>
+          <p class="mt-2 text-xs text-mute">{d.cartSubtotalNote}</p>
+
+          <form method="POST" action="/api/cart" class="mt-6">
+            <input type="hidden" name="intent" value="checkout" />
+            <input type="hidden" name="redirect" value={cartPath} />
+            <button type="submit" class={buttonVariants({ variant: 'solid' })}>
+              {d.cartCheckout}
+            </button>
+          </form>
+        </>
+      )
+    }
+  </section>
+</Base>

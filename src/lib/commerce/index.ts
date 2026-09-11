@@ -2,7 +2,7 @@ import type { Locale } from '../../i18n/config'
 import { previewActive } from '../preview'
 import { createShopifyStorefront, StorefrontError } from './shopify'
 import { createStripeAdapter } from './stripe'
-import type { CommerceAdapter, Product } from './types'
+import type { Cart, CommerceAdapter, Product } from './types'
 
 export type * from './types'
 
@@ -56,11 +56,14 @@ export interface LiveProduct {
   detail?: string
 }
 
-export async function getLiveProduct(
-  env: StorefrontEnv,
-  slug: string,
-  locale: Locale
-): Promise<LiveProduct> {
+/**
+ * The env check `getLiveProduct` and every cart operation below share: which
+ * of the two Shopify bindings is missing, said out loud, once, rather than
+ * five call sites each re-deriving "no-domain" vs "no-token".
+ */
+function resolveStorefront(
+  env: StorefrontEnv
+): { domain: string; token: string } | { reason: 'no-domain' | 'no-token' } {
   const domain = env.SHOPIFY_STORE_DOMAIN
   // A secret is pasted by hand, and a paste picks things up: a trailing
   // newline from `echo | wrangler secret put`, or the quotes someone put
@@ -69,23 +72,32 @@ export async function getLiveProduct(
   // credential problem and isn't. (`normalizeDomain` does the same for the
   // domain.)
   const token = env.SHOPIFY_STOREFRONT_TOKEN?.trim().replace(/^(['"])(.*)\1$/, '$2')
-  if (!domain || !token) {
-    // Said out loud for the same reason the no-join case in ./shopify.ts is:
-    // an unconfigured store renders exactly like a pre-drop page, so without
-    // this the only symptom is a buy band that never appears.
-    //
-    // Which of the two is missing is worth a distinct answer rather than one
-    // "not configured": the two have different causes. A missing token is
-    // usually a name that doesn't match what was set; a missing domain is
-    // usually a secret that landed on a different Worker, or a version
-    // uploaded before it was added.
-    const missing = !domain ? 'SHOPIFY_STORE_DOMAIN' : 'SHOPIFY_STOREFRONT_TOKEN'
-    console.error(`storefront: ${missing} is unset — no price will render`)
-    return { product: null, reason: !domain ? 'no-domain' : 'no-token' }
-  }
+  if (domain && token) return { domain, token }
+
+  // Said out loud for the same reason the no-join case in ./shopify.ts is:
+  // an unconfigured store renders exactly like a pre-drop page, so without
+  // this the only symptom is a buy band that never appears.
+  //
+  // Which of the two is missing is worth a distinct answer rather than one
+  // "not configured": the two have different causes. A missing token is
+  // usually a name that doesn't match what was set; a missing domain is
+  // usually a secret that landed on a different Worker, or a version
+  // uploaded before it was added.
+  const missing = !domain ? 'SHOPIFY_STORE_DOMAIN' : 'SHOPIFY_STOREFRONT_TOKEN'
+  console.error(`storefront: ${missing} is unset — no price will render`)
+  return { reason: !domain ? 'no-domain' : 'no-token' }
+}
+
+export async function getLiveProduct(
+  env: StorefrontEnv,
+  slug: string,
+  locale: Locale
+): Promise<LiveProduct> {
+  const config = resolveStorefront(env)
+  if (!('domain' in config)) return { product: null, reason: config.reason }
 
   try {
-    const product = await createShopifyStorefront({ domain, token }).getProduct(slug, locale)
+    const product = await createShopifyStorefront(config).getProduct(slug, locale)
     return { product, reason: product ? 'ok' : 'no-match' }
   } catch (err) {
     console.error('storefront read failed', err)
@@ -97,6 +109,68 @@ export async function getLiveProduct(
       detail: err instanceof StorefrontError ? err.detail : 'network',
     }
   }
+}
+
+export interface LiveCart {
+  cart: Cart | null
+  reason: StorefrontReason
+  detail?: string
+}
+
+/**
+ * One cart mutation, run against whichever Shopify operation `run` performs.
+ * Every cart route (`src/pages/api/cart.ts`) goes through this — never
+ * `./shopify` directly — for the same reason `getLiveProduct` is the seam
+ * for reads: one place resolves the env, one place turns a thrown
+ * `StorefrontError` into the same `StorefrontReason` vocabulary the page
+ * layer already knows how to render.
+ */
+async function withStorefront(
+  env: StorefrontEnv,
+  run: (source: ReturnType<typeof createShopifyStorefront>) => Promise<Cart | null>
+): Promise<LiveCart> {
+  const config = resolveStorefront(env)
+  if (!('domain' in config)) return { cart: null, reason: config.reason }
+
+  try {
+    const cart = await run(createShopifyStorefront(config))
+    // A null cart here means Shopify no longer knows the id (expired, or
+    // already turned into an order) — not a failure, just an empty cart.
+    return { cart, reason: 'ok' }
+  } catch (err) {
+    console.error('storefront cart operation failed', err)
+    return {
+      cart: null,
+      reason: 'unreachable',
+      detail: err instanceof StorefrontError ? err.detail : 'network',
+    }
+  }
+}
+
+/** The cart as it stands right now. Never cached — unlike `getLiveProduct`, this is one visitor's. */
+export function readCart(env: StorefrontEnv, cartId: string): Promise<LiveCart> {
+  return withStorefront(env, (source) => source.getCart(cartId))
+}
+
+export type CartOp =
+  | { intent: 'add'; cartId: string | null; merchandiseId: string; quantity: number }
+  | { intent: 'update'; cartId: string; lineId: string; quantity: number }
+  | { intent: 'remove'; cartId: string; lineId: string }
+
+/** Create, add, update or remove — whichever `op.intent` names. */
+export function mutateCart(env: StorefrontEnv, op: CartOp): Promise<LiveCart> {
+  return withStorefront(env, (source) => {
+    switch (op.intent) {
+      case 'add':
+        return op.cartId
+          ? source.addLine(op.cartId, op.merchandiseId, op.quantity)
+          : source.createCart(op.merchandiseId, op.quantity)
+      case 'update':
+        return source.updateLine(op.cartId, op.lineId, op.quantity)
+      case 'remove':
+        return source.removeLine(op.cartId, op.lineId)
+    }
+  })
 }
 
 /**

@@ -23,6 +23,7 @@ export const ROUTES = {
   unsubscribed: { 'fr-CA': '/desabonnement/', 'en-CA': '/en/unsubscribed/' },
   orderConfirmed: { 'fr-CA': '/commande-confirmee/', 'en-CA': '/en/order-confirmed/' },
   orderCancelled: { 'fr-CA': '/commande-annulee/', 'en-CA': '/en/order-cancelled/' },
+  cart: { 'fr-CA': '/panier/', 'en-CA': '/en/cart/' },
 } as const
 
 export type RouteId = keyof typeof ROUTES
@@ -64,6 +65,9 @@ export const INDEXABLE: Record<RouteId, boolean> = {
   unsubscribed: false,
   orderConfirmed: false,
   orderCancelled: false,
+  // A visitor's own working cart — nothing on it is worth ranking, and the
+  // same reasoning INDEXABLE gives confirmed/unsubscribed applies here too.
+  cart: false,
 }
 
 /**
@@ -89,6 +93,10 @@ export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   unsubscribed: false,
   orderConfirmed: false,
   orderCancelled: true,
+  // The visitor is already mid-purchase-decision on this page; a signup
+  // prompt competing with the checkout button for attention is the wrong
+  // moment for it.
+  cart: false,
 }
 
 /** Every indexable route's path, in every locale — the sitemap's allowlist. */

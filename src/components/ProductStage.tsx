@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { I18nProvider } from 'react-aria-components'
 import ProductCarousel from './ProductCarousel'
 import { Button } from './ui/button'
@@ -13,6 +13,17 @@ interface Variant {
   label: string
   inStock: boolean
   options?: Record<string, string>
+}
+
+/** Maps an /api/cart failure code to the string it should show — everything
+ *  but a real sold-out or a missing selection gets the one generic cart
+ *  error, same reasoning SignupForm's own errorMessage table follows for
+ *  /api/subscribe. `no_size` only ever reaches here via a no-JS submit —
+ *  the hydrated path catches it before the fetch, in `onSubmit` below. */
+function errorMessage(d: Dict, code: string): string {
+  if (code === 'sold_out') return d.errorSoldOut
+  if (code === 'no_size') return d.productChooseSize
+  return d.errorCartGeneric
 }
 
 interface FitOption {
@@ -55,6 +66,22 @@ type Props =
        *  `i18n/utils` stay server-side, same reason `price` arrives
        *  pre-formatted rather than this island importing `formatPrice`. */
       precontractHref: string
+      /**
+       * The page this island lives on, including any query string — carried
+       * as the form's hidden `redirect` field for the no-JS fallback, same
+       * pattern as SignupForm.tsx's own `redirectTo`. `/api/cart` bounces a
+       * native POST back here with the outcome folded into
+       * `added=1`/`ce=<code>`.
+       */
+      redirectTo: string
+      /**
+       * Read out of `Astro.url.searchParams` by the caller and passed
+       * straight through, so the server render and the first client render
+       * agree on `added`/`error` from the same props — see SignupForm.tsx's
+       * `initialSuccess`/`initialErrorCode` for the pattern this mirrors.
+       */
+      initialAdded?: boolean
+      initialErrorCode?: string
     })
 
 /**
@@ -97,41 +124,56 @@ export default function ProductStage(props: Props) {
   const [fit, setFit] = useState<FitId>(initialFit)
   const [size, setSize] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [added, setAdded] = useState(false)
-  const [error, setError] = useState('')
+  // Seeded from the query string /api/cart's no-JS redirect folds the
+  // outcome into — see the props doc on `initialAdded`/`initialErrorCode`.
+  const [added, setAdded] = useState(() => (commerceEnabled && props.initialAdded) ?? false)
+  const [error, setError] = useState(() =>
+    commerceEnabled && props.initialErrorCode ? errorMessage(d, props.initialErrorCode) : ''
+  )
 
   function onSizeChange(value: string) {
     setSize(value)
     setError('')
+    setAdded(false)
   }
 
-  async function onBuy() {
+  /**
+   * The band's <form> posts natively to /api/cart with no JS at all — this
+   * only intercepts that once hydrated, to stay on the page and roll the
+   * button's own label instead of taking the 303 round trip. `fit`/`size`
+   * travel exactly as the native submit would send them (RAC's radios are
+   * real named inputs — see the JSX below), so there is nothing here for
+   * the two paths to disagree about.
+   */
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     if (!commerceEnabled) return
-    const variantId = props.variants.find((v) => v.options?.fit === fit && v.options?.size === size)?.id
-    // Unreachable in practice — the button stays disabled until a size is
-    // picked — but the fetch below needs a variant id regardless of how it
-    // got here.
-    if (!variantId) return
+    e.preventDefault()
+    if (loading) return
+    const selected = props.variants.find((v) => v.options?.fit === fit && v.options?.size === size)
+    // The button is never `disabled` on `!selectedVariant` any more — see
+    // the note on the Button below for why — so this is reachable for real:
+    // an error, not a silent no-op, is what a no-JS submit of the same form
+    // gets from /api/cart's own missing-selection check.
+    if (!selected) {
+      setError(d.productChooseSize)
+      return
+    }
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variantId, quantity: 1, locale }),
+        body: JSON.stringify({ intent: 'add', fit, size, quantity: 1, locale }),
       })
-      const data = (await res.json()) as { ok: boolean; url?: string }
-      if (data.ok && data.url) {
-        // "Ajouté…" is what shows for the moment before the redirect fires
-        // — there is no cart to land in, only Stripe's hosted checkout, so
-        // this confirms the tap rather than a state the visitor stays in.
+      const data = (await res.json()) as { ok: boolean; code?: string }
+      if (data.ok) {
         setAdded(true)
-        window.location.href = data.url
         return
       }
-      setError(d.errorGeneric)
+      setError(errorMessage(d, data.code ?? ''))
     } catch {
-      setError(d.errorGeneric)
+      setError(d.errorCartGeneric)
     } finally {
       setLoading(false)
     }
@@ -153,7 +195,7 @@ export default function ProductStage(props: Props) {
     )
   }
 
-  const { fitOptions, variants, price, precontractHref } = props
+  const { fitOptions, variants, price, precontractHref, redirectTo } = props
   const sizesForFit = variants.filter((v) => v.options?.fit === fit)
   const selectedVariant = variants.find((v) => v.options?.fit === fit && v.options?.size === size)
 
@@ -181,45 +223,64 @@ export default function ProductStage(props: Props) {
         <ProductCarousel d={d} fit={fit} fits={fits} initialFit={initialFit} chromeRem={CHROME_REM} />
 
         {/*
-          No visible "Coupe" heading above these: the two tabs say
-          "Classique" and "Crop", which is the same information twice on a
-          page whose whole point is that nothing is there unasked. The
-          accessible name moves to `aria-label` rather than disappearing —
-          a radiogroup with no name is a different (and worse) thing than
-          one whose name isn't drawn on screen.
+          The whole fit picker and buy band, as one native form: this is
+          what lets "Ajouter au panier" work with JavaScript disabled — the
+          browser POSTs it to /api/cart exactly as `onSubmit` below does by
+          fetch() once hydrated, and /api/cart resolves the same (fit, size)
+          pair either way (RAC's radios are real named <input
+          type="radio">s under the hood, so `name="fit"`/`name="size"` below
+          reach FormData for free). See /api/cart.ts and CLAUDE.md's note on
+          SignupForm.tsx being the reference for this shape.
         */}
-        <RadioGroup
-          aria-label={d.productFitLabel}
-          value={fit}
-          onChange={(value) => setFit(value as FitId)}
-          className="mx-auto mt-5 grid max-w-[13rem] grid-cols-2 gap-px bg-line"
-        >
-          {fitOptions.map((f) => (
-            <Radio key={f.id} value={f.id} density="compact">
-              {f.label}
-            </Radio>
-          ))}
-        </RadioGroup>
+        <form method="POST" action="/api/cart" onSubmit={onSubmit}>
+          <input type="hidden" name="intent" value="add" />
+          <input type="hidden" name="quantity" value="1" />
+          <input type="hidden" name="locale" value={locale} />
+          {/* Where /api/cart's no-JS 303 bounces back to, outcome folded
+              into `added=1`/`ce=<code>` — see ProductView.astro. */}
+          <input type="hidden" name="redirect" value={redirectTo} />
 
-        {/*
-          The band. The name is a static heading — always on screen, never a
-          roller — and the sizes render directly with no entrance animation:
-          both used to be reachable only once the (now-removed) `+` was
-          tapped. Only the price and the button's own label still roll:
-          an error can replace the price without moving anything else, and
-          the button's label announces its own progress.
-        */}
-        <div className="mx-auto mt-10 flex w-full max-w-[20rem] flex-col items-center">
           {/*
-            Mono/uppercase at the band's own size, not the `wordmark` display
-            face: the reference sets the product name in exactly the same
-            treatment as the price under it, and at 2xl/3xl in an
-            800-weight display face this was the loudest thing on a page
-            whose loudest thing should be the photograph.
+            No visible "Coupe" heading above these: the two tabs say
+            "Classique" and "Crop", which is the same information twice on a
+            page whose whole point is that nothing is there unasked. The
+            accessible name moves to `aria-label` rather than disappearing —
+            a radiogroup with no name is a different (and worse) thing than
+            one whose name isn't drawn on screen.
           */}
-          <h1 className="flex h-7 w-full items-center justify-center font-mono text-xs uppercase tracking-label">
-            {productName}
-          </h1>
+          <RadioGroup
+            aria-label={d.productFitLabel}
+            name="fit"
+            value={fit}
+            onChange={(value) => setFit(value as FitId)}
+            className="mx-auto mt-5 grid max-w-[13rem] grid-cols-2 gap-px bg-line"
+          >
+            {fitOptions.map((f) => (
+              <Radio key={f.id} value={f.id} density="compact">
+                {f.label}
+              </Radio>
+            ))}
+          </RadioGroup>
+
+          {/*
+            The band. The name is a static heading — always on screen, never a
+            roller — and the sizes render directly with no entrance animation:
+            both used to be reachable only once the (now-removed) `+` was
+            tapped. Only the price and the button's own label still roll:
+            an error can replace the price without moving anything else, and
+            the button's label announces its own progress.
+          */}
+          <div className="mx-auto mt-10 flex w-full max-w-[20rem] flex-col items-center">
+            {/*
+              Mono/uppercase at the band's own size, not the `wordmark` display
+              face: the reference sets the product name in exactly the same
+              treatment as the price under it, and at 2xl/3xl in an
+              800-weight display face this was the loudest thing on a page
+              whose loudest thing should be the photograph.
+            */}
+            <h1 className="flex h-7 w-full items-center justify-center font-mono text-xs uppercase tracking-label">
+              {productName}
+            </h1>
 
           <Slot index={priceSlotIndex} className="mt-1 h-6 w-full">
             <p className="font-mono text-xs text-mute">{price}</p>
@@ -230,6 +291,7 @@ export default function ProductStage(props: Props) {
 
           <RadioGroup
             aria-label={d.productSizeLabel}
+            name="size"
             value={size}
             onChange={onSizeChange}
             // No `place-items-center`: the radios stretch to fill their own
@@ -294,13 +356,22 @@ export default function ProductStage(props: Props) {
           </span>
 
           <Slot index={actionSlotIndex} className="mt-4 h-11 w-full">
-            {/* The one tap that fires a purchase — disabled until a size is
-                picked, so a mis-tap on a size can never reach it by itself. */}
+            {/*
+              The one tap that fires a purchase — deliberately not disabled
+              on `!selectedVariant` any more. It used to be, which meant a
+              no-JS visitor could never submit at all: React computes that
+              condition client-side, so a native form built from the same
+              server render has no way to flip a `disabled` attribute once
+              a radio is picked — a disabled submit never fires a form,
+              full stop, whichever size is checked. `onSubmit` above (and
+              /api/cart itself, for the no-JS case that never reaches it)
+              is what actually refuses an incomplete pick now, with a real
+              error instead of a button that silently can't be pressed.
+            */}
             <Button
               variant="solid"
-              type="button"
-              onPress={onBuy}
-              isDisabled={!selectedVariant || loading}
+              type="submit"
+              isDisabled={loading}
               aria-describedby={!selectedVariant ? sizeHintId : undefined}
               // `solid`'s own padding falls just under the 44px minimum
               // target size at this font size — min-h-11 (the Slot
@@ -318,18 +389,19 @@ export default function ProductStage(props: Props) {
             </span>
           </Slot>
 
-          {/* The CPA pre-contract disclosure link — Quebec's Consumer
-              Protection Act wants this presented before the distance
-              contract forms, and checkout jumps straight to Stripe's
-              hosted page from here, so this is the last surface the site
-              controls before that happens. */}
-          <a
-            href={precontractHref}
-            className="underline-sweep mt-2 text-[11px] uppercase tracking-label text-mute hover:text-accent-ink"
-          >
-            {d.precontract}
-          </a>
-        </div>
+            {/* The CPA pre-contract disclosure link — Quebec's Consumer
+                Protection Act wants this presented before the distance
+                contract forms, and the cart page hands off straight to
+                Shopify's hosted checkout, so this is the last surface the
+                site controls before that happens. */}
+            <a
+              href={precontractHref}
+              className="underline-sweep mt-2 text-[11px] uppercase tracking-label text-mute hover:text-accent-ink"
+            >
+              {d.precontract}
+            </a>
+          </div>
+        </form>
       </div>
     </I18nProvider>
   )

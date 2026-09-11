@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config'
 import { CONSENT_VERSION, consentText } from '../../lib/consent'
 import { sendConfirmationEmail } from '../../lib/email'
-import { safeRedirect } from '../../lib/preview'
+import { isSameOrigin, jsonResponder, formResponder, type Responder } from '../../lib/form-endpoint'
 import {
   findByEmail,
   insertSubscriber,
@@ -25,52 +25,6 @@ const Body = z.object({
   company: z.string().optional(), // honeypot
 })
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
-
-/**
- * How the result reaches the caller differs by how the request arrived: a
- * fetch() call (SignupForm.tsx, hydrated) wants JSON it can render in place;
- * a native <form> POST (no JS, or JS that hasn't hydrated yet) can't stay on
- * the page, so it gets a redirect back to wherever the visitor was, with the
- * outcome folded into that page's own query string — 'sent=1' or 'se=<code>'
- * — so the next render can show the right state server-side. See the
- * matching read of those params in SignupForm.tsx's callers.
- */
-interface Responder {
-  ok: () => Response
-  fail: (code: string, status: number) => Response
-}
-
-function jsonResponder(): Responder {
-  return {
-    ok: () => json({ ok: true }),
-    fail: (code, status) => json({ ok: false, code }, status),
-  }
-}
-
-function formResponder(redirectField: string, origin: string): Responder {
-  function redirectTo(param: string, value: string) {
-    const target = new URL(safeRedirect(redirectField), origin)
-    // The hidden `redirect` field is just "the page the visitor was on" and
-    // may itself still carry a stale outcome from an earlier round trip
-    // (e.g. ?se=rate_limited, resubmitted successfully this time) — clear
-    // both before setting the current one so they never coexist.
-    target.searchParams.delete('sent')
-    target.searchParams.delete('se')
-    target.searchParams.set(param, value)
-    return new Response(null, { status: 303, headers: { Location: target.pathname + target.search } })
-  }
-  return {
-    ok: () => redirectTo('sent', '1'),
-    fail: (code) => redirectTo('se', code),
-  }
-}
-
 /**
  * A send that never left is not a success. The subscriber row stays — consent
  * was given and CASL requires us to keep that evidence — but the form must not
@@ -79,25 +33,6 @@ function formResponder(redirectField: string, origin: string): Responder {
 function emailFailed(error: string | undefined, respond: Responder) {
   console.error('confirmation email failed', error)
   return respond.fail('email_failed', 502)
-}
-
-/**
- * A native form POST is the one path a third-party site could trigger
- * without JS of its own (a hidden auto-submitting form is the classic CSRF
- * vector) — this checks the POST actually came from this site: same-origin
- * only, via whichever of Origin / Sec-Fetch-Site the browser sent. Neither
- * present fails closed — every real browser sends at least one on a
- * same-origin POST. The JSON (fetch) path doesn't need this of its own: this
- * endpoint sends no Access-Control-Allow-Origin header, so a fetch() from
- * another origin never even reaches here — the browser's own CORS check
- * blocks it first.
- */
-function isSameOrigin(request: Request, origin: string): boolean {
-  const requestOrigin = request.headers.get('Origin')
-  if (requestOrigin !== null) return requestOrigin === origin
-  const fetchSite = request.headers.get('Sec-Fetch-Site')
-  if (fetchSite !== null) return fetchSite === 'same-origin' || fetchSite === 'none'
-  return false
 }
 
 export const POST: APIRoute = async ({ request, url, clientAddress }) => {
@@ -116,7 +51,7 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
     const form = await request.formData().catch(() => null)
     if (!form) return new Response('Bad request', { status: 400 })
 
-    respond = formResponder(String(form.get('redirect') ?? ''), url.origin)
+    respond = formResponder('sent', 'se', String(form.get('redirect') ?? ''), url.origin)
     const consentValue = form.get('consent')
     raw = {
       email: form.get('email'),

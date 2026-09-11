@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getLiveProduct } from '../src/lib/commerce/index'
+import { getLiveProduct, mutateCart, readCart } from '../src/lib/commerce/index'
 import { normalizeDomain, parsePriceToCents, resetStorefrontCache } from '../src/lib/commerce/shopify'
 import { featuredProduct } from '../src/lib/catalogue'
 
@@ -25,7 +25,7 @@ const SLUG_EN = featuredProduct('en-CA').slug
 const SKUS = featuredProduct('fr-CA').variants.map((v) => v.sku)
 
 function variantNode(sku: string, amount = '65.00', available = true, currencyCode = 'CAD') {
-  return { sku, availableForSale: available, price: { amount, currencyCode } }
+  return { id: `gid://shopify/ProductVariant/${sku}`, sku, availableForSale: available, price: { amount, currencyCode } }
 }
 
 function storefrontResponse(variants: ReturnType<typeof variantNode>[]) {
@@ -269,5 +269,212 @@ describe('getLiveProduct', () => {
     )
     expect(request.method).toBe('POST')
     expect(request.headers.get('X-Shopify-Storefront-Access-Token')).toBe(ENV.SHOPIFY_STOREFRONT_TOKEN)
+  })
+})
+
+/**
+ * Cart operations, through the same seam #33's cart routes call —
+ * `readCart`/`mutateCart` in `src/lib/commerce/index.ts`, not `./shopify`
+ * directly. Shopify's cart mutations answer with `{ cart, userErrors }`
+ * inside their own named field (`cartCreate`, `cartLinesAdd`, …), which is
+ * stood in for here the same way `storefrontResponse` stands in for the
+ * inventory query above.
+ */
+function rawCartLine(
+  id: string,
+  merchandiseId: string,
+  quantity: number,
+  unitAmount = '65.00',
+  totalAmount?: string
+) {
+  return {
+    id,
+    quantity,
+    cost: { totalAmount: { amount: totalAmount ?? (Number(unitAmount) * quantity).toFixed(2), currencyCode: 'CAD' } },
+    merchandise: { id: merchandiseId, title: 'Classique / M', price: { amount: unitAmount, currencyCode: 'CAD' } },
+  }
+}
+
+function rawCart(id: string, lines: ReturnType<typeof rawCartLine>[], subtotalAmount = '65.00') {
+  return {
+    id,
+    checkoutUrl: `https://nuage-test.myshopify.com/cart/c/${id.split('/').pop()}`,
+    cost: { subtotalAmount: { amount: subtotalAmount, currencyCode: 'CAD' } },
+    lines: { nodes: lines },
+  }
+}
+
+function cartMutationResponse(
+  operation: string,
+  cart: ReturnType<typeof rawCart> | null,
+  userErrors: { field?: string[]; message: string }[] = []
+) {
+  return new Response(JSON.stringify({ data: { [operation]: { cart, userErrors } } }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+function cartQueryResponse(cart: ReturnType<typeof rawCart> | null) {
+  return new Response(JSON.stringify({ data: { cart } }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+const CART_ID = 'gid://shopify/Cart/c1'
+const MERCH_ID = 'gid://shopify/ProductVariant/1'
+
+describe('cart operations', () => {
+  it('creates a cart holding one line', async () => {
+    const line = rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 1)
+    stubStorefront(() => cartMutationResponse('cartCreate', rawCart(CART_ID, [line])))
+
+    const { cart, reason } = await mutateCart(ENV, {
+      intent: 'add',
+      cartId: null,
+      merchandiseId: MERCH_ID,
+      quantity: 1,
+    })
+
+    expect(reason).toBe('ok')
+    expect(cart).toEqual({
+      id: CART_ID,
+      checkoutUrl: `https://nuage-test.myshopify.com/cart/c/c1`,
+      subtotal: { amount: 6500, currency: 'CAD' },
+      lines: [
+        {
+          id: 'gid://shopify/CartLine/1',
+          merchandiseId: MERCH_ID,
+          label: 'Classique / M',
+          quantity: 1,
+          unitPrice: { amount: 6500, currency: 'CAD' },
+          linePrice: { amount: 6500, currency: 'CAD' },
+        },
+      ],
+    })
+  })
+
+  it('adds a line to an existing cart', async () => {
+    const line = rawCartLine('gid://shopify/CartLine/2', MERCH_ID, 2)
+    stubStorefront(() => cartMutationResponse('cartLinesAdd', rawCart(CART_ID, [line])))
+
+    const { cart } = await mutateCart(ENV, {
+      intent: 'add',
+      cartId: CART_ID,
+      merchandiseId: MERCH_ID,
+      quantity: 2,
+    })
+
+    expect(cart?.lines).toHaveLength(1)
+    expect(cart?.lines[0].quantity).toBe(2)
+  })
+
+  it('updates a line quantity', async () => {
+    const line = rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 3)
+    stubStorefront(() => cartMutationResponse('cartLinesUpdate', rawCart(CART_ID, [line])))
+
+    const { cart } = await mutateCart(ENV, {
+      intent: 'update',
+      cartId: CART_ID,
+      lineId: 'gid://shopify/CartLine/1',
+      quantity: 3,
+    })
+
+    expect(cart?.lines[0].quantity).toBe(3)
+  })
+
+  it('removes a line', async () => {
+    stubStorefront(() => cartMutationResponse('cartLinesRemove', rawCart(CART_ID, [])))
+
+    const { cart } = await mutateCart(ENV, {
+      intent: 'remove',
+      cartId: CART_ID,
+      lineId: 'gid://shopify/CartLine/1',
+    })
+
+    expect(cart?.lines).toEqual([])
+  })
+
+  it('reads the cart as it stands right now, uncached', async () => {
+    const calls = stubStorefront(
+      () => cartQueryResponse(rawCart(CART_ID, [rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 1)])),
+      () => cartQueryResponse(rawCart(CART_ID, [rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 2)]))
+    )
+
+    const first = await readCart(ENV, CART_ID)
+    const second = await readCart(ENV, CART_ID)
+
+    // Two calls, not one: unlike getLiveProduct's 15s inventory cache, a
+    // cart is one visitor's own and must never be stale.
+    expect(calls).toHaveLength(2)
+    expect(first.cart?.lines[0].quantity).toBe(1)
+    expect(second.cart?.lines[0].quantity).toBe(2)
+  })
+
+  it('treats a cart id Shopify no longer knows as gone, not as an error', async () => {
+    stubStorefront(() => cartMutationResponse('cartLinesAdd', null))
+
+    const { cart, reason } = await mutateCart(ENV, {
+      intent: 'add',
+      cartId: 'gid://shopify/Cart/expired',
+      merchandiseId: MERCH_ID,
+      quantity: 1,
+    })
+
+    expect(cart).toBeNull()
+    expect(reason).toBe('ok')
+  })
+
+  it('reads a gone cart the same way', async () => {
+    stubStorefront(() => cartQueryResponse(null))
+
+    const { cart, reason } = await readCart(ENV, 'gid://shopify/Cart/expired')
+
+    expect(cart).toBeNull()
+    expect(reason).toBe('ok')
+  })
+
+  it('throws on a real refusal — an out-of-stock line — rather than treating it as gone', async () => {
+    const existing = rawCart(CART_ID, [])
+    stubStorefront(() =>
+      cartMutationResponse('cartLinesAdd', existing, [{ message: 'Not enough stock' }])
+    )
+
+    const { cart, reason, detail } = await mutateCart(ENV, {
+      intent: 'add',
+      cartId: CART_ID,
+      merchandiseId: MERCH_ID,
+      quantity: 99,
+    })
+
+    expect(cart).toBeNull()
+    expect(reason).toBe('unreachable')
+    expect(detail).toBe('cart-user-error')
+  })
+
+  it('fails open on a Storefront outage the same way getLiveProduct does', async () => {
+    stubStorefront(() => new Response('down', { status: 500 }))
+
+    const { cart, reason, detail } = await mutateCart(ENV, {
+      intent: 'add',
+      cartId: null,
+      merchandiseId: MERCH_ID,
+      quantity: 1,
+    })
+
+    expect(cart).toBeNull()
+    expect(reason).toBe('unreachable')
+    expect(detail).toBe('status=500')
+  })
+
+  it('joins the live product with each variant’s Shopify merchandise id', async () => {
+    stubStorefront(() => storefrontResponse(SKUS.map((sku) => variantNode(sku))))
+
+    const { product } = await getLiveProduct(ENV, SLUG, 'fr-CA')
+
+    expect(product?.variants.every((v) => v.merchandiseId?.startsWith('gid://shopify/ProductVariant/'))).toBe(
+      true
+    )
   })
 })

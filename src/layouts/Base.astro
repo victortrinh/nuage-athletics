@@ -8,10 +8,11 @@ import NavIcon from '../components/NavIcon.astro'
 import SignupPrompt from '../components/SignupPrompt.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, SHOWS_SIGNUP_PROMPT, type RouteId } from '../i18n/utils'
-import { t } from '../i18n/ui'
+import { t, fmt } from '../i18n/ui'
 import { buttonVariants } from '../components/ui/button-variants'
 import { cn } from '../components/ui/cn'
 import { SOCIAL_PROFILES } from '../lib/brand'
+import { readCartCount } from '../lib/cart'
 
 interface Props {
   locale: Locale
@@ -43,6 +44,15 @@ const navLinks = [
 // Defaults to shown for a page with no routeId — same convention Seo.astro
 // uses for `noindex` when it has no INDEXABLE entry to read.
 const showPrompt = routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true
+
+// The header's cart link, gated on the readable line-count cookie
+// (src/lib/cart.ts) rather than a real cart read: every route renders
+// through this layout, and reading the actual cart here would cost a
+// Storefront call on every page view for anyone holding the cookie. The
+// cart page itself (src/pages/panier.astro) always reads the real cart
+// before rendering it — this count is display-only.
+const cartCount = readCartCount(Astro.request.headers.get('Cookie'))
+const cartHref = route('cart', locale)
 
 // The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
 // submit back to `redirect` with the outcome folded into 'sent'/'se' (see
@@ -201,6 +211,17 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
               </g>
             </svg>
           </button>
+          {
+            cartCount > 0 && (
+              <a
+                href={cartHref}
+                class="press underline-sweep text-xs uppercase tracking-label hover:text-accent-ink"
+                aria-label={fmt(d.cartCount, { n: cartCount })}
+              >
+                {d.cart} ({cartCount})
+              </a>
+            )
+          }
           <LocaleSwitcher {locale} {routeId} href={localeHref} />
         </div>
       </div>
