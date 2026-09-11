@@ -7,7 +7,7 @@ import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import NavIcon from '../components/NavIcon.astro'
 import SignupPrompt from '../components/SignupPrompt.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
-import { route, SHOWS_SIGNUP_PROMPT, type RouteId } from '../i18n/utils'
+import { route, SHOWS_SIGNUP_PROMPT, SIGNUP_PROMPT_ENABLED, type RouteId } from '../i18n/utils'
 import { t } from '../i18n/ui'
 import { buttonVariants } from '../components/ui/button-variants'
 import { cn } from '../components/ui/cn'
@@ -41,8 +41,9 @@ const navLinks = [
 ]
 
 // Defaults to shown for a page with no routeId — same convention Seo.astro
-// uses for `noindex` when it has no INDEXABLE entry to read.
-const showPrompt = routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true
+// uses for `noindex` when it has no INDEXABLE entry to read. Gated on
+// SIGNUP_PROMPT_ENABLED first — see that constant's comment.
+const showPrompt = SIGNUP_PROMPT_ENABLED && (routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true)
 
 // The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
 // submit back to `redirect` with the outcome folded into 'sent'/'se' (see
