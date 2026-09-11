@@ -113,16 +113,8 @@ src/
 
 ---
 
-## Before launch
+## Before launch / before selling
 
-- [ ] Real mailing address in `src/lib/consent.ts` — CASL requires it in every email
-- [ ] Privacy policy and terms written and legally reviewed (both locales)
-- [ ] Brand wordmark + typeface
-- [ ] `wrangler d1 create` and real `database_id`
-
-## Before selling
-
-- [ ] GST/HST registration (CRA); QST, BC PST, SK PST, MB RST as applicable
-- [ ] Enable tax collection in Shopify admin for the registrations you actually hold
-- [ ] Quebec *Loi sur la protection du consommateur* distance-contract disclosures
-- [ ] Flat-rate shipping decided, covering the territories
+The launch and selling checklist lives in one place, not two: see
+[#44](https://github.com/victortrinh/nuage-athletics/issues/44). See also
+`CONTEXT.md` and `docs/adr/` for the decisions behind it.
