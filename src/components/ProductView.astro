@@ -181,11 +181,18 @@ const jsonLd = live
           `<title>`/og:title (Seo.astro) and needs no new translation.
           Monospace, uppercase and tracked out for all three lines — this is
           a notice, not prose, and it should read as one at a glance.
+
+          `tagline`'s own full stop is stripped here, not from the string
+          itself: `<title>`/og:title (Seo.astro) and the meta description
+          (`${d.tagline} ${d.dropLine}`, index.astro) both need it as a
+          complete sentence, but neither sibling line in this h1 carries
+          terminal punctuation, and reading three lines as one notice means
+          matching that, not making tagline the odd one out.
         */}
         <h1 class="font-mono text-xs uppercase leading-loose tracking-label">
           {d.dropAnnounceFirst}
           <br />
-          {d.tagline}
+          {d.tagline.replace(/\.$/, '')}
           <br />
           {d.dropAnnounceAvailability}
         </h1>
