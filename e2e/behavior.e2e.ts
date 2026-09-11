@@ -711,6 +711,8 @@ test.describe('founder preview', () => {
     await page.goto(ROUTES.home['fr-CA'])
     await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toHaveCount(0)
+    // Same gate as the buy band itself — see Base.astro's `canBuy`.
+    await expect(page.getByRole('link', { name: 'Panier', exact: true })).toHaveCount(0)
   })
 
   test('the cookie reveals the buy flow, and the response is never cached', async ({
@@ -835,6 +837,13 @@ test.describe('founder preview', () => {
     const page = await context.newPage()
     await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
+    // The header link is reachable before anything is in the cart — gated
+    // on commerceEnabled (same switch as the buy band itself), not on
+    // whether the cart happens to hold a line, so a founder previewing the
+    // buy flow can always get to /panier/, not only after an add.
+    const cartLink = page.getByRole('link', { name: 'Panier', exact: true })
+    await expect(cartLink).toBeVisible()
+
     await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
     const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
     await button.click()
@@ -844,13 +853,13 @@ test.describe('founder preview', () => {
     await expect(page.getByText('Ajouté…')).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 
-    // The header link reads the count straight off the cookie /api/cart just
+    // The header link's count reads straight off the cookie /api/cart just
     // set (src/layouts/Base.astro) — server-rendered, so it only reflects
     // the add on the next render, not the in-place client update above.
     await page.reload()
-    const cartLink = page.getByRole('link', { name: /Panier \(1\)/ })
-    await expect(cartLink).toBeVisible()
-    await cartLink.click()
+    const cartLinkWithCount = page.getByRole('link', { name: /Panier \(1\)/ })
+    await expect(cartLinkWithCount).toBeVisible()
+    await cartLinkWithCount.click()
 
     await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
     await expect(page.getByText(/Classique/)).toBeVisible()

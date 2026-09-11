@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers'
 import '../styles/global.css'
 import Seo from '../components/Seo.astro'
 import Sky from '../components/Sky.astro'
@@ -13,6 +14,7 @@ import { buttonVariants } from '../components/ui/button-variants'
 import { cn } from '../components/ui/cn'
 import { SOCIAL_PROFILES } from '../lib/brand'
 import { readCartCount } from '../lib/cart'
+import { commerceEnabled } from '../lib/commerce/index'
 
 interface Props {
   locale: Locale
@@ -46,12 +48,21 @@ const navLinks = [
 // SIGNUP_PROMPT_ENABLED first — see that constant's comment.
 const showPrompt = SIGNUP_PROMPT_ENABLED && (routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true)
 
-// The header's cart link, gated on the readable line-count cookie
-// (src/lib/cart.ts) rather than a real cart read: every route renders
+// The header's cart link. Gated on `commerceEnabled` — the same single
+// switch every other piece of the buy flow (the band, /api/checkout,
+// /api/cart) already reads — not on whether the cart happens to hold
+// anything: an empty-but-reachable link is what lets a founder previewing
+// the buy flow actually get to /panier/ before adding something, and it's
+// what a launch-day visitor gets too, so preview never diverges from what
+// ships (CLAUDE.md's founder-preview note is explicit about this: "every
+// extra conditional is a way for what you tested to differ from what
+// ships"). The count itself still comes from the readable line-count
+// cookie (src/lib/cart.ts), not a real cart read — every route renders
 // through this layout, and reading the actual cart here would cost a
-// Storefront call on every page view for anyone holding the cookie. The
-// cart page itself (src/pages/panier.astro) always reads the real cart
-// before rendering it — this count is display-only.
+// Storefront call on every page view for anyone previewing. The cart page
+// itself (src/pages/panier.astro) always reads the real cart before
+// rendering it; this count is display-only.
+const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
 const cartCount = readCartCount(Astro.request.headers.get('Cookie'))
 const cartHref = route('cart', locale)
 
@@ -213,13 +224,13 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
             </svg>
           </button>
           {
-            cartCount > 0 && (
+            canBuy && (
               <a
                 href={cartHref}
                 class="press underline-sweep text-xs uppercase tracking-label hover:text-accent-ink"
-                aria-label={fmt(d.cartCount, { n: cartCount })}
+                aria-label={cartCount > 0 ? fmt(d.cartCount, { n: cartCount }) : d.cart}
               >
-                {d.cart} ({cartCount})
+                {cartCount > 0 ? `${d.cart} (${cartCount})` : d.cart}
               </a>
             )
           }
