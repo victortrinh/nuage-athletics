@@ -158,7 +158,7 @@ export const UI: Record<Locale, Dict> = {
   'fr-CA': {
     brand: 'Nuage Athletics',
     tagline: 'Vêtements de sport, sans le plastique.',
-    dropLine: 'Première sortie. Automne 2026.',
+    dropLine: 'Première sortie à l’automne 2026. Inscrivez-vous pour être averti dès sa disponibilité.',
     ogImageAlt:
       'Le chandail à manches longues 01 de Nuage Athletics, coupe classique, à plat sur fond clair.',
     emailLabel: 'Courriel',
@@ -244,7 +244,7 @@ export const UI: Record<Locale, Dict> = {
   'en-CA': {
     brand: 'Nuage Athletics',
     tagline: 'Athletic wear, without the plastic.',
-    dropLine: 'First drop. Fall 2026.',
+    dropLine: 'First drop, fall 2026. Sign up now to get notified the moment it’s available.',
     ogImageAlt:
       'Nuage Athletics Long Sleeve 01, classic fit, laid flat on a light background.',
     emailLabel: 'Email',

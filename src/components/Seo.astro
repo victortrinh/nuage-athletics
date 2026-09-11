@@ -97,6 +97,11 @@ const graph = {
 <meta name="description" content={description} />
 <link rel="canonical" href={canonical} />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<!-- PNG fallbacks: Google's favicon crawler doesn't reliably pick up SVG
+     icons, so a search listing without one falls back to a generic globe
+     placeholder. sizes are multiples of 48px per Google's favicon guidance. -->
+<link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
+<link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
 
 {/*
   On an indexable page, the positive directives are worth stating: without
