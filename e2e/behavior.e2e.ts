@@ -855,15 +855,21 @@ test.describe('founder preview', () => {
     await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
     await expect(page.getByText(/Classique/)).toBeVisible()
 
-    // The stub's checkout host isn't a real, resolvable store — intercepted
-    // rather than actually navigated to, since this suite's job stops at
-    // "the button hands off to the store's own host", not at what Shopify's
-    // hosted checkout itself renders.
-    await page.route(`https://${STUB_CHECKOUT_HOST}/**`, (route) =>
-      route.fulfill({ status: 200, contentType: 'text/plain', body: 'stub checkout' })
-    )
-    await page.getByRole('button', { name: 'Passer à la caisse' }).click()
-    await page.waitForURL((url) => url.hostname === STUB_CHECKOUT_HOST)
+    // The stub's checkout host isn't a real, resolvable store, so this reads
+    // /api/cart's own 303 response rather than letting the browser actually
+    // follow it — a real cross-origin navigation to an unresolvable host is
+    // exactly what left this flaky in CI (chrome-error://chromewebdata/,
+    // deterministically, not a one-off). This suite's job stops at "the
+    // button hands off to the store's own host" — what Shopify's hosted
+    // checkout itself renders is out of scope, same as it always was.
+    const [checkoutResponse] = await Promise.all([
+      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+      page.getByRole('button', { name: 'Passer à la caisse' }).click(),
+    ])
+    expect(checkoutResponse.status()).toBe(303)
+    const location = checkoutResponse.headers()['location']
+    expect(location).toBeTruthy()
+    expect(new URL(location!).hostname).toBe(STUB_CHECKOUT_HOST)
 
     await context.close()
   })
