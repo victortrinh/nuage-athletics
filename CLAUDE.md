@@ -170,8 +170,17 @@ of us to see the real buy flow on the real site before it opens.
   entirely: a successful hydrated add (`onSubmit` in `ProductStage.tsx`)
   bumps the header cart link (`#cart-link`, `Base.astro`) in place — its
   count and `aria-label` update from the same readable `na_cart_n` cookie
-  `/api/cart` just set, and it scales up briefly (`.cart-bump`,
-  `global.css`, reduced-motion-gated). Adding deliberately does **not**
+  `/api/cart` just set, and it answers with `.cart-bump` (`global.css`): a
+  short scale bump plus a ring pulsing out of it. That ring is the
+  `focus-block` focus ring's own geometry travelling outward — a 2px
+  accent-ink outline, expanded by animating `outline-offset` rather than
+  `scale`, since a scaled outline thickens and blurs as it grows. Both
+  parts are reduced-motion-gated and the cart page's steppers reuse the
+  same class, so every cart change answers identically wherever it came
+  from. `e2e/cart-motion.e2e.ts` pins that it fires (and re-fires on a
+  second add) with motion allowed; `behavior.e2e.ts` pins that it doesn't
+  under `reduce` — the count changing is what carries the information.
+  Adding deliberately does **not**
   navigate to the cart: someone buying two fits or three sizes shouldn't
   have to walk back from the cart between each one. It was tried the other
   way and reverted for exactly that reason — don't reintroduce it. The

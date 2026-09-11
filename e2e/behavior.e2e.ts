@@ -872,6 +872,16 @@ test.describe('founder preview', () => {
     await expect(page.getByRole('link', { name: /Panier \(1\)/ })).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 
+    // This project runs under reducedMotion: 'reduce', so the confirmation
+    // pulse is marked but never animates — the count still changed, which is
+    // the part that carries the information. cart-motion.e2e.ts holds the
+    // other half: that it does animate when motion is allowed.
+    const link = page.locator('#cart-link')
+    await expect(link).toHaveClass(/cart-bump/)
+    expect(
+      await link.evaluate((el) => el.getAnimations({ subtree: true }).length)
+    ).toBe(0)
+
     // The whole point of not navigating: a second size goes in from right
     // here, and the badge keeps count.
     await add('L')
