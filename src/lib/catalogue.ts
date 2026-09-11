@@ -32,8 +32,12 @@ export const SLUGS: Record<string, Record<Locale, string>> = {
  * report `inStock: true` unconditionally, which is a claim this file has no
  * way to make good on; Shopify's `availableForSale` is the only answer, and
  * leaving the field off the type means nothing can render the old lie.
+ *
+ * `merchandiseId` is missing for the same reason again: it's Shopify's GID
+ * for the variant, and this file has no way to know it either — only the
+ * live join in `./commerce/shopify.ts` does.
  */
-export type CatalogueVariant = Omit<ProductVariant, 'inStock'>
+export type CatalogueVariant = Omit<ProductVariant, 'inStock' | 'merchandiseId'>
 export type CatalogueProduct = Omit<Product, 'price' | 'variants'> & {
   variants: CatalogueVariant[]
 }
@@ -240,6 +244,27 @@ export const FEATURED_ID = 'ls-01'
 
 export function getCatalogueProduct(slug: string, locale: Locale): CatalogueProduct | null {
   return CATALOGUE[locale].find((p) => p.slug === slug) ?? null
+}
+
+/**
+ * The reverse of the SKU join `./commerce/shopify.ts` uses to price a
+ * variant: given a SKU a cart line came back with, find the catalogue
+ * product and variant it names. Used by `CartView.astro` to render a line's
+ * thumbnail, fit and size from data this file already owns, rather than
+ * carrying photography through the Storefront round trip. Null for a SKU
+ * that doesn't match anything here — not an error, since a cart line renders
+ * fine from its own Shopify-supplied label and price with no catalogue
+ * match at all (see the note on `CartLine.sku`).
+ */
+export function catalogueVariantBySku(
+  sku: string,
+  locale: Locale
+): { product: CatalogueProduct; variant: CatalogueVariant } | null {
+  for (const product of CATALOGUE[locale]) {
+    const variant = product.variants.find((v) => v.sku === sku)
+    if (variant) return { product, variant }
+  }
+  return null
 }
 
 export function featuredProduct(locale: Locale): CatalogueProduct {

@@ -1,0 +1,51 @@
+---
+import { env } from 'cloudflare:workers'
+import Base from '../layouts/Base.astro'
+import CartView from '../components/CartView.astro'
+import { t } from '../i18n/ui.ts'
+import { commerceEnabled, readCart } from '../lib/commerce/index.ts'
+import { readCartId } from '../lib/cart.ts'
+
+/**
+ * The cart route — reads the visitor's own cart and hands it to
+ * `CartView.astro`, which does the actual rendering (shared with
+ * `src/pages/en/cart.astro`). Kept as its own file, rather than folded
+ * entirely into `CartView`, because setting `Cache-Control` and the
+ * `X-Storefront` diagnostic is this response's job, not a shared
+ * component's.
+ */
+
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
+export const prerender = false
+
+const locale = 'fr-CA' as const
+const d = t(locale)
+
+// Per-visitor by definition, same reasoning as applyPreview()'s own
+// Cache-Control note in src/lib/preview.ts — nothing else in the codebase
+// sets this header outside a preview render, and a cart is nobody else's to
+// see cached.
+Astro.response.headers.set('Cache-Control', 'private, no-store')
+
+const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
+const cartId = canBuy ? readCartId(Astro.request.headers.get('Cookie')) : undefined
+const live = cartId ? await readCart(env, cartId) : null
+const cart = live?.cart ?? null
+
+// Same diagnostic header index.astro sets — a real Storefront failure (not
+// merely "no cart cookie yet") shouldn't look identical to an empty cart
+// from the outside.
+if (live && live.reason !== 'ok') {
+  Astro.response.headers.set(
+    'X-Storefront',
+    live.detail ? `${live.reason};${live.detail}` : live.reason
+  )
+}
+
+const errorCode = Astro.url.searchParams.get('ce') ?? undefined
+---
+
+<Base {locale} routeId="cart" title={d.cartTitle} description={d.cartTitle}>
+  <CartView {locale} {cart} {errorCode} />
+</Base>

@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { ROUTES, SIGNUP_PROMPT_ENABLED } from '../src/i18n/utils'
 import { E2E_PREVIEW_PASSWORD, NUDGE_DISMISSED } from '../playwright.config'
-import { SOLD_OUT, STUB_PRICE } from './storefront-stub'
+import { SOLD_OUT, STUB_PRICE, STUB_CHECKOUT_HOST } from './storefront-stub'
 import { LOCALES } from '../src/i18n/config'
 
 /**
@@ -276,27 +276,39 @@ test('the buy band never changes height, and the carousel never moves, across an
   expect(picked.gap).toBe(idle.gap)
 })
 
-test('the add-to-cart button is disabled until a size is picked, and a mis-tap on a size can never fire a purchase', async ({
+/**
+ * The button is deliberately NOT `disabled` while no size is picked — see
+ * ProductStage.tsx's own note on the Button: a `disabled` attribute baked
+ * into the server render would make the no-JS `<form>` (#33) unsubmittable
+ * no matter which size a visitor later checks, since nothing without JS can
+ * flip that attribute back off. What replaces it is a real refusal — an
+ * inline error, and no network call at all before a size is actually
+ * chosen — asserted here the same way the old "never fires a purchase"
+ * half of this test always was.
+ */
+test('a mis-tap on the add-to-cart button before a size is picked shows an error and fires no request', async ({
   page,
 }) => {
   await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
-  await expect(button).toBeDisabled()
+  await expect(button).toBeEnabled()
 
-  // Selecting the radio itself must not have submitted anything — track
-  // every request from here on and confirm none of them ever reaches
-  // /api/checkout, rather than racing a single waitForRequest against a
-  // timeout (which throws, rather than resolving empty, on its own timeout).
-  const checkoutRequests: string[] = []
+  const cartRequests: string[] = []
   page.on('request', (req) => {
-    if (req.url().includes('/api/checkout')) checkoutRequests.push(req.url())
+    if (req.url().includes('/api/cart')) cartRequests.push(req.url())
   })
 
-  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
-  await expect(button).toBeEnabled()
+  await button.click()
+  await expect(page.getByRole('alert')).toHaveText('Choisir une taille')
   await page.waitForTimeout(500)
-  expect(checkoutRequests).toHaveLength(0)
+  expect(cartRequests).toHaveLength(0)
+
+  // Picking a size afterwards still works — the earlier mis-tap didn't
+  // leave the band in some stuck state.
+  await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+  await button.click()
+  await expect(page.getByText('Ajouté…')).toBeVisible()
 })
 
 /**
@@ -699,6 +711,8 @@ test.describe('founder preview', () => {
     await page.goto(ROUTES.home['fr-CA'])
     await expect(page.getByText(/DISPONIBLE AUTOMNE 2026/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toHaveCount(0)
+    // Same gate as the buy band itself — see Base.astro's `canBuy`.
+    await expect(page.getByRole('link', { name: 'Panier', exact: true })).toHaveCount(0)
   })
 
   test('the cookie reveals the buy flow, and the response is never cached', async ({
@@ -803,6 +817,150 @@ test.describe('founder preview', () => {
       .getByRole('radio', { name: 'XL', exact: true })
       .locator('xpath=ancestor::span[contains(@class, "group")][1]')
     await expect(inStock.locator('[aria-hidden="true"]')).toHaveCount(0)
+
+    await context.close()
+  })
+
+  /**
+   * The real multi-item cart (#33): adding a size stays on the product
+   * page (the band rolls to "Ajouté…" via the hydrated fetch to
+   * /api/cart), the header picks up a cart link once there's a line in it,
+   * and the cart page itself shows that line and hands checkout off to
+   * Shopify's hosted page — asserted against the storefront stub's own
+   * host (STUB_CHECKOUT_HOST) rather than following the redirect, since
+   * there's no real Shopify checkout to land on in this suite.
+   */
+  test('adding a size stays on the page, and the cart carries it through to checkout', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
+    const page = await context.newPage()
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    // The header link is reachable before anything is in the cart — gated
+    // on commerceEnabled (same switch as the buy band itself), not on
+    // whether the cart happens to hold a line, so a founder previewing the
+    // buy flow can always get to /panier/, not only after an add.
+    const cartLink = page.getByRole('link', { name: 'Panier', exact: true })
+    await expect(cartLink).toBeVisible()
+
+    await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+    const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
+    await button.click()
+
+    // The button's own label rolls to confirm the add — no redirect, no
+    // navigation away from the product page.
+    await expect(page.getByText('Ajouté…')).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
+
+    // The header link's count reads straight off the cookie /api/cart just
+    // set (src/layouts/Base.astro) — server-rendered, so it only reflects
+    // the add on the next render, not the in-place client update above.
+    await page.reload()
+    const cartLinkWithCount = page.getByRole('link', { name: /Panier \(1\)/ })
+    await expect(cartLinkWithCount).toBeVisible()
+    await cartLinkWithCount.click()
+
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
+    await expect(page.getByText(/Classique/)).toBeVisible()
+
+    // The stub's checkout host isn't a real, resolvable store, so this reads
+    // /api/cart's own 303 response rather than letting the browser actually
+    // follow it — a real cross-origin navigation to an unresolvable host is
+    // exactly what left this flaky in CI (chrome-error://chromewebdata/,
+    // deterministically, not a one-off). This suite's job stops at "the
+    // button hands off to the store's own host" — what Shopify's hosted
+    // checkout itself renders is out of scope, same as it always was.
+    const [checkoutResponse] = await Promise.all([
+      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+      page.getByRole('button', { name: 'Passer à la caisse' }).click(),
+    ])
+    expect(checkoutResponse.status()).toBe(303)
+    const location = checkoutResponse.headers()['location']
+    expect(location).toBeTruthy()
+    expect(new URL(location!).hostname).toBe(STUB_CHECKOUT_HOST)
+
+    await context.close()
+  })
+
+  /**
+   * The cart page's own controls: two native forms per line (`+` / `−`),
+   * each a plain submit against `/api/cart`'s existing `update`/`remove`
+   * intents — there is no select-and-submit control left to test since the
+   * order-summary redesign replaced it with steppers. `−` at quantity 1
+   * removes the line rather than going to 0, which this asserts explicitly
+   * since it's the one place the two steppers don't mirror each other.
+   */
+  test('the cart page steppers update quantity, and stepping down from 1 removes the line', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
+    const page = await context.newPage()
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
+    await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click()
+    await expect(page.getByText('Ajouté…')).toBeVisible()
+
+    await page.goto(ROUTES.cart['fr-CA'])
+    // The one line on the page — scoped by aria-live rather than by text, so
+    // this doesn't also match a price or a size elsewhere in the row.
+    const qty = page.locator('[aria-live="polite"]')
+    await expect(qty).toHaveText('1')
+
+    const increase = page.getByRole('button', { name: /^Augmenter la quantité/ })
+    const decrease = page.getByRole('button', { name: /^Diminuer la quantité/ })
+
+    await increase.click()
+    await expect(qty).toHaveText('2')
+
+    await decrease.click()
+    await expect(qty).toHaveText('1')
+
+    // At quantity 1 the same-position button's intent flips from `update`
+    // to `remove` (CartView.astro) — same submit, no separate control.
+    const remove = page.getByRole('button', { name: /^Retirer/ })
+    await remove.click()
+    await expect(page.getByText(/Votre panier est vide/)).toBeVisible()
+
+    await context.close()
+  })
+
+  /**
+   * The one path #33's AC 2 is actually about: adding to cart with no
+   * JavaScript at all, via the plain `<form>` ProductStage.tsx renders and
+   * /api/cart's native-POST fallback (src/lib/form-endpoint.ts) — same
+   * shape as SignupForm.tsx's own no-JS round trip, asserted the same way
+   * (a separate browser context with JS disabled, following a real
+   * redirect rather than any script running).
+   */
+  test('adding a size works with JavaScript disabled', async ({ browser }) => {
+    // A tall viewport, not a wide one: the band is vertically centred in a
+    // box sized off `100dvh`, so a tall viewport gives it real clearance
+    // from SignupPrompt.astro's bottom banner — forced permanently visible
+    // by its own <noscript><style> with no JS to run the timer that would
+    // otherwise defer it — which `force: true` clicks below would otherwise
+    // land on instead of the band underneath it.
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1280, height: 2000 } })
+    const page = await context.newPage()
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    // force: true — same as the signup form's own no-JS test above: with JS
+    // off, SignupPrompt.astro's <noscript><style> forces its bottom banner
+    // permanently visible (it would otherwise wait for a ~6s JS timer),
+    // which can overlap the band depending on viewport height.
+    await page
+      .getByRole('radiogroup', { name: 'Taille' })
+      .locator('label')
+      .filter({ hasText: 'M' })
+      .click({ force: true })
+    await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click({ force: true })
+
+    // The native POST 303s back here with added=1 — ProductView.astro reads
+    // it server-side into ProductStage's initialAdded prop, so the button's
+    // "Ajouté…" label is in the very first (and, with no JS, only) render.
+    await expect(page).toHaveURL(/\?added=1$/)
+    await expect(page.getByText('Ajouté…')).toBeVisible()
 
     await context.close()
   })

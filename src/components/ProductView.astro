@@ -4,7 +4,7 @@ import ProductDetails from './ProductDetails.astro'
 import { fmt, t } from '../i18n/ui'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { organizationId } from '../lib/brand'
-import { editorialFor, featuredProduct, formatPrice, DEFAULT_FIT } from '../lib/catalogue'
+import { editorialFor, featuredProduct, formatPrice, DEFAULT_FIT, FIT_IDS, type FitId } from '../lib/catalogue'
 import type { Product } from '../lib/commerce/types'
 import { route } from '../i18n/utils'
 
@@ -34,6 +34,28 @@ const editorial = editorialFor(product.id, locale)
 
 const site = Astro.site?.origin ?? 'https://nuageathletics.com'
 const productUrl = new URL(Astro.url.pathname, site).href
+
+/**
+ * The fit a no-JS `?fit=` link switched to (see the <noscript> pair below),
+ * validated against the real id list rather than trusted outright. Read here
+ * rather than threaded through from index.astro/en/index.astro: this
+ * component already owns `DEFAULT_FIT` and is the one place both callers'
+ * `initialFit` prop comes from.
+ */
+const requestedFit = Astro.url.searchParams.get('fit')
+const initialFit: FitId = (FIT_IDS as readonly string[]).includes(requestedFit ?? '')
+  ? (requestedFit as FitId)
+  : DEFAULT_FIT
+
+/**
+ * The outcome of a no-JS /api/cart submit, folded into the query string by
+ * its 303 redirect (`added=1` / `ce=<code>`) — read back here and passed
+ * into ProductStage as `initialAdded`/`initialErrorCode` so the server
+ * render and the first client render agree, same pattern as
+ * SignupForm.tsx's `initialSuccess`/`initialErrorCode`.
+ */
+const added = Astro.url.searchParams.get('added') === '1'
+const errorCode = Astro.url.searchParams.get('ce') ?? undefined
 
 /**
  * No price is rendered while commerce is off, and the price is left out of the
@@ -123,7 +145,7 @@ const jsonLd = {
           productId={product.id}
           productName={product.name}
           fits={editorial.fits}
-          initialFit={DEFAULT_FIT}
+          {initialFit}
           commerceEnabled={false}
         />
         {/* Images are content, not chrome — the carousel needs JS to page
@@ -238,12 +260,15 @@ const jsonLd = {
             productId={product.id}
             productName={product.name}
             fits={editorial.fits}
-            initialFit={DEFAULT_FIT}
+            {initialFit}
             commerceEnabled={true}
             fitOptions={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
             variants={live.variants}
             price={formatPrice(live.price, locale)}
             precontractHref={route('precontract', locale)}
+            redirectTo={Astro.url.pathname + Astro.url.search}
+            initialAdded={added}
+            initialErrorCode={errorCode}
           />
           {/* Images are content, not chrome — the carousel needs JS to page
               through them, but every photo still has to reach a no-JS
@@ -266,6 +291,26 @@ const jsonLd = {
                 ))
               )}
             </div>
+            {/*
+              ProductStage's fit tabs are one RadioGroup — real controls, but
+              hydration is what wires them to which fit's sizes the form
+              offers. Without JS the form only ever submits the fit it was
+              rendered with (`initialFit`), so a no-JS visitor otherwise has
+              no way to buy the other fit at all. This is that way: a plain
+              link back to the same page with `?fit=` set, which
+              ProductView.astro reads server-side above. Only the fit not
+              already showing — switching to the one already selected would
+              be a link to do nothing.
+            */}
+            <p class="mt-3 text-center font-mono text-[11px] uppercase tracking-label">
+              {editorial.fits
+                .filter((f) => f.id !== initialFit)
+                .map((f) => (
+                  <a href={`?fit=${f.id}`} class="underline-sweep hover:text-accent-ink">
+                    {fmt(d.productViewFit, { fit: f.label })}
+                  </a>
+                ))}
+            </p>
           </noscript>
         </div>
 

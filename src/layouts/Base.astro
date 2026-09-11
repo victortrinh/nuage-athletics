@@ -1,17 +1,21 @@
 ---
+import { env } from 'cloudflare:workers'
 import '../styles/global.css'
 import Seo from '../components/Seo.astro'
 import Sky from '../components/Sky.astro'
 import Logo from '../components/Logo.astro'
 import LocaleSwitcher from '../components/LocaleSwitcher.astro'
 import NavIcon from '../components/NavIcon.astro'
+import CartIcon from '../components/CartIcon.astro'
 import SignupPrompt from '../components/SignupPrompt.astro'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { route, SHOWS_SIGNUP_PROMPT, SIGNUP_PROMPT_ENABLED, type RouteId } from '../i18n/utils'
-import { t } from '../i18n/ui'
+import { t, fmt } from '../i18n/ui'
 import { buttonVariants } from '../components/ui/button-variants'
 import { cn } from '../components/ui/cn'
 import { SOCIAL_PROFILES } from '../lib/brand'
+import { readCartCount } from '../lib/cart'
+import { commerceEnabled } from '../lib/commerce/index'
 
 interface Props {
   locale: Locale
@@ -44,6 +48,24 @@ const navLinks = [
 // uses for `noindex` when it has no INDEXABLE entry to read. Gated on
 // SIGNUP_PROMPT_ENABLED first — see that constant's comment.
 const showPrompt = SIGNUP_PROMPT_ENABLED && (routeId ? SHOWS_SIGNUP_PROMPT[routeId] : true)
+
+// The header's cart link. Gated on `commerceEnabled` — the same single
+// switch every other piece of the buy flow (the band, /api/checkout,
+// /api/cart) already reads — not on whether the cart happens to hold
+// anything: an empty-but-reachable link is what lets a founder previewing
+// the buy flow actually get to /panier/ before adding something, and it's
+// what a launch-day visitor gets too, so preview never diverges from what
+// ships (CLAUDE.md's founder-preview note is explicit about this: "every
+// extra conditional is a way for what you tested to differ from what
+// ships"). The count itself still comes from the readable line-count
+// cookie (src/lib/cart.ts), not a real cart read — every route renders
+// through this layout, and reading the actual cart here would cost a
+// Storefront call on every page view for anyone previewing. The cart page
+// itself (src/pages/panier.astro) always reads the real cart before
+// rendering it; this count is display-only.
+const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
+const cartCount = readCartCount(Astro.request.headers.get('Cookie'))
+const cartHref = route('cart', locale)
 
 // The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
 // submit back to `redirect` with the outcome folded into 'sent'/'se' (see
@@ -202,6 +224,27 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
               </g>
             </svg>
           </button>
+          {
+            canBuy && (
+              <a
+                href={cartHref}
+                aria-label={cartCount > 0 ? fmt(d.cartCount, { n: cartCount }) : d.cart}
+                class={cn(
+                  buttonVariants({ variant: 'quiet' }),
+                  'group flex h-8 min-w-8 items-center justify-center gap-1'
+                )}
+              >
+                <CartIcon />
+                {
+                  cartCount > 0 && (
+                    <span aria-hidden="true" class="font-mono text-[10px] tabular-nums">
+                      {cartCount}
+                    </span>
+                  )
+                }
+              </a>
+            )
+          }
           <LocaleSwitcher {locale} {routeId} href={localeHref} />
         </div>
       </div>

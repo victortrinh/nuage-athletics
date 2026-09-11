@@ -2,7 +2,7 @@ import type { Locale } from '../../i18n/config'
 // Explicit extension: scripts/shopify-check.ts imports this file under plain
 // node, which resolves nothing for you.
 import { getCatalogueProduct } from '../catalogue.ts'
-import type { Money, Product, ProductVariant } from './types'
+import type { Cart, CartLine, Money, Product, ProductVariant } from './types'
 
 /**
  * Shopify Storefront API, read side.
@@ -56,6 +56,7 @@ const INVENTORY_QUERY = `query NuageInventory($products: Int!, $variants: Int!) 
     nodes {
       variants(first: $variants) {
         nodes {
+          id
           sku
           availableForSale
           price { amount currencyCode }
@@ -71,6 +72,7 @@ interface InventoryResponse {
       nodes?: {
         variants?: {
           nodes?: {
+            id?: string | null
             sku?: string | null
             availableForSale?: boolean
             price?: { amount?: string; currencyCode?: string }
@@ -106,6 +108,8 @@ export class StorefrontError extends Error {
 interface LiveVariant {
   price: Money
   available: boolean
+  /** Shopify's own variant GID — the id cart mutations take. */
+  merchandiseId: string
 }
 
 type Inventory = Map<string, LiveVariant>
@@ -156,17 +160,25 @@ export function parsePriceToCents(amount: string): number | null {
 const cache = new Map<string, { expires: number; inventory: Inventory }>()
 const inFlight = new Map<string, Promise<Inventory>>()
 
-async function fetchInventory(config: StorefrontConfig): Promise<Inventory> {
+/**
+ * The one place a GraphQL request actually goes out — inventory reads and
+ * every cart mutation below share it, rather than each reimplementing the
+ * status check and the "200 with an `errors` array" trap fetchInventory
+ * used to guard alone. Returns the parsed body; callers still have to look
+ * at their own `data.*` shape, since that differs per operation.
+ */
+async function storefrontRequest<T>(
+  config: StorefrontConfig,
+  query: string,
+  variables: Record<string, unknown>
+): Promise<T> {
   const res = await fetch(endpoint(config.domain), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Shopify-Storefront-Access-Token': config.token,
     },
-    body: JSON.stringify({
-      query: INVENTORY_QUERY,
-      variables: { products: MAX_PRODUCTS, variants: MAX_VARIANTS },
-    }),
+    body: JSON.stringify({ query, variables }),
   })
   if (!res.ok) {
     throw new StorefrontError(
@@ -175,7 +187,7 @@ async function fetchInventory(config: StorefrontConfig): Promise<Inventory> {
     )
   }
 
-  const body = (await res.json()) as InventoryResponse
+  const body = (await res.json()) as { data?: T; errors?: { message?: string }[] }
   // GraphQL answers 200 with an `errors` array. Treating that as success is
   // how a partial response turns into a missing price rendered as a real one.
   if (body.errors?.length) {
@@ -184,12 +196,21 @@ async function fetchInventory(config: StorefrontConfig): Promise<Inventory> {
       'graphql'
     )
   }
+  return (body.data ?? {}) as T
+}
+
+async function fetchInventory(config: StorefrontConfig): Promise<Inventory> {
+  const data = await storefrontRequest<InventoryResponse['data']>(config, INVENTORY_QUERY, {
+    products: MAX_PRODUCTS,
+    variants: MAX_VARIANTS,
+  })
 
   const inventory: Inventory = new Map()
-  for (const product of body.data?.products?.nodes ?? []) {
+  for (const product of data?.products?.nodes ?? []) {
     for (const variant of product.variants?.nodes ?? []) {
       const sku = variant.sku?.trim()
-      if (!sku) continue
+      const merchandiseId = variant.id?.trim()
+      if (!sku || !merchandiseId) continue
       const cents = parsePriceToCents(variant.price?.amount ?? '')
       // A price this file can't read, or one in a currency the site doesn't
       // sell in, is not a price — the variant is simply left unknown, which
@@ -198,6 +219,7 @@ async function fetchInventory(config: StorefrontConfig): Promise<Inventory> {
       inventory.set(sku, {
         price: { amount: cents, currency: 'CAD' },
         available: variant.availableForSale === true,
+        merchandiseId,
       })
     }
   }
@@ -237,6 +259,202 @@ export function resetStorefrontCache(): void {
   inFlight.clear()
 }
 
+/**
+ * Every field a cart render needs, in one fragment shared by every cart
+ * operation below — one place to widen if the band ever needs another field,
+ * rather than five query strings drifting apart.
+ *
+ * `merchandise` is a union (`ProductVariant | ProductVariantComponent`, on
+ * newer API versions) — this catalogue only ever adds a plain
+ * `ProductVariant`, so the inline fragment is enough; a line whose
+ * merchandise isn't one (shouldn't happen, but a union is a union) is simply
+ * dropped in `parseCart` rather than crashing the whole cart render.
+ */
+const CART_FRAGMENT = `fragment NuageCart on Cart {
+  id
+  checkoutUrl
+  cost {
+    subtotalAmount { amount currencyCode }
+    totalAmount { amount currencyCode }
+    totalTaxAmount { amount currencyCode }
+  }
+  lines(first: ${MAX_VARIANTS}) {
+    nodes {
+      id
+      quantity
+      cost { totalAmount { amount currencyCode } }
+      merchandise {
+        ... on ProductVariant {
+          id
+          sku
+          title
+          price { amount currencyCode }
+        }
+      }
+    }
+  }
+}`
+
+const CART_CREATE = `${CART_FRAGMENT}
+mutation NuageCartCreate($merchandiseId: ID!, $quantity: Int!) {
+  cartCreate(input: { lines: [{ merchandiseId: $merchandiseId, quantity: $quantity }] }) {
+    cart { ...NuageCart }
+    userErrors { field message }
+  }
+}`
+
+const CART_LINES_ADD = `${CART_FRAGMENT}
+mutation NuageCartLinesAdd($cartId: ID!, $merchandiseId: ID!, $quantity: Int!) {
+  cartLinesAdd(cartId: $cartId, lines: [{ merchandiseId: $merchandiseId, quantity: $quantity }]) {
+    cart { ...NuageCart }
+    userErrors { field message }
+  }
+}`
+
+const CART_LINES_UPDATE = `${CART_FRAGMENT}
+mutation NuageCartLinesUpdate($cartId: ID!, $lineId: ID!, $quantity: Int!) {
+  cartLinesUpdate(cartId: $cartId, lines: [{ id: $lineId, quantity: $quantity }]) {
+    cart { ...NuageCart }
+    userErrors { field message }
+  }
+}`
+
+const CART_LINES_REMOVE = `${CART_FRAGMENT}
+mutation NuageCartLinesRemove($cartId: ID!, $lineId: ID!) {
+  cartLinesRemove(cartId: $cartId, lineIds: [$lineId]) {
+    cart { ...NuageCart }
+    userErrors { field message }
+  }
+}`
+
+const CART_QUERY = `${CART_FRAGMENT}
+query NuageCartQuery($cartId: ID!) {
+  cart(id: $cartId) { ...NuageCart }
+}`
+
+interface RawCart {
+  id: string
+  checkoutUrl: string
+  cost?: {
+    subtotalAmount?: { amount?: string; currencyCode?: string }
+    totalAmount?: { amount?: string; currencyCode?: string }
+    // Absent (not merely zero) whenever Shopify has no tax registration to
+    // quote from yet — the first drop ships with none configured. `money()`
+    // needs a string to parse, so this stays undefined rather than a string,
+    // and parseCart checks for that directly instead of forcing a `money()`
+    // call that would render it as a confident $0.00.
+    totalTaxAmount?: { amount?: string; currencyCode?: string } | null
+  }
+  lines?: {
+    nodes?: {
+      id: string
+      quantity: number
+      cost?: { totalAmount?: { amount?: string; currencyCode?: string } }
+      merchandise?: {
+        id?: string
+        sku?: string | null
+        title?: string
+        price?: { amount?: string; currencyCode?: string }
+      }
+    }[]
+  }
+}
+
+interface CartMutationResponse {
+  [key: string]: { cart: RawCart | null; userErrors?: { field?: string[]; message: string }[] } | undefined
+}
+
+interface CartQueryResponse {
+  cart: RawCart | null
+}
+
+/**
+ * "37.00" (or anything `parsePriceToCents` refuses) becomes 0 rather than a
+ * dropped line: `fetchInventory` can afford to drop a variant it can't price
+ * — the visitor never sees it — but a cart line the visitor already added is
+ * not this file's to make disappear. Logged so a bad amount doesn't fail
+ * silently the way a dropped inventory variant is allowed to.
+ */
+function money(amount: string | undefined, context: string): number {
+  const cents = parsePriceToCents(amount ?? '')
+  if (cents === null) {
+    console.error(`storefront: could not parse a price ("${amount}") for ${context}`)
+    return 0
+  }
+  return cents
+}
+
+function parseCart(raw: RawCart): Cart {
+  const lines: CartLine[] = []
+  for (const line of raw.lines?.nodes ?? []) {
+    const merchandiseId = line.merchandise?.id
+    // Not a ProductVariant, or Shopify answered a line with no merchandise at
+    // all (a deleted variant) — nothing to show for it, so it's dropped
+    // rather than rendered as a blank row.
+    if (!merchandiseId) continue
+    lines.push({
+      id: line.id,
+      merchandiseId,
+      // Blank rather than dropped when Shopify's own variant has no SKU set
+      // (shouldn't happen for this catalogue, but nothing here enforces it)
+      // — the catalogue join in CartView.astro treats an empty SKU the same
+      // way it treats one that simply doesn't match: falls back to the
+      // Shopify-only render for that line.
+      sku: line.merchandise?.sku?.trim() ?? '',
+      label: line.merchandise?.title ?? '',
+      quantity: line.quantity,
+      unitPrice: {
+        amount: money(line.merchandise?.price?.amount, `line ${line.id} unit price`),
+        currency: 'CAD',
+      },
+      linePrice: {
+        amount: money(line.cost?.totalAmount?.amount, `line ${line.id} total`),
+        currency: 'CAD',
+      },
+    })
+  }
+  return {
+    id: raw.id,
+    checkoutUrl: raw.checkoutUrl,
+    subtotal: { amount: money(raw.cost?.subtotalAmount?.amount, `cart ${raw.id} subtotal`), currency: 'CAD' },
+    total: { amount: money(raw.cost?.totalAmount?.amount, `cart ${raw.id} total`), currency: 'CAD' },
+    // Not run through money(): an absent totalTaxAmount means "no tax
+    // registration yet", which is a fact to display ("calculated at
+    // checkout"), not a price that failed to parse and should log as one.
+    tax: raw.cost?.totalTaxAmount?.amount
+      ? { amount: money(raw.cost.totalTaxAmount.amount, `cart ${raw.id} tax`), currency: 'CAD' }
+      : null,
+    lines,
+  }
+}
+
+/**
+ * Runs one cart mutation and resolves it to a `Cart`, or null.
+ *
+ * Null covers exactly one thing: Shopify no longer recognises the cart id
+ * (past its own ~10-day TTL, or already turned into a completed order) —
+ * that's not this file's error to raise, it reads as an empty cart and the
+ * caller clears the cookie. `userErrors` on a cart Shopify *did* find (an
+ * out-of-stock line, a bad quantity) is a real refusal and throws.
+ */
+async function runCartMutation(
+  config: StorefrontConfig,
+  query: string,
+  operation: string,
+  variables: Record<string, unknown>
+): Promise<Cart | null> {
+  const data = await storefrontRequest<CartMutationResponse>(config, query, variables)
+  const result = data[operation]
+  if (!result || !result.cart) return null
+  if (result.userErrors?.length) {
+    throw new StorefrontError(
+      `shopify storefront: ${result.userErrors.map((e) => e.message).join('; ')}`,
+      'cart-user-error'
+    )
+  }
+  return parseCart(result.cart)
+}
+
 export interface StorefrontSource {
   readonly name: string
   /**
@@ -244,11 +462,18 @@ export interface StorefrontSource {
    * Shopify can't answer for it. Never throws for an unreachable store: the
    * caller renders the no-price state instead (see `getLiveProduct` in
    * ./index.ts).
-   *
-   * Later tickets widen this into the full `CommerceAdapter` — cart, checkout
-   * handoff and the order webhook all land on the same object.
    */
   getProduct(slug: string, locale: Locale): Promise<Product | null>
+  /** A fresh cart holding one line. */
+  createCart(merchandiseId: string, quantity: number): Promise<Cart>
+  /** Adds a line to an existing cart, or null if Shopify no longer knows that cart. */
+  addLine(cartId: string, merchandiseId: string, quantity: number): Promise<Cart | null>
+  /** Sets a line's quantity outright (0 removes it) — same null rule as `addLine`. */
+  updateLine(cartId: string, lineId: string, quantity: number): Promise<Cart | null>
+  /** Same null rule as `addLine`. */
+  removeLine(cartId: string, lineId: string): Promise<Cart | null>
+  /** The cart as it stands right now — never cached, unlike `getProduct`. */
+  getCart(cartId: string): Promise<Cart | null>
 }
 
 export function createShopifyStorefront(config: StorefrontConfig): StorefrontSource {
@@ -267,6 +492,9 @@ export function createShopifyStorefront(config: StorefrontConfig): StorefrontSou
         // disabled rather than blocking the whole product — a half-loaded
         // Shopify catalogue should still sell the sizes that are in it.
         inStock: inventory.get(variant.sku)?.available === true,
+        // Absent for the same reason `inStock` is false: nothing to add to a
+        // cart for a SKU Shopify never answered with.
+        merchandiseId: inventory.get(variant.sku)?.merchandiseId,
       }))
 
       const prices = copy.variants
@@ -305,6 +533,41 @@ export function createShopifyStorefront(config: StorefrontConfig): StorefrontSou
       }
 
       return { ...copy, price: { amount: prices[0], currency: 'CAD' }, variants }
+    },
+
+    async createCart(merchandiseId, quantity): Promise<Cart> {
+      const data = await storefrontRequest<CartMutationResponse>(config, CART_CREATE, {
+        merchandiseId,
+        quantity,
+      })
+      const result = data.cartCreate
+      if (result?.userErrors?.length) {
+        throw new StorefrontError(
+          `shopify storefront: ${result.userErrors.map((e) => e.message).join('; ')}`,
+          'cart-user-error'
+        )
+      }
+      if (!result?.cart) {
+        throw new StorefrontError('shopify storefront: cartCreate returned no cart', 'cart-user-error')
+      }
+      return parseCart(result.cart)
+    },
+
+    addLine(cartId, merchandiseId, quantity) {
+      return runCartMutation(config, CART_LINES_ADD, 'cartLinesAdd', { cartId, merchandiseId, quantity })
+    },
+
+    updateLine(cartId, lineId, quantity) {
+      return runCartMutation(config, CART_LINES_UPDATE, 'cartLinesUpdate', { cartId, lineId, quantity })
+    },
+
+    removeLine(cartId, lineId) {
+      return runCartMutation(config, CART_LINES_REMOVE, 'cartLinesRemove', { cartId, lineId })
+    },
+
+    async getCart(cartId): Promise<Cart | null> {
+      const data = await storefrontRequest<CartQueryResponse>(config, CART_QUERY, { cartId })
+      return data.cart ? parseCart(data.cart) : null
     },
   }
 }
