@@ -307,8 +307,15 @@ test('a mis-tap on the add-to-cart button before a size is picked shows an error
   // Picking a size afterwards still works — the earlier mis-tap didn't
   // leave the band in some stuck state.
   await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
-  await button.click()
-  await expect(page.getByText('Ajouté…')).toBeVisible()
+  const [response] = await Promise.all([
+    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+    button.click(),
+  ])
+  expect(response.ok()).toBe(true)
+  // No "Added" state any more — the band simply rolls back to the ordinary
+  // idle button once the add succeeds.
+  await expect(button).toBeVisible()
+  await expect(button).toBeEnabled()
 })
 
 /**
@@ -823,12 +830,13 @@ test.describe('founder preview', () => {
 
   /**
    * The real multi-item cart (#33): adding a size stays on the product
-   * page (the band rolls to "Ajouté…" via the hydrated fetch to
-   * /api/cart), the header picks up a cart link once there's a line in it,
-   * and the cart page itself shows that line and hands checkout off to
-   * Shopify's hosted page — asserted against the storefront stub's own
-   * host (STUB_CHECKOUT_HOST) rather than following the redirect, since
-   * there's no real Shopify checkout to land on in this suite.
+   * page (the hydrated fetch to /api/cart resolves and the band simply
+   * rolls back to its ordinary idle button — no "Added" state), the header
+   * picks up a cart link once there's a line in it, and the cart page
+   * itself shows that line and hands checkout off to Shopify's hosted page
+   * — asserted against the storefront stub's own host (STUB_CHECKOUT_HOST)
+   * rather than following the redirect, since there's no real Shopify
+   * checkout to land on in this suite.
    */
   test('adding a size stays on the page, and the cart carries it through to checkout', async ({
     browser,
@@ -846,11 +854,15 @@ test.describe('founder preview', () => {
 
     await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
     const button = page.getByRole('button', { name: 'Ajouter au panier', exact: true })
-    await button.click()
+    const [response] = await Promise.all([
+      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+      button.click(),
+    ])
 
-    // The button's own label rolls to confirm the add — no redirect, no
-    // navigation away from the product page.
-    await expect(page.getByText('Ajouté…')).toBeVisible()
+    // The add resolves in place — no redirect, no navigation away from the
+    // product page, and the button is back to its ordinary idle state.
+    expect(response.ok()).toBe(true)
+    await expect(button).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 
     // The header link's count reads straight off the cookie /api/cart just
@@ -899,8 +911,11 @@ test.describe('founder preview', () => {
     await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
     await page.getByRole('radiogroup', { name: 'Taille' }).locator('label').filter({ hasText: 'M' }).click()
-    await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click()
-    await expect(page.getByText('Ajouté…')).toBeVisible()
+    const [response] = await Promise.all([
+      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
+      page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click(),
+    ])
+    expect(response.ok()).toBe(true)
 
     await page.goto(ROUTES.cart['fr-CA'])
     // The one line on the page — scoped by aria-live rather than by text, so
@@ -956,11 +971,12 @@ test.describe('founder preview', () => {
       .click({ force: true })
     await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click({ force: true })
 
-    // The native POST 303s back here with added=1 — ProductView.astro reads
-    // it server-side into ProductStage's initialAdded prop, so the button's
-    // "Ajouté…" label is in the very first (and, with no JS, only) render.
+    // The native POST 303s back here with added=1 — /api/cart still sets it,
+    // but ProductView.astro no longer reads it into anything: the button's
+    // ordinary idle label is in the very first (and, with no JS, only)
+    // render, same as a fresh visit.
     await expect(page).toHaveURL(/\?added=1$/)
-    await expect(page.getByText('Ajouté…')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toBeVisible()
 
     await context.close()
   })

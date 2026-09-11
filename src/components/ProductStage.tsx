@@ -77,10 +77,9 @@ type Props =
       /**
        * Read out of `Astro.url.searchParams` by the caller and passed
        * straight through, so the server render and the first client render
-       * agree on `added`/`error` from the same props — see SignupForm.tsx's
-       * `initialSuccess`/`initialErrorCode` for the pattern this mirrors.
+       * agree on `error` from the same prop — see SignupForm.tsx's
+       * `initialErrorCode` for the pattern this mirrors.
        */
-      initialAdded?: boolean
       initialErrorCode?: string
     })
 
@@ -115,8 +114,8 @@ const CHROME_REM = { base: 21.03125, sm: 19.03125 }
  * to its own always-open section below the fold (ProductDetails.astro) —
  * nothing left here to disclose into. What's fixed-height now is only the
  * price row (an error can replace it) and the button's own label (idle /
- * "Ajout…" / "Ajouté…"), both `product/Slot.tsx` rollers so neither changes
- * the band's total height.
+ * "Ajout…"), both `product/Slot.tsx` rollers so neither changes the band's
+ * total height.
  */
 export default function ProductStage(props: Props) {
   const { locale, d, productId, productName, fits, initialFit, commerceEnabled } = props
@@ -124,9 +123,6 @@ export default function ProductStage(props: Props) {
   const [fit, setFit] = useState<FitId>(initialFit)
   const [size, setSize] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  // Seeded from the query string /api/cart's no-JS redirect folds the
-  // outcome into — see the props doc on `initialAdded`/`initialErrorCode`.
-  const [added, setAdded] = useState(() => (commerceEnabled && props.initialAdded) ?? false)
   const [error, setError] = useState(() =>
     commerceEnabled && props.initialErrorCode ? errorMessage(d, props.initialErrorCode) : ''
   )
@@ -134,7 +130,6 @@ export default function ProductStage(props: Props) {
   function onSizeChange(value: string) {
     setSize(value)
     setError('')
-    setAdded(false)
   }
 
   /**
@@ -167,10 +162,7 @@ export default function ProductStage(props: Props) {
         body: JSON.stringify({ intent: 'add', fit, size, quantity: 1, locale }),
       })
       const data = (await res.json()) as { ok: boolean; code?: string }
-      if (data.ok) {
-        setAdded(true)
-        return
-      }
+      if (data.ok) return
       setError(errorMessage(d, data.code ?? ''))
     } catch {
       setError(d.errorCartGeneric)
@@ -200,7 +192,7 @@ export default function ProductStage(props: Props) {
   const selectedVariant = variants.find((v) => v.options?.fit === fit && v.options?.size === size)
 
   const priceSlotIndex = error ? 1 : 0
-  const actionSlotIndex = added ? 2 : loading ? 1 : 0
+  const actionSlotIndex = loading ? 1 : 0
   const sizeHintId = `size-hint-${productId}`
 
   return (
@@ -383,9 +375,6 @@ export default function ProductStage(props: Props) {
             </Button>
             <span role="status" aria-live="polite" className="font-mono text-xs uppercase tracking-label">
               {d.productAdding}
-            </span>
-            <span role="status" aria-live="polite" className="font-mono text-xs uppercase tracking-label">
-              {d.productAdded}
             </span>
           </Slot>
 

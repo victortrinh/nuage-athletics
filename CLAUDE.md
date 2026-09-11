@@ -164,9 +164,12 @@ of us to see the real buy flow on the real site before it opens.
   add-to-cart button). Everything in the band is visible on arrival now —
   no `+` to open it, no "Détails" toggle swapping the sizes for a
   description panel. Only the price row and the button's own label
-  ("Ajouter au panier" / "Ajout…" / "Ajouté…") still roll
-  (`product/Slot.tsx`), so an error or the button's progress can't change
-  the band's height. The description and spec list moved out of the band
+  ("Ajouter au panier" / "Ajout…") still roll (`product/Slot.tsx`), so an
+  error or the button's progress can't change the band's height. There is
+  no "Added" state any more — a successful add just rolls the label back to
+  "Ajouter au panier" rather than announcing itself, so the band's only
+  confirmation is the header's cart count on the next render. The description
+  and spec list moved out of the band
   entirely, onto an always-open section below the fold
   (`ProductDetails.astro`, still gated on `commerceEnabled`) — there's
   nothing left to disclose into. The size row is seven identically sized,
