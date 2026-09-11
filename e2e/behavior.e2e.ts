@@ -396,7 +396,9 @@ test('the add-to-cart button and size radios meet a 44×44 minimum target size',
 test('carousel exposes exactly one image at a time, pages with the markers, and announces the change', async ({
   page,
 }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+    // The carousel only renders once there's something to buy — preview,
+  // same reason the size/fit selector tests above need it.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   await expect(carousel).toHaveAttribute('aria-roledescription', 'carousel')
@@ -424,7 +426,9 @@ test('carousel exposes exactly one image at a time, pages with the markers, and 
 })
 
 test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+    // The carousel only renders once there's something to buy — preview,
+  // same reason the size/fit selector tests above need it.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   // Arrow keys work from focus anywhere in the group (see onKeyDown in
   // ProductCarousel.tsx), pagination and prev/next arrows included.
@@ -450,7 +454,9 @@ test('carousel pagination wraps and is keyboard-operable', async ({ page }) => {
 })
 
 test('carousel prev/next arrows page and wrap', async ({ page }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+    // The carousel only renders once there's something to buy — preview,
+  // same reason the size/fit selector tests above need it.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   const prev = page.getByRole('button', { name: 'Image précédente' })
@@ -485,7 +491,9 @@ test('carousel prev/next arrows page and wrap', async ({ page }) => {
 test('carousel arrows are desktop-only, and arrow keys still page without them', async ({
   page,
 }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+    // The carousel only renders once there's something to buy — preview,
+  // same reason the size/fit selector tests above need it.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const next = page.getByRole('button', { name: 'Image suivante' })
   const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
@@ -523,7 +531,9 @@ async function swipe(page: import('@playwright/test').Page, dx: number) {
 }
 
 test('carousel advances on a horizontal drag and clamps at the ends', async ({ page }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+    // The carousel only renders once there's something to buy — preview,
+  // same reason the size/fit selector tests above need it.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const carousel = page.getByRole('group', { name: 'Images du produit' })
   const pageButtons = page.getByRole('button', { name: /^Image \d de 2$/ })
@@ -578,7 +588,9 @@ test('controls report a pointer cursor', async ({ page }) => {
  * with the gesture.
  */
 test('the carousel photo advertises its drag with a grab cursor', async ({ page }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+    // The carousel only renders once there's something to buy — preview,
+  // same reason the size/fit selector tests above need it.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const stage = page.locator('div.touch-pan-y')
   await expect(stage).toHaveCSS('cursor', 'grab')
@@ -1032,48 +1044,30 @@ test.describe('founder preview', () => {
   })
 
   /**
-   * Founder preview only tells you what launch day looks like if turning it
-   * on doesn't move the page. The two renders are held identical from the top
-   * of the document down through the marker row by two halves of one
-   * arrangement: ProductStage's shared CHROME_REM (which sizes the frame off
-   * the same height budget either way) and the `min-h`/`pt` block in
-   * ProductView.astro's pre-drop branch (which reserves exactly what the fit
-   * picker and buy band occupy in the commerce render). Either half drifting
-   * on its own puts the photo back to a different size or a different place,
-   * which is what this measures — and the arithmetic is spread across two
-   * files, so a comment alone would not have caught it.
-   *
-   * Both viewports on purpose: they fail differently. The frame is
-   * width-bound on a phone (so a chrome mismatch shows up as a vertical
-   * offset) and height-bound on a desktop (where it shows up as a
-   * differently-sized photo).
+   * The garment's design isn't final, so the public pre-drop page carries no
+   * product photography at all — no carousel, no image, in either locale.
+   * Founder preview (this describe block) is the only way to see it. This
+   * replaces a pixel-placement comparison this repo used to run here
+   * ("preview does not move the product"): that test pinned the public and
+   * preview renders to an identical photo position, which depended on the
+   * pre-drop page reserving the exact height the carousel + band occupy
+   * under preview. There is no public photo to place any more, so the
+   * invariant worth pinning is narrower and more direct — no photography
+   * leaks to the public page, full stop.
    */
-  for (const [name, viewport] of [
-    ['phone', { width: 393, height: 851 }],
-    ['desktop', { width: 1280, height: 720 }],
-  ] as const) {
-    test(`preview does not move the product (${name})`, async ({ browser }) => {
-      async function placement(url: string) {
-        const context = await browser.newContext({ storageState: NUDGE_DISMISSED, viewport })
-        const page = await context.newPage()
-        await page.goto(url)
-        const marker = page.locator('button[data-pagination="true"]').first()
-        await marker.waitFor()
-        const photo = page.locator('[aria-roledescription="carousel"] img').first()
-        const boxes = { photo: await photo.boundingBox(), marker: await marker.boundingBox() }
-        await context.close()
-        return boxes
-      }
+  test('the public page shows no product photography; preview does', async ({ page }) => {
+    await page.goto(ROUTES.home['fr-CA'])
+    await expect(page.getByRole('group', { name: 'Images du produit' })).toHaveCount(0)
+    await expect(page.locator('img[src*="ls-01"]')).toHaveCount(0)
 
-      const publicView = await placement(ROUTES.home['fr-CA'])
-      const previewView = await placement(
-        `${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`
-      )
+    await page.goto(ROUTES.home['en-CA'])
+    await expect(page.getByRole('group', { name: 'Product images' })).toHaveCount(0)
+    await expect(page.locator('img[src*="ls-01"]')).toHaveCount(0)
 
-      expect(publicView.photo).toEqual(previewView.photo)
-      expect(publicView.marker).toEqual(previewView.marker)
-    })
-  }
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+    await expect(page.getByRole('group', { name: 'Images du produit' })).toBeVisible()
+    await expect(page.locator('img[src*="ls-01"]').first()).toBeVisible()
+  })
 })
 
 /**

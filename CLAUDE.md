@@ -174,6 +174,23 @@ of us to see the real buy flow on the real site before it opens.
 - React islands only where interaction requires it. Default to zero JS.
 - Tailwind utility classes inline; no component CSS files.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
+- **The garment isn't final, so the public pre-drop page shows no
+  photography at all** — not the carousel, not a static image, nothing under
+  `public/img/ls-01-*`. `ProductView.astro`'s `!live` branch is a
+  display-scale announcement instead: the product name set in `.wordmark`
+  (`global.css`), with `dropAnnounceProduct`/`dropAnnounceAvailability`
+  underneath, centred over the sky. `ProductStage.tsx` (carousel, fit
+  picker, buy band) only ever mounts inside the `live` branch now, so its
+  `Props` are plainly required — there's no `commerceEnabled: false` arm to
+  keep in sync any more, and no code path constructs the island without a
+  real Shopify price and real photography behind it. Founder preview is the
+  only way to see the garment before the design is final: turning it on
+  doesn't just reveal the buy band, it's the only render with a photograph
+  in it. (An earlier version of this page pinned the pre-drop and preview
+  renders to the same photo, pixel-for-pixel, via a hand-measured
+  reservation in `ProductView.astro` and a shared `CHROME_REM` in
+  `ProductStage.tsx` — that pairing and its `e2e/behavior.e2e.ts` test are
+  gone along with the public photo they existed to keep in place.)
 - The product's **fit** (`FitId` in `src/lib/catalogue.ts`) is a purchasable
   axis alongside size, not just a photo toggle — 12 variants, fit × size.
   `ProductStage.tsx` is the one island for the whole interactive product

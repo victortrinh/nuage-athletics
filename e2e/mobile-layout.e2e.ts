@@ -27,11 +27,11 @@ import { ROUTES } from '../src/i18n/utils'
  *
  * Runs against /conditions/, not the home page: the header itself (Base.astro)
  * is identical everywhere, but this test needs a route tall enough to
- * actually scroll on a phone viewport, and the home page's height is the
- * product carousel's own — which now deliberately shrinks to fit a short
- * window (see ProductCarousel.tsx's frame-sizing comment), leaving too
- * little margin on a page this short to reliably scroll on every device
- * profile. A legal page's length isn't going anywhere.
+ * actually scroll on a phone viewport. The public home page reserves
+ * exactly one screenful and no more (ProductView.astro's `!live` branch —
+ * no product photography renders there while the design isn't final),
+ * leaving too little margin on a page this short to reliably scroll on
+ * every device profile. A legal page's length isn't going anywhere.
  */
 test('header stays sticky, see-through, and on top of scrolled content', async ({ page }) => {
   await page.goto(ROUTES.terms['fr-CA'])
