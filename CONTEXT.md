@@ -42,11 +42,11 @@ reference to `SITE_LOCKED` elsewhere (an older issue, a stale comment), it
 describes a design this repo no longer has.
 
 1. **`COMMERCE_ENABLED`** (`wrangler.toml` `[vars]`, currently `"false"`) — the
-   public switch. Off: the home page renders the drop announcement, no price,
-   no buy band. On: everyone gets the real buy flow. This is the flag that
-   actually gates selling; the "fall 2026" copy on the home page is
-   independent marketing text and does not, by itself, do anything (see the
-   comment at `src/lib/commerce/index.ts:20-24`).
+   public switch. Off: the home page renders the drop announcement, no
+   photography, no price, no buy band. On: everyone gets the real buy flow.
+   This is the flag that actually gates selling; the "fall 2026" copy on the
+   home page is independent marketing text and does not, by itself, do
+   anything (see the comment at `src/lib/commerce/index.ts:20-24`).
 2. **Founder preview** (`PREVIEW_PASSWORD`, a secret) — a per-visitor override.
    `/?preview=<password>` sets a signed cookie that turns commerce on for that
    visitor only, so the four founders can exercise the real buy flow on the
@@ -62,6 +62,12 @@ answers "may this request see prices," combining both.
 
 **`COMMERCE_ENABLED = "true"`** needs, in order:
 
+- The garment's design finalised. Unrelated to the flag mechanically, but
+  the reason `COMMERCE_ENABLED` staying `"false"` is currently doing double
+  duty: the public pre-drop page (`ProductView.astro`'s `!live` branch)
+  shows no product photography at all, by design, not only no price — see
+  CLAUDE.md's product-page bullet. Founder preview is the only render that
+  shows the current photos while this is still open.
 - A real price: landed cost (duty + freight on the China import, ADR-0002/ADR-0001)
   computed, then set in Shopify — `catalogue.ts` has no price field to fill in
   any more (non-negotiable 5.5).

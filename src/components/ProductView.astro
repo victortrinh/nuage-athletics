@@ -147,91 +147,55 @@ const jsonLd = live
   {
     !live ? (
       /*
-        Same reserved screenful and same centring as the commerce branch
-        below, and the block under the carousel reserves the same height the
-        fit picker and buy band occupy there. Together with the shared
-        CHROME_REM in ProductStage.tsx, that makes the two renders identical
-        from the top of the page down through the marker row: turning founder
-        preview on reveals the buy flow without the photograph moving, which
-        is the only way previewing it tells you what launch day looks like.
+        The garment's design isn't final, so no photography reaches this
+        branch at all — not the carousel, not the <noscript> gallery. What's
+        here instead is the announcement itself, promoted to display scale
+        and centred over the sky (Sky.astro renders full-bleed behind this
+        whole page): the one thing this site can honestly show before the
+        design is settled is that a drop is coming.
+
+        This used to reserve the exact height the fit picker and buy band
+        occupy in the commerce branch below, so switching founder preview on
+        wouldn't move a shared photograph by a pixel. There is no longer a
+        shared photograph to pin — the carousel now lives entirely inside the
+        `live` branch — so that reservation is gone with it. The screenful
+        centring stays: the page should still read as a considered whole, not
+        a top-aligned scrap, whether or not there's a product underneath.
       */
-      <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col justify-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
-        {/* Pre-drop: carousel, the plain product-name heading, and the
-            announcement — nothing else. Once commerce is on, this same
-            heading moves inside ProductStage's band (slot A's collapsed
-            state) so it can roll away when the band opens; it stays a
-            static heading here because there is no band to roll it into. */}
-        <ProductStage
-          client:load
-          {locale}
-          d={d}
-          productId={product.id}
-          productName={product.name}
-          fits={editorial.fits}
-          {initialFit}
-          commerceEnabled={false}
-        />
-        {/* Images are content, not chrome — the carousel needs JS to page
-            through them, but every photo still has to reach a no-JS
-            visitor. */}
-        <noscript>
-          <div class="mt-3 grid grid-cols-2 gap-3">
-            {editorial.fits.flatMap((fit) =>
-              fit.gallery.map((image) => (
-                <img
-                  src={image.src}
-                  width={image.width}
-                  height={image.height}
-                  alt={image.alt}
-                  loading="lazy"
-                  decoding="async"
-                  class="w-full object-contain"
-                />
-              ))
-            )}
-          </div>
-        </noscript>
-
+      <div class="flex min-h-[calc(100dvh-var(--header-h)-4rem)] flex-col items-center justify-center text-center lg:min-h-[calc(100dvh-var(--header-h)-6rem)]">
         {/*
-          The commerce render puts `mt-5` + a 1.9375rem fit picker + `mt-10` +
-          a 12.53125rem band under the marker row (the band's own name row,
-          price row, size row, button row and pre-contract link, measured
-          top-to-bottom — see ProductStage.tsx). This block stands in for all
-          of it: `mt-5` matches that first gap, `min-h` reserves the
-          remaining 16.96875rem so the column totals the same height either
-          way, and the `pt` drops the heading past where the fit picker would
-          be (1.9375rem + `mt-10`) plus the 0.375rem that centres 1rem of
-          text in the band's own h-7 name box, so the product name lands
-          there exactly. `min-h` rather than a fixed height because the
-          announcement is the one part here that can wrap to a third line on
-          a narrow phone.
+          Three lines, one h1, one voice: what's dropping, what the brand
+          is, when. `d.tagline` sits between the two drop-announcement
+          strings rather than above them in its own paragraph — the earlier
+          version, with tagline muted and set apart — because all three are
+          the same kind of statement (short, flat, declarative) and reading
+          them as three facts in one notice beat reading them as a caption
+          plus a separate announcement.
+
+          Not a separate brand-name heading above it either: the header's
+          own logo link already carries `aria-label={d.brand}` (Base.astro),
+          so an h1 repeating "Nuage Athletics" here would be the same fact
+          said twice on every render, not a heading for this page's own
+          content. `tagline` is reused rather than rewritten for the same
+          reason it was pulled in at all — it already exists for
+          `<title>`/og:title (Seo.astro) and needs no new translation.
+          Monospace, uppercase and tracked out for all three lines — this is
+          a notice, not prose, and it should read as one at a glance.
+
+          `tagline`'s own full stop is stripped here, not from the string
+          itself: `<title>`/og:title (Seo.astro) and the meta description
+          (`${d.tagline} ${d.dropLine}`, index.astro) both need it as a
+          complete sentence, but neither sibling line in this h1 carries
+          terminal punctuation, and reading three lines as one notice means
+          matching that, not making tagline the odd one out.
         */}
-        <div class="mt-5 min-h-[16.96875rem] pt-[4.8125rem] text-center">
-          {/* Small and mono, matching the band's own name row in
-              ProductStage's commerce render, rather than the wordmark
-              display face — there's no band here to roll it into, but
-              there's also no reason for the two states of the same page to
-              set the product name at wildly different sizes. */}
-          <h1 class="font-mono text-xs uppercase tracking-label">{product.name}</h1>
-
-          {/*
-            The drop announcement — what a visitor gets instead of a buy band,
-            and what replaced the pre-launch password screen as the answer to
-            "what is this site for right now".
-
-            It is the availability statement, so the old bordered "coming
-            soon" badge went with it: a badge saying the drop is ahead sitting
-            above a line naming the season is the same sentence twice.
-            Monospace, uppercase and tracked out, set apart from the editorial
-            copy below — this is a notice, not prose, and it should read as
-            one at a glance.
-          */}
-          <p class="mt-6 font-mono text-xs uppercase leading-loose tracking-label">
-            {fmt(d.dropAnnounceProduct, { product: product.name })}
-            <br />
-            {d.dropAnnounceAvailability}
-          </p>
-        </div>
+        <h1 class="font-mono text-xs uppercase leading-loose tracking-label">
+          {d.dropAnnounceFirst}
+          <br />
+          {d.tagline.replace(/\.$/, '')}
+          <br />
+          {d.dropAnnounceAvailability}
+        </h1>
       </div>
     ) : (
       <>
@@ -284,7 +248,6 @@ const jsonLd = live
             productName={product.name}
             fits={editorial.fits}
             {initialFit}
-            commerceEnabled={true}
             fitOptions={editorial.fits.map((f) => ({ id: f.id, label: f.label }))}
             variants={live.variants}
             price={formatPrice(live.price, locale)}

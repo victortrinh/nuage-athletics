@@ -145,7 +145,7 @@ These look like arbitrary choices and are not. Do not "simplify" them.
 ## Founder preview
 
 The pre-launch password gate is gone; the home page is public and announces the
-drop instead (`dropAnnounceProduct` / `dropAnnounceAvailability` in
+drop instead (`dropAnnounceFirst` / `dropAnnounceAvailability` in
 `src/i18n/ui.ts` — the availability line is the one string per locale to change
 when the date firms up). What replaced the gate is narrower: a way for the four
 of us to see the real buy flow on the real site before it opens.
@@ -174,6 +174,32 @@ of us to see the real buy flow on the real site before it opens.
 - React islands only where interaction requires it. Default to zero JS.
 - Tailwind utility classes inline; no component CSS files.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
+- **The garment isn't final, so the public pre-drop page shows no
+  photography at all** — not the carousel, not a static image, nothing under
+  `public/img/ls-01-*`. `ProductView.astro`'s `!live` branch is three lines
+  in one `<h1>` and nothing else, centred over the sky: `dropAnnounceFirst`,
+  `d.tagline`, `dropAnnounceAvailability` (`src/i18n/ui.ts`) — what's
+  dropping, what the brand is, when. `dropAnnounceFirst` is generic on
+  purpose ("first drop", not which one — naming the garment would be a
+  label with nothing to label without a photo). `tagline` in the middle is
+  reused rather than new copy — it already exists for `<title>`/og:title
+  (`Seo.astro`) and was never rendered on the page itself before this.
+  There's no separate brand-name heading above the three lines — the
+  header's own logo link already carries `aria-label={d.brand}`
+  (`Base.astro`), so repeating "Nuage Athletics" here would say the same
+  fact twice on every render rather than heading this page's own content.
+  `ProductStage.tsx` (carousel, fit picker, buy band) only ever mounts
+  inside the `live` branch now, so its `Props` are plainly required — there's
+  no `commerceEnabled: false` arm to
+  keep in sync any more, and no code path constructs the island without a
+  real Shopify price and real photography behind it. Founder preview is the
+  only way to see the garment before the design is final: turning it on
+  doesn't just reveal the buy band, it's the only render with a photograph
+  in it. (An earlier version of this page pinned the pre-drop and preview
+  renders to the same photo, pixel-for-pixel, via a hand-measured
+  reservation in `ProductView.astro` and a shared `CHROME_REM` in
+  `ProductStage.tsx` — that pairing and its `e2e/behavior.e2e.ts` test are
+  gone along with the public photo they existed to keep in place.)
 - The product's **fit** (`FitId` in `src/lib/catalogue.ts`) is a purchasable
   axis alongside size, not just a photo toggle — 12 variants, fit × size.
   `ProductStage.tsx` is the one island for the whole interactive product

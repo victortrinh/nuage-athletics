@@ -81,67 +81,56 @@ interface FitOption {
   label: string
 }
 
-interface BaseProps {
+/**
+ * This island is only ever mounted from `ProductView.astro`'s `live` branch
+ * now — the pre-drop page renders no photography and no buy flow at all, so
+ * there is nothing left for this component to gate. `price`/`variants` used
+ * to be behind a `commerceEnabled` discriminant purely so the caller
+ * couldn't pass them without a real Shopify price to back them (non-
+ * negotiable 5.5 in CLAUDE.md); that guarantee is now stronger, not weaker —
+ * there is no code path left that constructs this island without one.
+ */
+interface Props {
   locale: Locale
   d: Dict
   productId: string
   productName: string
-  /** Photos + labels for the carousel — never gated: see ProductView.astro. */
+  /** Photos + labels for the carousel. */
   fits: ProductFit[]
   initialFit: FitId
+  fitOptions: FitOption[]
+  variants: Variant[]
+  /** Pre-formatted by the caller (`formatPrice` in catalogue.ts) — this
+   *  island has no reason to know about `Intl.NumberFormat` or currency
+   *  codes. */
+  price: string
+  /** Resolved server-side (`route('precontract', locale)` in
+   *  ProductView.astro) rather than imported here — `route()` and
+   *  `i18n/utils` stay server-side, same reason `price` arrives
+   *  pre-formatted rather than this island importing `formatPrice`. */
+  precontractHref: string
+  /**
+   * The page this island lives on, including any query string — carried
+   * as the form's hidden `redirect` field for the no-JS fallback, same
+   * pattern as SignupForm.tsx's own `redirectTo`. `/api/cart` bounces a
+   * native POST back here with the outcome folded into
+   * `added=1`/`ce=<code>`.
+   */
+  redirectTo: string
+  /**
+   * Read out of `Astro.url.searchParams` by the caller and passed
+   * straight through, so the server render and the first client render
+   * agree on `error` from the same prop — see SignupForm.tsx's
+   * `initialErrorCode` for the pattern this mirrors.
+   */
+  initialErrorCode?: string
 }
 
 /**
- * Everything below is gated on `commerceEnabled` at the type level, not just
- * at render time. ProductView.astro server-renders this island's props into
- * the page as JSON (Astro's `astro-island` attribute) — hiding `price` and
- * `variants` behind an `if` inside this component would still put the
- * placeholder price on the wire for anyone who reads the HTML.
- * Non-negotiable 5.5 in CLAUDE.md is about the number reaching the visitor,
- * not about what renders, so the caller literally cannot pass these unless
- * `commerceEnabled` is `true`.
- */
-type Props =
-  | (BaseProps & { commerceEnabled: false })
-  | (BaseProps & {
-      commerceEnabled: true
-      fitOptions: FitOption[]
-      variants: Variant[]
-      /** Pre-formatted by the caller (`formatPrice` in catalogue.ts) — this
-       *  island has no reason to know about `Intl.NumberFormat` or currency
-       *  codes. */
-      price: string
-      /** Resolved server-side (`route('precontract', locale)` in
-       *  ProductView.astro) rather than imported here — `route()` and
-       *  `i18n/utils` stay server-side, same reason `price` arrives
-       *  pre-formatted rather than this island importing `formatPrice`. */
-      precontractHref: string
-      /**
-       * The page this island lives on, including any query string — carried
-       * as the form's hidden `redirect` field for the no-JS fallback, same
-       * pattern as SignupForm.tsx's own `redirectTo`. `/api/cart` bounces a
-       * native POST back here with the outcome folded into
-       * `added=1`/`ce=<code>`.
-       */
-      redirectTo: string
-      /**
-       * Read out of `Astro.url.searchParams` by the caller and passed
-       * straight through, so the server render and the first client render
-       * agree on `error` from the same prop — see SignupForm.tsx's
-       * `initialErrorCode` for the pattern this mirrors.
-       */
-      initialErrorCode?: string
-    })
-
-/**
  * The column's non-frame chrome, per breakpoint — the pad above the carousel
- * plus everything the caller puts below the marker row. Deliberately ONE
- * number for both renders rather than two hand-measured ones: the pre-drop
- * view reserves exactly the height the fit picker and buy band occupy here
- * (see ProductView.astro's `min-h`), so the photo and the marker row land in
- * the same place whether or not commerce is on. Flipping founder preview on
- * must not move the product — that's the whole point of previewing the real
- * page. Re-measure both halves together if the band's height changes.
+ * plus everything below the marker row (fit picker + buy band). Hand-
+ * measured from `ProductCarousel.tsx`'s own frame-sizing math; see that
+ * file's frame-sizing comment for how it's used.
  */
 const CHROME_REM = { base: 21.03125, sm: 19.03125 }
 
@@ -168,13 +157,25 @@ const CHROME_REM = { base: 21.03125, sm: 19.03125 }
  * total height.
  */
 export default function ProductStage(props: Props) {
-  const { locale, d, productId, productName, fits, initialFit, commerceEnabled } = props
+  const {
+    locale,
+    d,
+    productId,
+    productName,
+    fits,
+    initialFit,
+    fitOptions,
+    variants,
+    price,
+    precontractHref,
+    redirectTo,
+  } = props
 
   const [fit, setFit] = useState<FitId>(initialFit)
   const [size, setSize] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(() =>
-    commerceEnabled && props.initialErrorCode ? errorMessage(d, props.initialErrorCode) : ''
+    props.initialErrorCode ? errorMessage(d, props.initialErrorCode) : ''
   )
 
   function onSizeChange(value: string) {
@@ -193,10 +194,9 @@ export default function ProductStage(props: Props) {
    * between each one. The header badge is the confirmation.
    */
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    if (!commerceEnabled) return
     e.preventDefault()
     if (loading) return
-    const selected = props.variants.find((v) => v.options?.fit === fit && v.options?.size === size)
+    const selected = variants.find((v) => v.options?.fit === fit && v.options?.size === size)
     // The button is never `disabled` on `!selectedVariant` any more — see
     // the note on the Button below for why — so this is reachable for real:
     // an error, not a silent no-op, is what a no-JS submit of the same form
@@ -226,23 +226,6 @@ export default function ProductStage(props: Props) {
     }
   }
 
-  if (!commerceEnabled) {
-    // Pre-drop: the carousel and its fit photography exist, but nothing
-    // below it does — no picker, no band, no price. The h1 and drop
-    // announcement are rendered by ProductView.astro itself, outside this
-    // island, exactly as they were before this redesign; see the note
-    // there on why that stays a plain server-rendered heading rather than
-    // moving into the band. Same pad above the carousel and same CHROME_REM
-    // as the commerce branch below — the two renders are deliberately
-    // identical from the top of the page down through the marker row.
-    return (
-      <div className="pt-10 sm:pt-2">
-        <ProductCarousel d={d} fit={fit} fits={fits} initialFit={initialFit} chromeRem={CHROME_REM} />
-      </div>
-    )
-  }
-
-  const { fitOptions, variants, price, precontractHref, redirectTo } = props
   const sizesForFit = variants.filter((v) => v.options?.fit === fit)
   const selectedVariant = variants.find((v) => v.options?.fit === fit && v.options?.size === size)
 

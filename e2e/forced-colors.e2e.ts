@@ -86,7 +86,9 @@ test('fit radio stays visually distinct selected vs unselected in forced-colors'
 test('current pagination marker stays visually distinct from the others in forced-colors', async ({
   page,
 }) => {
-  await page.goto(ROUTES.home['fr-CA'])
+  // The carousel only renders once there's something to buy — preview,
+  // same reason the fit-radio test above needs it.
+  await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
 
   const markers = page.getByRole('button', { name: /^Image \d de 2$/ }).locator('span')
   const current = await markers.nth(0).evaluate((el) => getComputedStyle(el).backgroundColor)

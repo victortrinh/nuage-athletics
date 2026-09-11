@@ -102,7 +102,7 @@ export type Dict = {
   mailIgnore: string
   mailUnsub: string
   // drop announcement
-  dropAnnounceProduct: string
+  dropAnnounceFirst: string
   dropAnnounceAvailability: string
   // product / checkout
   productDetails: string
@@ -203,7 +203,7 @@ export const UI: Record<Locale, Dict> = {
     mailCta: 'Confirmer mon inscription',
     mailIgnore: "Si cette inscription ne vient pas de vous, ignorez ce courriel.",
     mailUnsub: 'Se désabonner',
-    dropAnnounceProduct: 'LE NOUVEAU {product}',
+    dropAnnounceFirst: 'PREMIÈRE SORTIE',
     dropAnnounceAvailability: 'DISPONIBLE AUTOMNE 2026',
     productDetails: 'Détails',
     productGalleryLabel: 'Images du produit',
@@ -288,7 +288,7 @@ export const UI: Record<Locale, Dict> = {
     mailCta: 'Confirm my signup',
     mailIgnore: "If this signup wasn't you, ignore this email.",
     mailUnsub: 'Unsubscribe',
-    dropAnnounceProduct: 'THE NEW {product}',
+    dropAnnounceFirst: 'FIRST DROP',
     dropAnnounceAvailability: 'AVAILABLE FALL 2026',
     productDetails: 'Details',
     productGalleryLabel: 'Product images',
