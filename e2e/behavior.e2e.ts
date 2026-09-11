@@ -312,10 +312,9 @@ test('a mis-tap on the add-to-cart button before a size is picked shows an error
     button.click(),
   ])
   expect(response.ok()).toBe(true)
-  // No "Added" state any more — the band simply rolls back to the ordinary
-  // idle button once the add succeeds.
-  await expect(button).toBeVisible()
-  await expect(button).toBeEnabled()
+  // A real add now hands off to the cart page a beat later — see the
+  // dedicated test below for the bump/handoff itself.
+  await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
 })
 
 /**
@@ -829,16 +828,17 @@ test.describe('founder preview', () => {
   })
 
   /**
-   * The real multi-item cart (#33): adding a size stays on the product
-   * page (the hydrated fetch to /api/cart resolves and the band simply
-   * rolls back to its ordinary idle button — no "Added" state), the header
-   * picks up a cart link once there's a line in it, and the cart page
-   * itself shows that line and hands checkout off to Shopify's hosted page
-   * — asserted against the storefront stub's own host (STUB_CHECKOUT_HOST)
-   * rather than following the redirect, since there's no real Shopify
-   * checkout to land on in this suite.
+   * The real multi-item cart (#33), and its confirmation (#74): a
+   * successful add bumps the header cart badge in place — no page reload
+   * needed for the count/aria-label to update, since ProductStage.tsx reads
+   * the same `na_cart_n` cookie /api/cart just set — then hands off to the
+   * cart page itself a beat later, which shows the line and hands checkout
+   * off to Shopify's hosted page. Checkout is asserted against the
+   * storefront stub's own host (STUB_CHECKOUT_HOST) rather than following
+   * the redirect, since there's no real Shopify checkout to land on in this
+   * suite.
    */
-  test('adding a size stays on the page, and the cart carries it through to checkout', async ({
+  test('adding a size bumps the cart badge and hands off to the cart, which carries it through to checkout', async ({
     browser,
   }) => {
     const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
@@ -858,21 +858,14 @@ test.describe('founder preview', () => {
       page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/api/cart')),
       button.click(),
     ])
-
-    // The add resolves in place — no redirect, no navigation away from the
-    // product page, and the button is back to its ordinary idle state.
     expect(response.ok()).toBe(true)
-    await expect(button).toBeVisible()
-    await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 
-    // The header link's count reads straight off the cookie /api/cart just
-    // set (src/layouts/Base.astro) — server-rendered, so it only reflects
-    // the add on the next render, not the in-place client update above.
-    await page.reload()
+    // The badge updates in place, before the navigation below ever fires —
+    // no reload needed to see it, unlike the header's own first render.
     const cartLinkWithCount = page.getByRole('link', { name: /Panier \(1\)/ })
     await expect(cartLinkWithCount).toBeVisible()
-    await cartLinkWithCount.click()
 
+    // And a beat later, the page moves on to the cart by itself.
     await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}$`))
     await expect(page.getByText(/Classique/)).toBeVisible()
 

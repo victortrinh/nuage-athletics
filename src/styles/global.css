@@ -484,3 +484,26 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 
 @keyframes prompt-in { from { translate: 0 100%; } to { translate: 0 0; } }
 @keyframes prompt-out { from { translate: 0 0; } to { translate: 0 100%; } }
+
+/*
+ * The header cart link (#cart-link, Base.astro) briefly scales up when
+ * ProductStage.tsx's hydrated add succeeds — the one visible confirmation
+ * left once the button's own "Added" state was removed (#74). A `transition`
+ * won't do here for the same reason the drawer and prompt above use
+ * keyframes: the script toggles the class off and back on for a rapid
+ * second add, and a transition never restarts from a class that's already
+ * "on". Reduced motion drops the scale entirely rather than making it
+ * instant — the badge's new count is still announced via aria-label either
+ * way, so there's nothing lost by skipping the motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  #cart-link.cart-bump {
+    animation: cart-bump 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
+@keyframes cart-bump {
+  0% { scale: 1; }
+  40% { scale: 1.25; }
+  100% { scale: 1; }
+}

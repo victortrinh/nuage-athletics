@@ -4,7 +4,7 @@ import ProductCarousel from './ProductCarousel'
 import { Button } from './ui/button'
 import { RadioGroup, Radio } from './ui/radio-group'
 import { Slot } from './product/Slot'
-import { type Dict } from '../i18n/ui'
+import { fmt, type Dict } from '../i18n/ui'
 import type { Locale } from '../i18n/config'
 import type { FitId, ProductFit } from '../lib/catalogue'
 
@@ -24,6 +24,56 @@ function errorMessage(d: Dict, code: string): string {
   if (code === 'sold_out') return d.errorSoldOut
   if (code === 'no_size') return d.productChooseSize
   return d.errorCartGeneric
+}
+
+/**
+ * The literal cookie name `/api/cart` just set (`CART_COUNT_COOKIE` in
+ * src/lib/cart.ts) rather than an import from there: that module pulls in
+ * `preview.ts`'s server-only db/crypto code through `readCookie`, which has
+ * no business in this island's client bundle. The cookie is deliberately
+ * readable and deliberately display-only — see cart.ts's own comment — so
+ * reading it directly here is exactly the use it was built for.
+ */
+function readCartCount(): number {
+  const match = document.cookie.match(/(?:^|; )na_cart_n=(\d+)/)
+  const n = match ? Number(match[1]) : NaN
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/**
+ * The one visible confirmation an add still gets, now that the button's own
+ * "Added" state is gone (#74): the header cart link (#cart-link, Base.astro)
+ * updates its count in place and briefly scales up (`.cart-bump`,
+ * global.css). Reaches across from this island into the layout's plain
+ * server-rendered markup via a DOM id rather than any shared state — the two
+ * have no common parent to lift state into, same reasoning ProductCarousel
+ * and the old ProductActions once needed a module-level store for (see this
+ * file's own top-of-file note on fit-store.ts's removal).
+ */
+function bumpCartBadge(d: Dict) {
+  const link = document.getElementById('cart-link')
+  if (!link) return
+  const count = readCartCount()
+  link.setAttribute('aria-label', count > 0 ? fmt(d.cartCount, { n: count }) : d.cart)
+  let badge = link.querySelector<HTMLSpanElement>('[data-cart-count]')
+  if (count > 0) {
+    if (!badge) {
+      badge = document.createElement('span')
+      badge.dataset.cartCount = ''
+      badge.setAttribute('aria-hidden', 'true')
+      badge.className = 'font-mono text-[10px] tabular-nums'
+      link.appendChild(badge)
+    }
+    badge.textContent = String(count)
+  } else {
+    badge?.remove()
+  }
+  // Remove-then-reflow-then-add restarts the CSS animation even when a
+  // second add lands while the first bump is still playing — a class that's
+  // already present wouldn't retrigger it.
+  link.classList.remove('cart-bump')
+  void link.offsetWidth
+  link.classList.add('cart-bump')
 }
 
 interface FitOption {
@@ -66,6 +116,12 @@ type Props =
        *  `i18n/utils` stay server-side, same reason `price` arrives
        *  pre-formatted rather than this island importing `formatPrice`. */
       precontractHref: string
+      /** Resolved server-side the same way as `precontractHref` above — where
+       *  the hydrated path sends the visitor shortly after a successful add
+       *  (see `onSubmit`'s success branch below). The no-JS fallback doesn't
+       *  use this: a native submit still returns to `redirectTo`, since a
+       *  303 there has no way to show the bump animation first. */
+      cartHref: string
       /**
        * The page this island lives on, including any query string — carried
        * as the form's hidden `redirect` field for the no-JS fallback, same
@@ -134,11 +190,14 @@ export default function ProductStage(props: Props) {
 
   /**
    * The band's <form> posts natively to /api/cart with no JS at all — this
-   * only intercepts that once hydrated, to stay on the page and roll the
-   * button's own label instead of taking the 303 round trip. `fit`/`size`
-   * travel exactly as the native submit would send them (RAC's radios are
-   * real named inputs — see the JSX below), so there is nothing here for
-   * the two paths to disagree about.
+   * only intercepts that once hydrated, to fetch() in place instead of
+   * taking the 303 round trip. `fit`/`size` travel exactly as the native
+   * submit would send them (RAC's radios are real named inputs — see the
+   * JSX below), so there is nothing here for the two paths to disagree
+   * about. On success the hydrated path bumps the header cart badge and
+   * moves on to the cart itself a beat later (see the success branch
+   * below); the no-JS fallback stays on this page, same as it always has —
+   * a 303 has no way to show the bump first.
    */
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     if (!commerceEnabled) return
@@ -162,7 +221,14 @@ export default function ProductStage(props: Props) {
         body: JSON.stringify({ intent: 'add', fit, size, quantity: 1, locale }),
       })
       const data = (await res.json()) as { ok: boolean; code?: string }
-      if (data.ok) return
+      if (data.ok) {
+        bumpCartBadge(d)
+        // Long enough to see the badge bump (420ms, global.css) land before
+        // the page unloads — short enough that this still reads as one
+        // continuous action, not a separate step.
+        window.setTimeout(() => window.location.assign(props.cartHref), 550)
+        return
+      }
       setError(errorMessage(d, data.code ?? ''))
     } catch {
       setError(d.errorCartGeneric)
