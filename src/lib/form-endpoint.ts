@@ -37,7 +37,13 @@ export function isSameOrigin(request: Request, origin: string): boolean {
  * show the right state server-side.
  */
 export interface Responder {
-  ok: () => Response
+  /**
+   * @param notice a code for something the caller should be *told* about an
+   *   otherwise successful request — today only `/api/cart`'s "Shopify had
+   *   fewer than you asked for, so the line was clamped". Distinct from
+   *   `fail`: the request did what it could, and the cart really did change.
+   */
+  ok: (notice?: string) => Response
   fail: (code: string, status: number) => Response
 }
 
@@ -50,13 +56,13 @@ export function json(body: unknown, status = 200): Response {
 
 export function jsonResponder(): Responder {
   return {
-    ok: () => json({ ok: true }),
+    ok: (notice) => json(notice ? { ok: true, notice } : { ok: true }),
     fail: (code, status) => json({ ok: false, code }, status),
   }
 }
 
 /**
- * @param okParam the query param set (to '1') on success, e.g. 'sent' or 'added'
+ * @param okParam the query param set on success, e.g. 'sent' or 'added' — '1', or a notice code
  * @param failParam the query param set (to the failure code) on failure, e.g. 'se' or 'ce'
  * @param redirectField the raw value of the form's hidden `redirect` field
  * @param origin the request's own origin, for `safeRedirect`'s same-origin resolution
@@ -79,7 +85,12 @@ export function formResponder(
     return new Response(null, { status: 303, headers: { Location: target.pathname + target.search } })
   }
   return {
-    ok: () => redirectTo(okParam, '1'),
+    // The success param carries the outcome rather than a bare flag: '1' is
+    // "nothing to report", a code is "succeeded, with this to say". One
+    // param rather than two because a page that reads neither (the product
+    // page — see CLAUDE.md) stays unaffected either way, and two params
+    // would need clearing in pairs above.
+    ok: (notice) => redirectTo(okParam, notice ?? '1'),
     fail: (code) => redirectTo(failParam, code),
   }
 }

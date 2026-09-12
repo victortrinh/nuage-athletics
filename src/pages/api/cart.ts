@@ -20,6 +20,32 @@ export const prerender = false
  * initial props — or JSON for the hydrated path (ProductStage.tsx's `onBuy`).
  */
 
+/**
+ * A bound on the *input*, not a purchase policy — the distinction matters,
+ * because this number used to be mistaken for one.
+ *
+ * How many of a variant someone may buy is Shopify's answer and only
+ * Shopify's: it is the one place that knows the stock, it clamps a line to
+ * it on every mutation, and it says so in `Cart.adjustments`
+ * (src/lib/commerce/shopify.ts's `CART_WARNINGS`). This exists purely so a
+ * hand-rolled POST asking for 10^6 is refused before it reaches the
+ * Storefront API, and it sits far above any plausible order so that it
+ * never becomes the effective limit — the moment it does, it would be a
+ * limit nobody decided on, enforced here and nowhere near the hosted
+ * checkout this site hands off to.
+ *
+ * It was 10, applied per *request*, which enforced nothing at all: the buy
+ * band posts `quantity: 1`, so eleven presses of "Ajouter au panier" walked
+ * straight past it. Worse, `update` shared the bound, so a line that got
+ * above 10 that way could no longer be decremented — the cart page's "−"
+ * posts `quantity - 1`, which the schema then refused, leaving both
+ * steppers dead and removal the only way out. If a real per-customer limit
+ * is ever wanted, it belongs in Shopify (native per-checkout quantity
+ * limits, or a checkout-validation Function), where it also binds the
+ * checkout — not in this schema, where it binds only the polite path.
+ */
+const QUANTITY_SANITY_MAX = 99
+
 const AddBody = z.object({
   intent: z.literal('add'),
   // Either the catalogue variant id the hydrated island already resolved, or
@@ -31,13 +57,13 @@ const AddBody = z.object({
   variantId: z.string().optional(),
   fit: z.string().optional(),
   size: z.string().optional(),
-  quantity: z.coerce.number().int().min(1).max(10).default(1),
+  quantity: z.coerce.number().int().min(1).max(QUANTITY_SANITY_MAX).default(1),
   locale: z.string().refine(isLocale).catch(DEFAULT_LOCALE),
 })
 const UpdateBody = z.object({
   intent: z.literal('update'),
   lineId: z.string().min(1),
-  quantity: z.coerce.number().int().min(1).max(10),
+  quantity: z.coerce.number().int().min(1).max(QUANTITY_SANITY_MAX),
 })
 const RemoveBody = z.object({
   intent: z.literal('remove'),
@@ -53,6 +79,23 @@ function withCartCookies(res: Response, cart: Cart | null, secure: boolean): Res
     res.headers.append('Set-Cookie', cookie)
   }
   return res
+}
+
+/**
+ * What a successful mutation still has to tell the visitor.
+ *
+ * Shopify clamps a line to the stock it actually has and reports that as a
+ * *warning* on a mutation that otherwise succeeded (see `CART_WARNINGS` in
+ * src/lib/commerce/shopify.ts). Without this the route answers a bare `ok`
+ * to an add it only partly performed, the badge bumps, and the only trace
+ * is a quantity on the cart page that the visitor never chose.
+ *
+ * Undefined when there is nothing to say, which is the ordinary case.
+ */
+function noticeFor(cart: Cart): string | undefined {
+  const adjustment = cart.adjustments[0]
+  if (!adjustment) return undefined
+  return adjustment.code === 'out-of-stock' ? 'stock_gone' : 'stock_short'
 }
 
 /** `LiveCart.reason` is `'ok'` for both "here's the cart" and "Shopify no longer knows that id" — only anything else is a real Storefront failure worth naming on the wire. */
@@ -172,7 +215,7 @@ export const POST: APIRoute = async ({ request, url }) => {
 
       const { cart, reason } = await addToCart(cartId, merchandiseId, input.quantity)
       if (!cart) return withCartCookies(respond.fail(failureCode(reason), 502), null, secure)
-      return withCartCookies(respond.ok(), cart, secure)
+      return withCartCookies(respond.ok(noticeFor(cart)), cart, secure)
     }
 
     // update / remove both act on an existing line, which needs an existing cart.
@@ -189,7 +232,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         : await mutateCart(env, { intent: 'remove', cartId, lineId: input.lineId })
 
     if (!cart && reason !== 'ok') return withCartCookies(respond.fail(reason, 502), null, secure)
-    return withCartCookies(respond.ok(), cart, secure)
+    return withCartCookies(respond.ok(cart ? noticeFor(cart) : undefined), cart, secure)
   } catch (err) {
     console.error('cart operation failed', err)
     return respond.fail('cart_failed', 500)

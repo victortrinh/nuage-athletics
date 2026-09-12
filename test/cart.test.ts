@@ -160,7 +160,33 @@ function formContext(
 }
 
 async function readJson(res: Response) {
-  return (await res.json()) as { ok: boolean; code?: string }
+  return (await res.json()) as { ok: boolean; code?: string; notice?: string }
+}
+
+/**
+ * The same stub, but with Shopify clamping the add: it writes `available`
+ * rather than the quantity asked for and reports the difference as a
+ * warning on a mutation that otherwise succeeded — the 2024-10 shape. See
+ * `CART_WARNINGS` in src/lib/commerce/shopify.ts.
+ */
+function stubClampedAdd(available: number, code = 'MERCHANDISE_NOT_ENOUGH_STOCK') {
+  stubShopify({
+    NuageInventory: () => inventoryData(),
+    NuageCartCreate: () => ({
+      cartCreate: {
+        cart: rawCart([rawCartLine('gid://shopify/CartLine/1', MERCH_ID, available)]),
+        userErrors: [],
+        warnings: [{ target: 'gid://shopify/CartLine/1', code, message: 'Not enough stock' }],
+      },
+    }),
+    NuageCartLinesAdd: () => ({
+      cartLinesAdd: {
+        cart: rawCart([rawCartLine('gid://shopify/CartLine/1', MERCH_ID, available)]),
+        userErrors: [],
+        warnings: [{ target: 'gid://shopify/CartLine/1', code, message: 'Not enough stock' }],
+      },
+    }),
+  })
 }
 
 beforeEach(() => {
@@ -311,6 +337,101 @@ describe('POST /api/cart — update / remove', () => {
 
     expect(res.status).toBe(400)
     expect(await readJson(res)).toEqual({ ok: false, code: 'cart_gone' })
+  })
+})
+
+/*
+ * The stock ceiling, which is Shopify's and never this route's. The old
+ * `max(10)` looked like one and enforced nothing — the band posts
+ * `quantity: 1`, so repeated adds walked past it — while also making a line
+ * that got above 10 impossible to decrement. What replaces it is
+ * `QUANTITY_SANITY_MAX`, a bound on the input only, plus reporting whatever
+ * Shopify actually did with the request.
+ */
+describe('POST /api/cart — the stock ceiling is Shopify’s', () => {
+  it('answers ok, but says so, when Shopify clamped the line', async () => {
+    stubClampedAdd(2)
+    const cookie = await previewCookie()
+
+    const res = await POST(
+      jsonContext({ intent: 'add', fit: 'classic', size: 'M', quantity: 5, locale: 'fr-CA' }, cookie)
+    )
+
+    // The add succeeded and the cart really did change — it is not a failure.
+    expect(res.status).toBe(200)
+    expect(await readJson(res)).toEqual({ ok: true, notice: 'stock_short' })
+    // And the readable count is Shopify's number, not the 5 that was asked for.
+    expect(res.headers.getSetCookie().join('; ')).toContain(`${CART_COUNT_COOKIE}=2`)
+  })
+
+  it('tells nothing-left apart from not-enough-left', async () => {
+    stubClampedAdd(0, 'MERCHANDISE_OUT_OF_STOCK')
+    const cookie = await previewCookie()
+
+    const res = await POST(
+      jsonContext({ intent: 'add', fit: 'classic', size: 'M', quantity: 1, locale: 'fr-CA' }, cookie)
+    )
+
+    expect(await readJson(res)).toEqual({ ok: true, notice: 'stock_gone' })
+  })
+
+  it('folds the notice into the redirect for a no-JS submit', async () => {
+    stubClampedAdd(2)
+    const cookie = await previewCookie()
+
+    const res = await POST(
+      formContext(
+        { intent: 'add', fit: 'classic', size: 'M', quantity: '5', locale: 'fr-CA', redirect: '/' },
+        cookie
+      )
+    )
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/?added=stock_short')
+  })
+
+  it('stays silent on an ordinary add', async () => {
+    stubEverything()
+    const cookie = await previewCookie()
+
+    const res = await POST(
+      jsonContext({ intent: 'add', fit: 'classic', size: 'M', quantity: 1, locale: 'fr-CA' }, cookie)
+    )
+
+    expect(await readJson(res)).toEqual({ ok: true })
+  })
+
+  /*
+   * The regression the old shared `max(10)` caused: the cart page's "−"
+   * posts `line.quantity - 1`, so a line that repeated adds had pushed to 15
+   * posted 14, which the schema refused — leaving "+" disabled, "−" a 400,
+   * and removing the whole line the only way out.
+   */
+  it('lets a line above the old cap be decremented', async () => {
+    stubEverything([rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 15)])
+    const cookie = `${await previewCookie()}; ${CART_COOKIE}=${CART_ID}`
+
+    const res = await POST(
+      jsonContext({ intent: 'update', lineId: 'gid://shopify/CartLine/1', quantity: 14 }, cookie)
+    )
+
+    expect(res.status).toBe(200)
+    expect(await readJson(res)).toEqual({ ok: true })
+  })
+
+  it('still refuses a quantity no real order could carry', async () => {
+    stubEverything()
+    const cookie = await previewCookie()
+
+    const res = await POST(
+      jsonContext(
+        { intent: 'add', fit: 'classic', size: 'M', quantity: 1_000_000, locale: 'fr-CA' },
+        cookie
+      )
+    )
+
+    expect(res.status).toBe(400)
+    expect(await readJson(res)).toEqual({ ok: false, code: 'bad_request' })
   })
 })
 

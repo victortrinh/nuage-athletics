@@ -27,6 +27,20 @@ function errorMessage(d: Dict, code: string): string {
 }
 
 /**
+ * The other half: what to say when the add *worked* but Shopify wrote a
+ * different quantity than the one asked for — `noticeFor()` in
+ * `/api/cart.ts`, from `Cart.adjustments`. Empty for '1' (an ordinary
+ * success) and for anything unrecognised, since silence is the honest
+ * answer to a code this build doesn't know rather than a generic error for
+ * a request that succeeded.
+ */
+function noticeText(d: Dict, code: string | undefined): string {
+  if (code === 'stock_short') return d.cartStockShort
+  if (code === 'stock_gone') return d.cartStockGone
+  return ''
+}
+
+/**
  * The literal cookie name `/api/cart` just set (`CART_COUNT_COOKIE` in
  * src/lib/cart.ts) rather than an import from there: that module pulls in
  * `preview.ts`'s server-only db/crypto code through `readCookie`, which has
@@ -124,6 +138,11 @@ interface Props {
    * `initialErrorCode` for the pattern this mirrors.
    */
   initialErrorCode?: string
+  /**
+   * Same round-trip, success side: `added=<code>` from a no-JS submit. See
+   * `noticeText` above — '1' has nothing to say.
+   */
+  initialNoticeCode?: string
 }
 
 /**
@@ -177,10 +196,12 @@ export default function ProductStage(props: Props) {
   const [error, setError] = useState(() =>
     props.initialErrorCode ? errorMessage(d, props.initialErrorCode) : ''
   )
+  const [notice, setNotice] = useState(() => noticeText(d, props.initialNoticeCode))
 
   function onSizeChange(value: string) {
     setSize(value)
     setError('')
+    setNotice('')
   }
 
   /**
@@ -207,15 +228,20 @@ export default function ProductStage(props: Props) {
     }
     setLoading(true)
     setError('')
+    setNotice('')
     try {
       const res = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ intent: 'add', fit, size, quantity: 1, locale }),
       })
-      const data = (await res.json()) as { ok: boolean; code?: string }
+      const data = (await res.json()) as { ok: boolean; code?: string; notice?: string }
       if (data.ok) {
+        // The cart did change, so the badge bumps either way — but when
+        // Shopify clamped the line, saying so is the difference between a
+        // confirmation and a half-truth.
         bumpCartBadge(d)
+        setNotice(noticeText(d, data.notice))
         return
       }
       setError(errorMessage(d, data.code ?? ''))
@@ -229,7 +255,10 @@ export default function ProductStage(props: Props) {
   const sizesForFit = variants.filter((v) => v.options?.fit === fit)
   const selectedVariant = variants.find((v) => v.options?.fit === fit && v.options?.size === size)
 
-  const priceSlotIndex = error ? 1 : 0
+  // Error, then notice, then the price. An error and a notice can't both be
+  // live (each submit clears both first), so the order only sets which
+  // branch each state maps to.
+  const priceSlotIndex = error ? 1 : notice ? 2 : 0
   const actionSlotIndex = loading ? 1 : 0
   const sizeHintId = `size-hint-${productId}`
 
@@ -316,6 +345,15 @@ export default function ProductStage(props: Props) {
             <p className="font-mono text-xs text-mute">{price}</p>
             <p role="alert" className="font-mono text-xs text-danger">
               {error}
+            </p>
+            {/*
+              `status`, not `alert`: the add succeeded and the cart holds
+              something new — this reports what it holds, it doesn't
+              interrupt. Rides the same roller as the price and the error so
+              the band's height is untouched, per the note above.
+            */}
+            <p role="status" className="font-mono text-xs text-warn">
+              {notice}
             </p>
           </Slot>
 

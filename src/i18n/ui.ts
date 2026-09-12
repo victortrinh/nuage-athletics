@@ -148,6 +148,19 @@ export type Dict = {
   cartTotal: string
   cartDeferred: string
   cartCheckout: string
+  // A cart is not a hold. Shopify decrements inventory when a payment
+  // succeeds, not when a line is added, so two visitors can hold the last
+  // unit at once and the second finds out at checkout. Said out loud rather
+  // than left implied: CPA s. 54.4 wants availability terms disclosed before
+  // the distance contract forms, and this site hands off to Shopify's hosted
+  // checkout — so the cart page is the last surface we control.
+  cartNoHold: string
+  // Shopify had fewer than were asked for and clamped the line (stock_short)
+  // or had none left at all (stock_gone) — `Cart.adjustments`, surfaced by
+  // /api/cart.ts's noticeFor(). The add itself succeeded, so these are not
+  // errorCart* strings: they report what the cart now holds.
+  cartStockShort: string
+  cartStockGone: string
   errorCartGeneric: string
   // background sky effect
   skyPause: string
@@ -238,6 +251,10 @@ export const UI: Record<Locale, Dict> = {
     cartTotal: 'Total',
     cartDeferred: 'Calculé à la caisse',
     cartCheckout: 'Passer à la caisse',
+    cartNoHold:
+      "Ajouter un article au panier ne le réserve pas. La disponibilité n'est confirmée qu'au moment du paiement.",
+    cartStockShort: "Il n'en restait pas assez. La quantité a été ajustée à ce qui est disponible.",
+    cartStockGone: "Cet article s'est épuisé entre-temps.",
     errorCartGeneric: "Le panier n'a pas pu être mis à jour. Réessayez dans un moment.",
     skyPause: 'Figer le ciel',
     skyResume: 'Animer le ciel',
@@ -323,6 +340,10 @@ export const UI: Record<Locale, Dict> = {
     cartTotal: 'Total',
     cartDeferred: 'Calculated at checkout',
     cartCheckout: 'Checkout',
+    cartNoHold:
+      'Adding an item to your cart does not reserve it. Availability is confirmed only at payment.',
+    cartStockShort: "There weren't enough left. The quantity was adjusted to what's available.",
+    cartStockGone: 'This item sold out in the meantime.',
     errorCartGeneric: 'The cart could not be updated. Try again in a moment.',
     skyPause: 'Pause the sky',
     skyResume: 'Animate the sky',

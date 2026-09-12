@@ -70,9 +70,47 @@ export interface CartLine {
   linePrice: Money
 }
 
+/**
+ * An automatic change Shopify made to the cart while running a mutation —
+ * Shopify's own `CartWarning`, narrowed to the two codes that mean
+ * "inventory disagreed with what was asked for".
+ *
+ * This is deliberately not an error. Until Storefront API 2024-10 an
+ * over-stock add came back in a mutation's `userErrors`; since then Shopify
+ * moved it to a separate `warnings` field, on the grounds that the mutation
+ * *succeeded* — it just quietly wrote a different quantity than the one it
+ * was given. So there is no failure for `runCartMutation` to throw on, and
+ * without reading this the site would answer `ok` to an add it only
+ * partially performed. See the note on `CART_WARNINGS` in ./shopify.ts.
+ *
+ * Shopify emits other warning codes too (non-applicable discount codes,
+ * unavailable delivery options). They are dropped rather than carried here:
+ * this site has no discount or delivery-option UI for them to speak to, and
+ * a code with nowhere to render is a string that eventually gets rendered
+ * somewhere wrong.
+ */
+export type CartAdjustmentCode =
+  /** Shopify clamped the line to the quantity it actually had. */
+  | 'not-enough-stock'
+  /** Nothing was left at all. */
+  | 'out-of-stock'
+
+export interface CartAdjustment {
+  code: CartAdjustmentCode
+  /** The cart line Shopify changed — its `target`, ready for `cartLinesRemove`. */
+  lineId: string
+}
+
 export interface Cart {
   id: string
   lines: CartLine[]
+  /**
+   * What Shopify changed behind our back on the mutation that produced this
+   * cart. Always empty for a plain read (`getCart`): a warning describes a
+   * mutation, and reading the cart performs none. Required rather than
+   * optional so the one place that builds a `Cart` has to answer for it.
+   */
+  adjustments: CartAdjustment[]
   subtotal: Money
   /**
    * Shopify's own grand total (`cost.totalAmount`) — rendered as-is, never

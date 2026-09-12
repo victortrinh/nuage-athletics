@@ -114,6 +114,48 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    `Cache-Control`, so this is currently belt and braces — which is exactly why
    it must survive the day someone adds caching.
 
+5.7 **How many you may buy is Shopify's answer, and a cart is not a hold.**
+   There is no purchase limit in this codebase and there must not be one
+   that looks like a decision nobody made. `QUANTITY_SANITY_MAX`
+   (`src/pages/api/cart.ts`) bounds the *input* so a hand-rolled POST asking
+   for a million is refused before it reaches the Storefront API, and it
+   sits far above any plausible order precisely so it never becomes the
+   effective ceiling. It replaced a `max(10)` that was mistaken for a
+   policy and enforced nothing: the buy band posts `quantity: 1`, so
+   eleven presses walked past it, and because `update` shared the bound a
+   line that got above 10 that way could no longer be decremented at all
+   (the cart page's `−` posts `quantity - 1`, which the schema then
+   refused). A real per-customer limit belongs in Shopify — native
+   per-checkout quantity limits, or a checkout-validation Function — where
+   it also binds the hosted checkout this site hands off to.
+
+   The real ceiling is stock, which this site cannot see: `INVENTORY_QUERY`
+   asks for `availableForSale`, a boolean, not `quantityAvailable` (that
+   field needs the `unauthenticated_read_product_inventory` scope, which has
+   a long-standing Shopify bug where it reads as granted and still refuses —
+   check before planning anything on it). What we get instead is Shopify's
+   own account of what it did: since Storefront API 2024-10 an over-stock
+   add is **not** a `userError` but a `warning` on a mutation that
+   *succeeded*, carrying `MERCHANDISE_NOT_ENOUGH_STOCK` /
+   `MERCHANDISE_OUT_OF_STOCK`. So Shopify clamps the line to the stock it
+   had, answers 200 with no error, and the only trace is that field.
+   `CART_WARNINGS` (`src/lib/commerce/shopify.ts`) selects it on all four
+   mutations, `Cart.adjustments` carries it provider-neutrally, and
+   `noticeFor()` in `/api/cart.ts` turns it into a notice the band and the
+   cart page render — `respond.ok(notice)`, because the add did happen and
+   the cart did change. Drop any of that and the site answers a bare "added"
+   to an add it only partly performed. Warning codes about discounts and
+   delivery options are deliberately dropped, not carried: there is no UI
+   for them to speak to.
+
+   Because the cart holds nothing, `cartNoHold` says so under the checkout
+   button and both pre-contract pages carry an availability clause. Shopify
+   decrements inventory when a payment succeeds, not when a line is added,
+   so two visitors really can hold the last unit at once — CPA s. 54.4 wants
+   availability terms disclosed before the distance contract forms, and
+   checkout leaves this site. Plain text, never a `<details>`: a disclosure
+   nobody opens is one that wasn't made.
+
 6. **Every commercial email needs sender name, mailing address and unsubscribe.**
    See `SENDER_IDENTITY` in `src/lib/consent.ts`. CASL requires all three.
 
