@@ -2,7 +2,9 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { ROUTES, SIGNUP_PROMPT_ENABLED } from '../src/i18n/utils'
 import { E2E_PREVIEW_PASSWORD, NUDGE_DISMISSED } from '../playwright.config'
-import { SOLD_OUT, STUB_PRICE, STUB_CHECKOUT_HOST } from './storefront-stub'
+import { SOLD_OUT, STUB_PRICE, STUB_CHECKOUT_HOST, seedStubCart, soldOutSku } from './storefront-stub'
+import { CART_COOKIE, CART_COUNT_COOKIE } from '../src/lib/cart'
+import { BASE_URL } from '../playwright.config'
 import { LOCALES } from '../src/i18n/config'
 
 /**
@@ -990,6 +992,66 @@ test.describe('founder preview', () => {
     expect(
       await page.evaluate(() => (window as unknown as Record<string, unknown>).naNoReload)
     ).toBe(true)
+
+    await context.close()
+  })
+
+  /**
+   * The other half of "a cart is not a hold": the cart page re-checks
+   * availability on every render, so a line that sold out after it went in
+   * stops looking buyable here rather than on Shopify's hosted checkout,
+   * in wording we don't own, after the visitor has committed (#86).
+   *
+   * The line is planted rather than added through the buy band, because the
+   * band cannot produce this state and shouldn't be able to: `/api/cart`'s
+   * add re-resolves the variant against a live read and refuses anything
+   * out of stock. `seedStubCart()` makes the cart the way Shopify would
+   * have made it while the size was still there — see its own note.
+   *
+   * Checkout stays enabled, deliberately, and that is asserted too: this is
+   * a boolean cached ~15s, and disabling it would strand someone whose item
+   * is actually fine (CLAUDE.md 5.7).
+   */
+  test('the cart page marks a line that sold out after it was added, and warns before checkout', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ storageState: NUDGE_DISMISSED })
+    const page = await context.newPage()
+    // Preview first: the cart route is gated on commerceEnabled, same as the
+    // buy band, and the redirect that strips the secret sets the cookie.
+    await page.goto(`${ROUTES.home['fr-CA']}?preview=${E2E_PREVIEW_PASSWORD}`)
+
+    const cartId = await seedStubCart(soldOutSku())
+    await context.addCookies([
+      // httpOnly, exactly as /api/cart sets it — the id is a capability and
+      // never reaches client JS (src/lib/cart.ts).
+      { name: CART_COOKIE, value: cartId, url: BASE_URL, httpOnly: true },
+      { name: CART_COUNT_COOKIE, value: '1', url: BASE_URL },
+    ])
+
+    await page.goto(ROUTES.cart['fr-CA'])
+
+    // Three renderings of one fact, the same vocabulary the product page
+    // uses for a sold-out size: the strikethrough for the glance, the word
+    // for everyone (it is in the row's own text, not a hover tip), and the
+    // notice above the button that says what to do about it.
+    const row = page.locator('li', { hasText: SOLD_OUT.size })
+    await expect(row.getByText('Épuisé', { exact: true })).toBeVisible()
+    await expect(row.locator('span.line-through').first()).toHaveCSS(
+      'text-decoration-line',
+      'line-through'
+    )
+    await expect(page.getByText(/n'est plus disponible/)).toBeVisible()
+
+    // Shopify is still the authority on whether this order can happen.
+    const checkout = page.getByRole('button', { name: 'Passer à la caisse' })
+    await expect(checkout).toBeVisible()
+    await expect(checkout).toBeEnabled()
+
+    // And removing it is still possible — the flag never touched the
+    // steppers' accessible names, which name an action that works.
+    await page.getByRole('button', { name: /^Retirer/ }).click()
+    await expect(page.getByText(/Votre panier est vide/)).toBeVisible()
 
     await context.close()
   })

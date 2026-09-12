@@ -148,9 +148,21 @@ These look like arbitrary choices and are not. Do not "simplify" them.
    delivery options are deliberately dropped, not carried: there is no UI
    for them to speak to.
 
-   Because the cart holds nothing, `cartNoHold` says so under the checkout
-   button and both pre-contract pages carry an availability clause. Shopify
-   decrements inventory when a payment succeeds, not when a line is added,
+   Because a cart holds nothing, the cart page re-reads availability on
+   every render rather than trusting what was true at add time:
+   `panier.astro` / `en/cart.astro` call `getLiveProduct()` alongside
+   `readCart()`, and `CartView.astro` joins the two by SKU into
+   `soldOutSkus` — a line whose variant is gone is struck through, says
+   "Épuisé" in its own text, and puts `cartSoldOutNotice` above the
+   checkout button. That set holds only SKUs Shopify said were sold out, so
+   a null product (5.5 — outage, commerce off, no join) flags *nothing* and
+   the cart renders as it always did: an outage must never tell someone
+   their cart is gone. The button stays enabled on purpose — it is a
+   boolean cached ~15s, and disabling checkout on that would strand someone
+   whose item is fine — so this narrows the window rather than closing it,
+   and Shopify's checkout is still the authority. `cartNoHold` says so under
+   the checkout button and both pre-contract pages carry an availability
+   clause. Shopify decrements inventory when a payment succeeds, not when a line is added,
    so two visitors really can hold the last unit at once — CPA s. 54.4 wants
    availability terms disclosed before the distance contract forms, and
    checkout leaves this site. Plain text, never a `<details>`: a disclosure

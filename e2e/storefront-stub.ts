@@ -40,7 +40,7 @@ export const SOLD_OUT = { fit: 'classic', size: 'XXL' } as const
 /** The host Shopify's hosted checkout would live on, for asserting the buy flow hands off there. */
 export const STUB_CHECKOUT_HOST = 'stub-shop.example'
 
-function soldOutSku(): string {
+export function soldOutSku(): string {
   const variant = CATALOGUE['fr-CA'][0].variants.find(
     (v) => v.options?.fit === SOLD_OUT.fit && v.options?.size === SOLD_OUT.size
   )
@@ -220,6 +220,43 @@ const server = createServer((req, res) => {
     res.end(JSON.stringify({ data: handle(body.variables ?? {}) }))
   })
 })
+
+/**
+ * Creates a cart in the stub holding one line of `sku`, and answers with its
+ * id — ready to be planted in a browser context's `na_cart` cookie.
+ *
+ * This exists for the one state the site's own add path cannot produce, by
+ * design: a line whose variant is sold out. `/api/cart`'s `add` intent
+ * re-resolves the variant against a live read and refuses anything that
+ * isn't in stock (`resolveMerchandiseId`), which is correct — the case being
+ * tested is a line that was buyable when it went in and isn't any more, and
+ * this stub's inventory is fixed for the run (see the note at the top of
+ * this file on why it does not fail or change on command).
+ *
+ * So the cart is made the way Shopify would have made it before the stock
+ * ran out — through the same `cartCreate` the adapter calls, with no
+ * availability check of its own, exactly as the real Storefront API has
+ * none. No new stub state: a cart per caller is what every cart-flow test
+ * already creates.
+ */
+export async function seedStubCart(sku: string, quantity = 1): Promise<string> {
+  const res = await fetch(`http://127.0.0.1:${STOREFRONT_STUB_PORT}/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Storefront-Access-Token': STOREFRONT_STUB_TOKEN,
+    },
+    body: JSON.stringify({
+      // Routed on the operation name, same as every call the adapter makes.
+      query: 'mutation NuageCartCreate { cartCreate { cart { id } } }',
+      variables: { merchandiseId: merchandiseId(sku), quantity },
+    }),
+  })
+  const body = (await res.json()) as { data?: { cartCreate?: { cart?: { id?: string } } } }
+  const id = body.data?.cartCreate?.cart?.id
+  if (!id) throw new Error(`stub: could not seed a cart for ${sku}`)
+  return id
+}
 
 // playwright.config.ts imports the port and token from here so the two ends
 // of the wiring can't drift; only running this file as a script starts it.

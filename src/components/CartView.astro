@@ -5,7 +5,7 @@ import { buttonVariants } from './ui/button-variants.ts'
 import { formatPrice, catalogueVariantBySku, editorialFor } from '../lib/catalogue.ts'
 import { cn } from './ui/cn.ts'
 import type { Locale } from '../i18n/config'
-import type { Cart, CartLine } from '../lib/commerce/types'
+import type { Cart, CartLine, Product } from '../lib/commerce/types'
 
 /**
  * The cart body, shared by `src/pages/panier.astro` and
@@ -28,6 +28,18 @@ import type { Cart, CartLine } from '../lib/commerce/types'
 interface Props {
   locale: Locale
   cart: Cart | null
+  /**
+   * The product as Shopify has it right now — the same read that prices the
+   * product page (`getLiveProduct`), passed in by the two cart pages. Only
+   * its per-variant availability is used here: a line whose variant sold
+   * out since it was added has to stop looking buyable, rather than looking
+   * ordinary until Shopify's own checkout refuses it on a page we don't
+   * control (#86).
+   *
+   * Null on every Storefront failure (5.5), and null must mean "render the
+   * cart exactly as before" — see `soldOutSkus`.
+   */
+  live: Product | null
   errorCode?: string
   /**
    * The success-path code `/api/cart.ts` folded into the redirect — '1' for
@@ -37,7 +49,7 @@ interface Props {
   noticeCode?: string
 }
 
-const { locale, cart, errorCode, noticeCode } = Astro.props
+const { locale, cart, live, errorCode, noticeCode } = Astro.props
 const d = t(locale)
 
 const errorMessage = errorCode === 'sold_out' ? d.errorSoldOut : errorCode ? d.errorCartGeneric : null
@@ -54,6 +66,26 @@ const noticeMessage =
     : noticeCode === 'stock_gone'
       ? d.cartStockGone
       : null
+
+/**
+ * The SKUs Shopify says are no longer for sale, joined to the cart by the
+ * same `line.sku` `lineDisplay()` already uses for the thumbnail.
+ *
+ * A set of *sold-out* SKUs, deliberately, rather than a lookup of
+ * availability: everything this page doesn't know has to fall on the side
+ * of saying nothing. A null `live` — commerce off, Shopify unreachable, an
+ * unconfigured store, a SKU that never joined (5.5) — leaves this empty and
+ * the cart renders exactly as it did before, because an outage telling
+ * someone their cart is gone would be worse than the stale confidence this
+ * fixes. A blank or unjoined SKU is the same case, one line at a time.
+ *
+ * The read is cached ~15s, so this narrows the window rather than closing
+ * it. Shopify's checkout stays the authority; the goal is only that this
+ * page stops looking confident when we already know better.
+ */
+const soldOutSkus = new Set((live?.variants ?? []).filter((v) => !v.inStock).map((v) => v.sku))
+const soldOutLine = (line: CartLine) => !!line.sku && soldOutSkus.has(line.sku)
+const hasSoldOutLine = cart?.lines.some(soldOutLine) ?? false
 
 const cartPath = route('cart', locale)
 const productPath = route('home', locale)
@@ -150,6 +182,7 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
               const display = lineDisplay(line)
               const label = lineAccessibleLabel(line, display)
               const atFloor = line.quantity <= 1
+              const soldOut = soldOutLine(line)
               return (
                 <li class="flex gap-4 py-5">
                   {display.thumb && (
@@ -165,7 +198,11 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
                   )}
                   <div class="min-w-0 flex-1 space-y-1.5">
                     <div class="flex items-baseline justify-between gap-3">
-                      <span class="truncate">{display.code}</span>
+                      {/* Struck through and dimmed, the same treatment
+                          `radio-group.tsx` gives a sold-out size on the
+                          product page (`data-[disabled]`) — one vocabulary
+                          for one fact, in both places it can be said. */}
+                      <span class={cn('truncate', soldOut && 'text-mute line-through')}>{display.code}</span>
                       <span class="shrink-0 tabular-nums">
                         <span class="sr-only">{d.cartLineTotal}: </span>
                         {formatPrice(line.linePrice, locale)}
@@ -183,6 +220,21 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
                         <span>{display.sizeLabel}</span>
                       </div>
                     )}
+                    {/*
+                      And the word itself, visibly, in the row's own text —
+                      so it is in what a screen reader reads down the list
+                      as well as what a sighted visitor sees, and neither
+                      has to infer "sold out" from a line through a product
+                      code. The product page says it in a hover tip instead
+                      because seven sizes in a seven-column grid have no
+                      room for it; a list row does.
+
+                      Not folded into the steppers' accessible names
+                      (`lineAccessibleLabel`): those name an action that
+                      still works — removing this line is exactly what
+                      someone reading this should be able to do.
+                    */}
+                    {soldOut && <p class="text-warn">{d.cartLineSoldOut}</p>}
                     <div class="flex items-center justify-between">
                       <span class="text-mute">{d.cartQty}</span>
                       <div class="flex items-center gap-3">
@@ -258,6 +310,27 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
               <dd class="tabular-nums">{formatPrice(cart.total, locale)}</dd>
             </div>
           </dl>
+
+          {/*
+            Above the button, because this is the last point at which it is
+            still our page saying it: without this, a sold-out line rides a
+            normal-looking checkout button to Shopify's hosted page, and the
+            bad news breaks there — in wording we don't own, after the
+            visitor has committed to buying.
+
+            The button stays enabled on purpose. This is a boolean read
+            cached ~15s (5.7 — `availableForSale`, never a count), and
+            disabling checkout on it would strand someone whose item is
+            actually fine; Shopify claims a unit at payment and remains the
+            authority on whether this order can happen. Saying what we know
+            is the part that was missing, not taking the decision away.
+
+            No `role="status"`: nothing just happened, and a live region
+            inside `#cart-body` is replaced wholesale by the hydrated swap,
+            which announces nothing (see `#cart-status` above). The line's
+            own strikethrough and word carry it in the summary either way.
+          */}
+          {hasSoldOutLine && <p class="mt-6 text-sm text-warn">{d.cartSoldOutNotice}</p>}
 
           <form method="POST" action="/api/cart" class="mt-6">
             <input type="hidden" name="intent" value="checkout" />
