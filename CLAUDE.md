@@ -346,6 +346,13 @@ of us to see the real buy flow on the real site before it opens.
   drawer, and a line directly under the buy button — that last link matters
   for CPA s. 54.4, which wants the disclosure presented before the distance
   contract forms, and checkout hands off to Shopify's hosted page from here.
+  The frame still sizes and caps the photo itself — none of that math
+  changed — but the slide is clipped to the page's width, not the frame's:
+  `ProductCarousel.tsx` measures the page and centres a wider clip layer
+  on the frame, so paging moves the photo all the way across the viewport
+  instead of stopping at the frame's own edge. The prev/next arrows sit
+  above that layer (`relative z-10`), which is what keeps them clickable
+  once it extends past them.
 - **Coming back from checkout costs exactly one Storefront read, and the
   rest of the return trip is Shopify's to configure.** The purchase happens
   on Shopify's hosted page: the cart becomes an order there, and this site
@@ -370,13 +377,6 @@ of us to see the real buy flow on the real site before it opens.
   Shopify-admin fix (redirect or unpublish that channel's theme, or make the
   storefront domain the store's primary one), not a code one; don't spend an
   afternoon looking for the API that sets it.
-  The frame still sizes and caps the photo itself — none of that math
-  changed — but the slide is clipped to the page's width, not the frame's:
-  `ProductCarousel.tsx` measures the page and centres a wider clip layer
-  on the frame, so paging moves the photo all the way across the viewport
-  instead of stopping at the frame's own edge. The prev/next arrows sit
-  above that layer (`relative z-10`), which is what keeps them clickable
-  once it extends past them.
 - **The sky is allowed to stop; it is never allowed to leave a white page.**
   `sky/engine.ts` walks a degrade ladder and eventually gives up (hiding the
   canvas, dropping the GL context, recording `na-sky-gaveup`), and three rules
