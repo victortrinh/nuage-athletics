@@ -3,7 +3,15 @@ import type { Locale } from '../../i18n/config'
 // node, which resolves nothing for you.
 import { getCatalogueProduct } from '../catalogue.ts'
 import { hmacBase64, timingSafeEqual } from '../crypto.ts'
-import type { Cart, CartLine, Money, Product, ProductVariant } from './types'
+import type {
+  Cart,
+  CartAdjustment,
+  CartAdjustmentCode,
+  CartLine,
+  Money,
+  Product,
+  ProductVariant,
+} from './types'
 
 /**
  * Shopify Storefront API, read side.
@@ -320,10 +328,34 @@ const CART_FRAGMENT = `fragment NuageCart on Cart {
   }
 }`
 
+/**
+ * Every cart mutation asks for this beside its `userErrors`.
+ *
+ * Shopify moved inventory problems *out* of `userErrors` in Storefront API
+ * 2024-10 and into `warnings`: a `userError` means the mutation failed,
+ * while a warning means it succeeded and Shopify silently changed the cart
+ * to fit — clamping a line to the stock it actually had, or emptying it. So
+ * a store with two left, asked for five, answers 200 with no error at all
+ * and a line of two. Not selecting this field is how the site ends up
+ * telling a visitor "added" and showing them a quantity they never chose.
+ *
+ * `target` is the affected line's id. Shopify intends it as input to
+ * `cartLinesRemove`; here it just says which line to talk about.
+ *
+ * Worth knowing before trusting the clamp itself: Shopify's own behaviour
+ * here is buggy on lines that aren't the cart's first
+ * (Shopify/storefront-api-feedback#186 — quantity set to 0 instead of
+ * clamped, acknowledged 2023, still open). The warning is reliable; the
+ * resulting quantity is Shopify's to state, which is why `parseCart` reads
+ * it back off the response rather than assuming the requested number.
+ */
+const CART_WARNINGS = `warnings { target code message }`
+
 const CART_CREATE = `${CART_FRAGMENT}
 mutation NuageCartCreate($merchandiseId: ID!, $quantity: Int!) {
   cartCreate(input: { lines: [{ merchandiseId: $merchandiseId, quantity: $quantity }] }) {
     cart { ...NuageCart }
+    ${CART_WARNINGS}
     userErrors { field message }
   }
 }`
@@ -332,6 +364,7 @@ const CART_LINES_ADD = `${CART_FRAGMENT}
 mutation NuageCartLinesAdd($cartId: ID!, $merchandiseId: ID!, $quantity: Int!) {
   cartLinesAdd(cartId: $cartId, lines: [{ merchandiseId: $merchandiseId, quantity: $quantity }]) {
     cart { ...NuageCart }
+    ${CART_WARNINGS}
     userErrors { field message }
   }
 }`
@@ -340,6 +373,7 @@ const CART_LINES_UPDATE = `${CART_FRAGMENT}
 mutation NuageCartLinesUpdate($cartId: ID!, $lineId: ID!, $quantity: Int!) {
   cartLinesUpdate(cartId: $cartId, lines: [{ id: $lineId, quantity: $quantity }]) {
     cart { ...NuageCart }
+    ${CART_WARNINGS}
     userErrors { field message }
   }
 }`
@@ -348,6 +382,7 @@ const CART_LINES_REMOVE = `${CART_FRAGMENT}
 mutation NuageCartLinesRemove($cartId: ID!, $lineId: ID!) {
   cartLinesRemove(cartId: $cartId, lineIds: [$lineId]) {
     cart { ...NuageCart }
+    ${CART_WARNINGS}
     userErrors { field message }
   }
 }`
@@ -385,8 +420,20 @@ interface RawCart {
   }
 }
 
+interface RawWarning {
+  target?: string | null
+  code?: string | null
+  message?: string | null
+}
+
 interface CartMutationResponse {
-  [key: string]: { cart: RawCart | null; userErrors?: { field?: string[]; message: string }[] } | undefined
+  [key: string]:
+    | {
+        cart: RawCart | null
+        warnings?: RawWarning[]
+        userErrors?: { field?: string[]; message: string }[]
+      }
+    | undefined
 }
 
 interface CartQueryResponse {
@@ -409,7 +456,34 @@ function money(amount: string | undefined, context: string): number {
   return cents
 }
 
-function parseCart(raw: RawCart): Cart {
+/**
+ * Shopify's warning codes, narrowed to the two this site can say something
+ * about. Anything else — a discount code that didn't apply, a delivery
+ * option that vanished — is dropped: see the note on `CartAdjustment`.
+ * Logged rather than silently swallowed, because a new inventory-shaped code
+ * appearing in a future API version should be a line in the Worker log, not
+ * a quantity nobody was told about.
+ */
+const ADJUSTMENT_CODES: Record<string, CartAdjustmentCode> = {
+  MERCHANDISE_NOT_ENOUGH_STOCK: 'not-enough-stock',
+  MERCHANDISE_OUT_OF_STOCK: 'out-of-stock',
+}
+
+/** Only the codes above, and only the ones naming a line. */
+function parseAdjustments(warnings: RawWarning[] | undefined): CartAdjustment[] {
+  const adjustments: CartAdjustment[] = []
+  for (const warning of warnings ?? []) {
+    const code = warning.code ? ADJUSTMENT_CODES[warning.code] : undefined
+    if (!code) {
+      if (warning.code) console.error(`storefront: unhandled cart warning ${warning.code}`)
+      continue
+    }
+    adjustments.push({ code, lineId: warning.target ?? '' })
+  }
+  return adjustments
+}
+
+function parseCart(raw: RawCart, warnings?: RawWarning[]): Cart {
   const lines: CartLine[] = []
   for (const line of raw.lines?.nodes ?? []) {
     const merchandiseId = line.merchandise?.id
@@ -441,6 +515,7 @@ function parseCart(raw: RawCart): Cart {
   return {
     id: raw.id,
     checkoutUrl: raw.checkoutUrl,
+    adjustments: parseAdjustments(warnings),
     subtotal: { amount: money(raw.cost?.subtotalAmount?.amount, `cart ${raw.id} subtotal`), currency: 'CAD' },
     total: { amount: money(raw.cost?.totalAmount?.amount, `cart ${raw.id} total`), currency: 'CAD' },
     // Not run through money(): an absent totalTaxAmount means "no tax
@@ -459,8 +534,13 @@ function parseCart(raw: RawCart): Cart {
  * Null covers exactly one thing: Shopify no longer recognises the cart id
  * (past its own ~10-day TTL, or already turned into a completed order) —
  * that's not this file's error to raise, it reads as an empty cart and the
- * caller clears the cookie. `userErrors` on a cart Shopify *did* find (an
- * out-of-stock line, a bad quantity) is a real refusal and throws.
+ * caller clears the cookie. `userErrors` on a cart Shopify *did* find (a
+ * merchandise id it doesn't know, a malformed quantity) is a real refusal
+ * and throws.
+ *
+ * Inventory is *not* one of those refusals, and hasn't been since 2024-10 —
+ * it arrives as a `warning` on an otherwise successful mutation and rides
+ * out on `Cart.adjustments`. See `CART_WARNINGS` above.
  */
 async function runCartMutation(
   config: StorefrontConfig,
@@ -477,7 +557,7 @@ async function runCartMutation(
       'cart-user-error'
     )
   }
-  return parseCart(result.cart)
+  return parseCart(result.cart, result.warnings)
 }
 
 export interface StorefrontSource {
@@ -575,7 +655,7 @@ export function createShopifyStorefront(config: StorefrontConfig): StorefrontSou
       if (!result?.cart) {
         throw new StorefrontError('shopify storefront: cartCreate returned no cart', 'cart-user-error')
       }
-      return parseCart(result.cart)
+      return parseCart(result.cart, result.warnings)
     },
 
     addLine(cartId, merchandiseId, quantity) {

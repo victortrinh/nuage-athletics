@@ -326,9 +326,10 @@ function rawCart(
 function cartMutationResponse(
   operation: string,
   cart: ReturnType<typeof rawCart> | null,
-  userErrors: { field?: string[]; message: string }[] = []
+  userErrors: { field?: string[]; message: string }[] = [],
+  warnings: { target?: string; code?: string; message?: string }[] = []
 ) {
-  return new Response(JSON.stringify({ data: { [operation]: { cart, userErrors } } }), {
+  return new Response(JSON.stringify({ data: { [operation]: { cart, userErrors, warnings } } }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   })
@@ -360,6 +361,7 @@ describe('cart operations', () => {
     expect(cart).toEqual({
       id: CART_ID,
       checkoutUrl: `https://nuage-test.myshopify.com/cart/c/c1`,
+      adjustments: [],
       subtotal: { amount: 6500, currency: 'CAD' },
       total: { amount: 6500, currency: 'CAD' },
       tax: null,
@@ -457,10 +459,12 @@ describe('cart operations', () => {
     expect(reason).toBe('ok')
   })
 
-  it('throws on a real refusal — an out-of-stock line — rather than treating it as gone', async () => {
+  it('throws on a real refusal — a merchandise id Shopify rejects — rather than treating it as gone', async () => {
     const existing = rawCart(CART_ID, [])
     stubStorefront(() =>
-      cartMutationResponse('cartLinesAdd', existing, [{ message: 'Not enough stock' }])
+      cartMutationResponse('cartLinesAdd', existing, [
+        { message: 'The merchandise with id … does not exist' },
+      ])
     )
 
     const { cart, reason, detail } = await mutateCart(ENV, {
@@ -473,6 +477,106 @@ describe('cart operations', () => {
     expect(cart).toBeNull()
     expect(reason).toBe('unreachable')
     expect(detail).toBe('cart-user-error')
+  })
+
+  /*
+   * The 2024-10 split, which is the whole reason `Cart.adjustments` exists:
+   * Shopify stopped putting inventory problems in `userErrors` and started
+   * reporting them as warnings on a mutation that *succeeded*. So the
+   * request looks entirely clean — 200, no errors, a real cart back — and
+   * the only trace of "we gave you two of the five you asked for" is this
+   * field. Nothing above throws, and nothing should: the add did happen.
+   */
+  it('carries a clamped line out as an adjustment, not an error', async () => {
+    const line = rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 2)
+    stubStorefront(() =>
+      cartMutationResponse(
+        'cartLinesAdd',
+        rawCart(CART_ID, [line]),
+        [],
+        [
+          {
+            target: 'gid://shopify/CartLine/1',
+            code: 'MERCHANDISE_NOT_ENOUGH_STOCK',
+            message: 'Not enough stock',
+          },
+        ]
+      )
+    )
+
+    const { cart, reason } = await mutateCart(ENV, {
+      intent: 'add',
+      cartId: CART_ID,
+      merchandiseId: MERCH_ID,
+      quantity: 5,
+    })
+
+    expect(reason).toBe('ok')
+    expect(cart?.adjustments).toEqual([
+      { code: 'not-enough-stock', lineId: 'gid://shopify/CartLine/1' },
+    ])
+    // Shopify's own number, read back off the response — never the 5 asked for.
+    expect(cart?.lines[0].quantity).toBe(2)
+  })
+
+  it('distinguishes nothing left from not enough left', async () => {
+    stubStorefront(() =>
+      cartMutationResponse(
+        'cartLinesAdd',
+        rawCart(CART_ID, []),
+        [],
+        [{ target: 'gid://shopify/CartLine/9', code: 'MERCHANDISE_OUT_OF_STOCK' }]
+      )
+    )
+
+    const { cart } = await mutateCart(ENV, {
+      intent: 'add',
+      cartId: CART_ID,
+      merchandiseId: MERCH_ID,
+      quantity: 1,
+    })
+
+    expect(cart?.adjustments).toEqual([
+      { code: 'out-of-stock', lineId: 'gid://shopify/CartLine/9' },
+    ])
+  })
+
+  /*
+   * Shopify emits warnings for things this site has no UI for — a discount
+   * code that didn't apply, a delivery option that vanished. Carrying those
+   * would mean a code with nowhere to render, which eventually renders
+   * somewhere wrong. Dropped, and the cart is otherwise untouched.
+   */
+  it('drops a warning code it has nothing to say about', async () => {
+    const line = rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 1)
+    stubStorefront(() =>
+      cartMutationResponse(
+        'cartLinesUpdate',
+        rawCart(CART_ID, [line]),
+        [],
+        [{ target: 'gid://shopify/Cart/c1', code: 'DISCOUNT_CODE_NOT_APPLICABLE' }]
+      )
+    )
+
+    const { cart, reason } = await mutateCart(ENV, {
+      intent: 'update',
+      cartId: CART_ID,
+      lineId: 'gid://shopify/CartLine/1',
+      quantity: 1,
+    })
+
+    expect(reason).toBe('ok')
+    expect(cart?.adjustments).toEqual([])
+  })
+
+  /* A read performs no mutation, so there is nothing for it to warn about. */
+  it('reports no adjustments for a plain read', async () => {
+    const line = rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 1)
+    stubStorefront(() => cartQueryResponse(rawCart(CART_ID, [line])))
+
+    const { cart } = await readCart(ENV, CART_ID)
+
+    expect(cart?.adjustments).toEqual([])
   })
 
   it('fails open on a Storefront outage the same way getLiveProduct does', async () => {

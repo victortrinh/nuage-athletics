@@ -29,18 +29,46 @@ interface Props {
   locale: Locale
   cart: Cart | null
   errorCode?: string
+  /**
+   * The success-path code `/api/cart.ts` folded into the redirect — '1' for
+   * an ordinary success, or a notice saying Shopify changed what was asked
+   * for. See `noticeFor()` there.
+   */
+  noticeCode?: string
 }
 
-const { locale, cart, errorCode } = Astro.props
+const { locale, cart, errorCode, noticeCode } = Astro.props
 const d = t(locale)
 
 const errorMessage = errorCode === 'sold_out' ? d.errorSoldOut : errorCode ? d.errorCartGeneric : null
 
+/**
+ * Not an error, and rendered as its own line rather than through
+ * `errorMessage`: the mutation succeeded and the cart really did change —
+ * just not by as much as was asked for. '1' is the ordinary success and has
+ * nothing to say.
+ */
+const noticeMessage =
+  noticeCode === 'stock_short'
+    ? d.cartStockShort
+    : noticeCode === 'stock_gone'
+      ? d.cartStockGone
+      : null
+
 const cartPath = route('cart', locale)
 const productPath = route('home', locale)
 
-/** Shopify caps a line at whatever inventory allows; 10 matches the cap `/api/cart.ts`'s zod schema enforces on both `add` and `update`. */
-const MAX_QUANTITY = 10
+/**
+ * Mirrors `QUANTITY_SANITY_MAX` in `/api/cart.ts` — the input bound, so "+"
+ * never posts a quantity the schema would refuse.
+ *
+ * It is not a purchase limit and must not be read as one: the real ceiling
+ * is whatever stock Shopify has, which this page cannot see (we ask for
+ * `availableForSale`, a boolean, not `quantityAvailable`). Shopify clamps
+ * the line to its own number and says so, and that is what `noticeMessage`
+ * above renders. This constant only keeps the button from posting nonsense.
+ */
+const MAX_QUANTITY = 99
 
 /**
  * A cart line, resolved back to the catalogue by SKU for its thumbnail, fit
@@ -93,6 +121,14 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
       errorMessage && (
         <p role="alert" class="mt-4 text-center text-sm text-danger">
           {errorMessage}
+        </p>
+      )
+    }
+
+    {
+      noticeMessage && (
+        <p role="status" class="mt-4 text-center text-sm text-warn">
+          {noticeMessage}
         </p>
       )
     }
@@ -230,6 +266,16 @@ function lineAccessibleLabel(line: CartLine, display: ReturnType<typeof lineDisp
               {d.cartCheckout}
             </button>
           </form>
+
+          {/*
+            Under the button, before the hand-off: a cart is not a hold, and
+            this is the last surface this site controls before Shopify's
+            hosted checkout takes over. Plain text, not a <details> — a
+            disclosure nobody opens is one that wasn't made (the same
+            reasoning that moved the CPA pre-contract information out of a
+            closed <details> and onto its own route).
+          */}
+          <p class="mt-4 text-xs leading-relaxed text-mute">{d.cartNoHold}</p>
         </>
       )
     }

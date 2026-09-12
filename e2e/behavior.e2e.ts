@@ -959,6 +959,16 @@ test.describe('founder preview', () => {
     const qty = page.locator('[data-cart-qty]')
     await expect(qty).toHaveText('1')
 
+    /*
+     * A cart is not a hold, and this is the last surface the site controls
+     * before Shopify's hosted checkout — so the disclosure has to be on the
+     * page, not behind a toggle. Asserted here rather than in the axe scan
+     * because axe cannot know whether a required statement is present, only
+     * that whatever is present is markup-valid. Quoted loosely (the sentence
+     * is copy and will be edited); "ne le réserve pas" is the claim itself.
+     */
+    await expect(page.getByText(/ne le réserve pas/)).toBeVisible()
+
     const increase = page.getByRole('button', { name: /^Augmenter la quantité/ })
     const decrease = page.getByRole('button', { name: /^Diminuer la quantité/ })
 
@@ -1014,10 +1024,13 @@ test.describe('founder preview', () => {
       .click({ force: true })
     await page.getByRole('button', { name: 'Ajouter au panier', exact: true }).click({ force: true })
 
-    // The native POST 303s back here with added=1 — /api/cart still sets it,
-    // but ProductView.astro no longer reads it into anything: the button's
-    // ordinary idle label is in the very first (and, with no JS, only)
-    // render, same as a fresh visit.
+    // The native POST 303s back here with added=1 — '1' meaning the add went
+    // through with nothing to report, which is the whole of what
+    // ProductView.astro renders for it: the button's ordinary idle label, in
+    // the very first (and, with no JS, only) render, same as a fresh visit.
+    // The param does carry a notice code when Shopify clamped the line
+    // (`noticeFor()` in /api/cart.ts), which the band then does render — the
+    // stub keeps enough stock that this add is the plain case.
     await expect(page).toHaveURL(/\?added=1$/)
     await expect(page.getByRole('button', { name: 'Ajouter au panier', exact: true })).toBeVisible()
 
@@ -1029,9 +1042,10 @@ test.describe('founder preview', () => {
     await expect(page.locator('[data-cart-qty]')).toHaveText('1')
     await page.getByRole('button', { name: /^Augmenter la quantité/ }).click({ force: true })
 
-    // `added=1` because /api/cart's form responder folds every success into
-    // that one param (src/lib/form-endpoint.ts), whichever intent it was;
-    // the cart page reads nothing out of it.
+    // `added=1` because /api/cart's form responder folds success into that
+    // one param (src/lib/form-endpoint.ts), whichever intent it was — '1'
+    // for an untroubled one, a notice code when Shopify changed what was
+    // asked for, which is what the cart page reads it for.
     await expect(page).toHaveURL(new RegExp(`${ROUTES.cart['fr-CA']}\\?added=1$`))
     await expect(page.locator('[data-cart-qty]')).toHaveText('2')
 

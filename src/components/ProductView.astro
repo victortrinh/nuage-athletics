@@ -52,11 +52,19 @@ const initialFit: FitId = (FIT_IDS as readonly string[]).includes(requestedFit ?
  * string by its 303 redirect (`ce=<code>`) — read back here and passed into
  * ProductStage as `initialErrorCode` so the server render and the first
  * client render agree, same pattern as SignupForm.tsx's own
- * `initialErrorCode`. The success half (`added=1`) is still set by
- * /api/cart's redirect but isn't read back into anything — the band simply
- * renders its ordinary idle state, same as a fresh visit.
+ * `initialErrorCode`.
  */
 const errorCode = Astro.url.searchParams.get('ce') ?? undefined
+
+/**
+ * The success half. `added=1` still means "nothing to report" and renders
+ * the ordinary idle band, exactly as a fresh visit does — but it now also
+ * carries `/api/cart`'s notice codes, which do have something to report:
+ * Shopify had fewer than were asked for and clamped the line. A no-JS
+ * submit lands back here and this is its only chance to be told, so unlike
+ * the bare flag this one is read back into the band.
+ */
+const noticeCode = Astro.url.searchParams.get('added') ?? undefined
 
 /**
  * No price is rendered while commerce is off, and structured data follows
@@ -254,6 +262,7 @@ const jsonLd = live
             precontractHref={route('precontract', locale)}
             redirectTo={Astro.url.pathname + Astro.url.search}
             initialErrorCode={errorCode}
+            initialNoticeCode={noticeCode}
           />
           {/* Images are content, not chrome — the carousel needs JS to page
               through them, but every photo still has to reach a no-JS

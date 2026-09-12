@@ -44,8 +44,14 @@ if (live && live.reason !== 'ok') {
 }
 
 const errorCode = Astro.url.searchParams.get('ce') ?? undefined
+// The success param carries '1' for an ordinary success, or a notice code
+// when Shopify changed what was asked for — see `noticeFor()` in
+// src/pages/api/cart.ts. Read here so a no-JS stepper submit renders it
+// server-side, which is also what the hydrated swap picks up: that fetch
+// follows the same 303 and gets this same render back.
+const noticeCode = Astro.url.searchParams.get('added') ?? undefined
 ---
 
 <Base {locale} routeId="cart" title={d.cartTitle} description={d.cartTitle}>
-  <CartView {locale} {cart} {errorCode} />
+  <CartView {locale} {cart} {errorCode} {noticeCode} />
 </Base>
