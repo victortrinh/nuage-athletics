@@ -161,6 +161,17 @@ export type Dict = {
   // errorCart* strings: they report what the cart now holds.
   cartStockShort: string
   cartStockGone: string
+  // A line whose variant Shopify no longer sells, found by the cart page's
+  // own availability read (getLiveProduct, joined by SKU) rather than
+  // reported by a mutation — so unlike cartStock* above, nothing just
+  // happened; this is standing state the page had already been hiding.
+  // cartLineSoldOut is the word on the line itself, the cart's spelling of
+  // productOutOfStock; cartSoldOutNotice sits above the checkout button,
+  // which deliberately stays enabled — the read is ~15s cached and
+  // Shopify's checkout is still the authority, so this says what we already
+  // know instead of blocking someone on a stale boolean.
+  cartLineSoldOut: string
+  cartSoldOutNotice: string
   errorCartGeneric: string
   // background sky effect
   skyPause: string
@@ -255,6 +266,9 @@ export const UI: Record<Locale, Dict> = {
       "Ajouter un article au panier ne le réserve pas. La disponibilité n'est confirmée qu'au moment du paiement.",
     cartStockShort: "Il n'en restait pas assez. La quantité a été ajustée à ce qui est disponible.",
     cartStockGone: "Cet article s'est épuisé entre-temps.",
+    cartLineSoldOut: 'Épuisé',
+    cartSoldOutNotice:
+      "Un article de votre panier n'est plus disponible. Retirez-le avant de passer à la caisse, qui le refuserait autrement.",
     errorCartGeneric: "Le panier n'a pas pu être mis à jour. Réessayez dans un moment.",
     skyPause: 'Figer le ciel',
     skyResume: 'Animer le ciel',
@@ -344,6 +358,9 @@ export const UI: Record<Locale, Dict> = {
       'Adding an item to your cart does not reserve it. Availability is confirmed only at payment.',
     cartStockShort: "There weren't enough left. The quantity was adjusted to what's available.",
     cartStockGone: 'This item sold out in the meantime.',
+    cartLineSoldOut: 'Sold out',
+    cartSoldOutNotice:
+      'An item in your cart is no longer available. Remove it before checking out — checkout would refuse it otherwise.',
     errorCartGeneric: 'The cart could not be updated. Try again in a moment.',
     skyPause: 'Pause the sky',
     skyResume: 'Animate the sky',

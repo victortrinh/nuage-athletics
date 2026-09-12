@@ -3,7 +3,8 @@ import { env } from 'cloudflare:workers'
 import Base from '../layouts/Base.astro'
 import CartView from '../components/CartView.astro'
 import { t } from '../i18n/ui.ts'
-import { commerceEnabled, readCart } from '../lib/commerce/index.ts'
+import { commerceEnabled, getLiveProduct, readCart } from '../lib/commerce/index.ts'
+import { featuredProduct } from '../lib/catalogue.ts'
 import { readCartId } from '../lib/cart.ts'
 
 /**
@@ -33,6 +34,24 @@ const cartId = canBuy ? readCartId(Astro.request.headers.get('Cookie')) : undefi
 const live = cartId ? await readCart(env, cartId) : null
 const cart = live?.cart ?? null
 
+// Availability, from the same read that prices the product page. Without it
+// this page renders a line Shopify no longer sells as an ordinary one, next
+// to a live-looking checkout button, and the visitor finds out on Shopify's
+// hosted page instead (#86). `getLiveProduct` is the seam — never
+// `./shopify` (non-negotiable 5) — and it returns null on every Storefront
+// failure, which `CartView` renders as "flag nothing" rather than "flag
+// everything": see `soldOutSkus` there.
+//
+// Skipped when there is nothing to check, so an empty cart or a visitor
+// without commerce still costs no Storefront call. The reason is not put on
+// `X-Storefront` below: that header is the cart read's answer on this
+// response, and a second value for a second read would make it ambiguous.
+const stock =
+  cart && cart.lines.length > 0
+    ? await getLiveProduct(env, featuredProduct(locale).slug, locale)
+    : null
+const stockProduct = stock?.product ?? null
+
 // Same diagnostic header index.astro sets — a real Storefront failure (not
 // merely "no cart cookie yet") shouldn't look identical to an empty cart
 // from the outside.
@@ -53,5 +72,5 @@ const noticeCode = Astro.url.searchParams.get('added') ?? undefined
 ---
 
 <Base {locale} routeId="cart" title={d.cartTitle} description={d.cartTitle}>
-  <CartView {locale} {cart} {errorCode} {noticeCode} />
+  <CartView {locale} {cart} live={stockProduct} {errorCode} {noticeCode} />
 </Base>

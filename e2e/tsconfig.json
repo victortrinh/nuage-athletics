@@ -3,6 +3,6 @@
   "include": ["**/*", "../playwright.config.ts"],
   "exclude": [],
   "compilerOptions": {
-    "types": ["node", "@playwright/test"]
+    "types": ["node", "@playwright/test", "@cloudflare/workers-types"]
   }
 }
