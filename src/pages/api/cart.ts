@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config.ts'
 import { commerceEnabled, getLiveProduct, mutateCart, readCart, type LiveCart } from '../../lib/commerce/index.ts'
 import { isSameOrigin, jsonResponder, formResponder, type Responder } from '../../lib/form-endpoint.ts'
-import { readCartId, cartCookies } from '../../lib/cart.ts'
+import { readCartId, cartCookies, checkoutCookie } from '../../lib/cart.ts'
 import { featuredProduct } from '../../lib/catalogue.ts'
 import type { Cart } from '../../lib/commerce/types'
 
@@ -197,11 +197,18 @@ export const POST: APIRoute = async ({ request, url }) => {
       // is what safeRedirect() guards; Shopify's checkoutUrl is an absolute
       // URL by design, and handing a visitor off to it is this intent's
       // entire job.
-      return withCartCookies(
+      //
+      // The marker cookie rides along because this is the last thing this
+      // site hears about the cart: Shopify turns it into an order on its own
+      // page, and without it the header keeps showing the count of a cart
+      // that no longer exists (#88). See CHECKOUT_COOKIE in src/lib/cart.ts.
+      const handoff = withCartCookies(
         new Response(null, { status: 303, headers: { Location: cart.checkoutUrl } }),
         cart,
         secure
       )
+      handoff.headers.append('Set-Cookie', checkoutCookie(secure))
+      return handoff
     }
 
     if (input.intent === 'add') {

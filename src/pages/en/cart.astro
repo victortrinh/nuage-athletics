@@ -5,7 +5,7 @@ import CartView from '../../components/CartView.astro'
 import { t } from '../../i18n/ui.ts'
 import { commerceEnabled, getLiveProduct, readCart } from '../../lib/commerce/index.ts'
 import { featuredProduct } from '../../lib/catalogue.ts'
-import { readCartId } from '../../lib/cart.ts'
+import { readCartId, cartCookies, cartLineCount } from '../../lib/cart.ts'
 
 /**
  * The cart route — reads the visitor's own cart and hands it to
@@ -60,6 +60,18 @@ if (live && live.reason !== 'ok') {
     'X-Storefront',
     live.detail ? `${live.reason};${live.detail}` : live.reason
   )
+}
+
+// The header count is a cookie, and this page has just read the cart it
+// summarizes — so make the two agree rather than leaving the header quoting
+// a read that is now older than this one. Costs no extra Storefront call:
+// it is `live` above, reused. Skipped when that read failed, since a
+// Storefront outage is not evidence that anybody's cart is empty.
+if (live && live.reason === 'ok') {
+  Astro.locals.cartCount = cartLineCount(cart)
+  for (const cookie of cartCookies(cart, Astro.url.protocol === 'https:')) {
+    Astro.response.headers.append('Set-Cookie', cookie)
+  }
 }
 
 const errorCode = Astro.url.searchParams.get('ce') ?? undefined

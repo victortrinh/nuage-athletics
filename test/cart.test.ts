@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { env } from 'cloudflare:test'
 import { POST } from '../src/pages/api/cart'
 import { PREVIEW_COOKIE, issueToken } from '../src/lib/preview'
-import { CART_COOKIE, CART_COUNT_COOKIE } from '../src/lib/cart'
+import { CART_COOKIE, CART_COUNT_COOKIE, CHECKOUT_COOKIE, applyCheckoutReturn } from '../src/lib/cart'
 import { resetStorefrontCache } from '../src/lib/commerce/shopify'
 import { featuredProduct } from '../src/lib/catalogue'
 
@@ -464,5 +464,116 @@ describe('POST /api/cart — checkout', () => {
 
     expect(res.status).toBe(400)
     expect(await readJson(res)).toEqual({ ok: false, code: 'empty_cart' })
+  })
+})
+
+/*
+ * Coming back from Shopify's hosted checkout (#88).
+ *
+ * The purchase happens on Shopify's page, so the cart turns into an order
+ * with no response from this site to write the readable count cookie —
+ * which is why the header kept showing the count of a cart that no longer
+ * existed. `applyCheckoutReturn` is the one Storefront read that fixes it,
+ * bought by the marker cookie the checkout hand-off sets.
+ */
+describe('returning from Shopify checkout', () => {
+  function documentContext(cookie: string, method = 'GET', accept = 'text/html') {
+    const request = new Request(`${SITE}/`, { method, headers: { Cookie: cookie, Accept: accept } })
+    return { request, url: new URL(request.url), locals: {} as { cartCount?: number } }
+  }
+
+  /** Shopify's answer for an id it no longer knows — a completed checkout, or an expired cart. */
+  function stubCartGone() {
+    stubShopify({ NuageCartQuery: () => ({ cart: null }) })
+  }
+
+  it('marks the hand-off so the next page view knows to reconcile', async () => {
+    stubEverything([rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 1)])
+    const cookie = `${await previewCookie()}; ${CART_COOKIE}=${CART_ID}`
+
+    const res = await POST(formContext({ intent: 'checkout', redirect: '/panier/' }, cookie))
+
+    expect(res.headers.getSetCookie().some((c) => c.startsWith(`${CHECKOUT_COOKIE}=1`))).toBe(true)
+    // httpOnly, like the cart id it settles — nothing on the client reads it.
+    expect(res.headers.getSetCookie().some((c) => c.startsWith(`${CHECKOUT_COOKIE}=1`) && c.includes('HttpOnly'))).toBe(true)
+  })
+
+  it('clears both cart cookies and renders 0 once the cart became an order', async () => {
+    stubCartGone()
+    const context = documentContext(
+      `${await previewCookie()}; ${CART_COOKIE}=${CART_ID}; ${CHECKOUT_COOKIE}=1`
+    )
+
+    const res = await applyCheckoutReturn(env, context, async () => new Response('page'))
+
+    // The render that lands on the visitor's screen, not the one after it.
+    expect(context.locals.cartCount).toBe(0)
+    const setCookies = res.headers.getSetCookie()
+    expect(setCookies.some((c) => c.startsWith(`${CART_COOKIE}=;`))).toBe(true)
+    expect(setCookies.some((c) => c.startsWith(`${CART_COUNT_COOKIE}=;`))).toBe(true)
+    // And the marker is spent, so the next page view costs no Storefront call.
+    expect(setCookies.some((c) => c.startsWith(`${CHECKOUT_COOKIE}=;`))).toBe(true)
+  })
+
+  it('refreshes the count from the real cart when the checkout was abandoned', async () => {
+    stubEverything([rawCartLine('gid://shopify/CartLine/1', MERCH_ID, 3)])
+    const context = documentContext(
+      `${await previewCookie()}; ${CART_COOKIE}=${CART_ID}; ${CHECKOUT_COOKIE}=1`
+    )
+
+    const res = await applyCheckoutReturn(env, context, async () => new Response('page'))
+
+    expect(context.locals.cartCount).toBe(3)
+    expect(res.headers.getSetCookie().some((c) => c.startsWith(`${CART_COUNT_COOKIE}=3`))).toBe(true)
+  })
+
+  it('leaves the cart alone — and keeps the marker — when Shopify is unreachable', async () => {
+    vi.stubGlobal('fetch', async () => new Response('nope', { status: 503 }))
+    const context = documentContext(
+      `${await previewCookie()}; ${CART_COOKIE}=${CART_ID}; ${CHECKOUT_COOKIE}=1`
+    )
+
+    const res = await applyCheckoutReturn(env, context, async () => new Response('page'))
+
+    // An outage is not evidence that anyone's cart is empty.
+    expect(context.locals.cartCount).toBeUndefined()
+    expect(res.headers.getSetCookie()).toEqual([])
+  })
+
+  it('spends nothing without the marker', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const context = documentContext(`${await previewCookie()}; ${CART_COOKIE}=${CART_ID}`)
+
+    const res = await applyCheckoutReturn(env, context, async () => new Response('page'))
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(res.headers.getSetCookie()).toEqual([])
+  })
+
+  /*
+   * The marker is spent by the render that would otherwise show the stale
+   * number. A sub-resource or a fetch() reaching the Worker first would
+   * clear it before that render ever happened.
+   */
+  it('spends nothing on a request that renders no page', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const cookie = `${await previewCookie()}; ${CART_COOKIE}=${CART_ID}; ${CHECKOUT_COOKIE}=1`
+
+    await applyCheckoutReturn(env, documentContext(cookie, 'POST'), async () => new Response('x'))
+    await applyCheckoutReturn(env, documentContext(cookie, 'GET', 'image/avif,image/webp,*/*'), async () => new Response('x'))
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('does nothing for a visitor with no commerce at all', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const context = documentContext(`${CART_COOKIE}=${CART_ID}; ${CHECKOUT_COOKIE}=1`)
+
+    await applyCheckoutReturn(env, context, async () => new Response('page'))
+
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

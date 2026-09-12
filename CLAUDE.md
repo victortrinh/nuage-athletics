@@ -353,6 +353,30 @@ of us to see the real buy flow on the real site before it opens.
   instead of stopping at the frame's own edge. The prev/next arrows sit
   above that layer (`relative z-10`), which is what keeps them clickable
   once it extends past them.
+- **Coming back from checkout costs exactly one Storefront read, and the
+  rest of the return trip is Shopify's to configure.** The purchase happens
+  on Shopify's hosted page: the cart becomes an order there, and this site
+  never sees a request for it, so the header's count cookie went on
+  reporting a cart that no longer existed (#88). The fix is a third cookie,
+  `na_cart_co` (`src/lib/cart.ts`) — set on the redirect to `checkoutUrl`,
+  read once by `applyCheckoutReturn` in `src/middleware.ts` on the next
+  *document* request, spent there and cleared. That read rewrites both cart
+  cookies from what Shopify now says and puts the number in
+  `Astro.locals.cartCount`, which `Base.astro` prefers over the cookie, so
+  the header is right on the render the visitor lands on rather than the
+  one after it. The cart pages set the same local from the read they were
+  already doing. A Storefront failure keeps the marker and changes nothing:
+  an outage is not evidence that anyone's cart is empty. Everything else
+  about the header count is unchanged — no page view costs a Storefront
+  call, which is the property that comment in `Base.astro` exists to
+  protect, and the marker is why this one is affordable.
+  What is *not* fixable here is the checkout page's own "Retour à la
+  boutique" link (also #88): it is Shopify's chrome, pointed at the store's
+  Online Store channel — today `nuage-athletics-dev.myshopify.com` — and the
+  Storefront API offers no way to aim it at a headless storefront. It is a
+  Shopify-admin fix (redirect or unpublish that channel's theme, or make the
+  storefront domain the store's primary one), not a code one; don't spend an
+  afternoon looking for the API that sets it.
 - **The sky is allowed to stop; it is never allowed to leave a white page.**
   `sky/engine.ts` walks a degrade ladder and eventually gives up (hiding the
   canvas, dropping the GL context, recording `na-sky-gaveup`), and three rules
