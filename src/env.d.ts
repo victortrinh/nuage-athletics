@@ -2,6 +2,20 @@
 /// <reference types="@cloudflare/workers-types" />
 
 /**
+ * Per-request state. `cartCount` is set by the two places that have just
+ * read the real cart — `applyCheckoutReturn` (src/lib/cart.ts) and the cart
+ * pages themselves — so src/layouts/Base.astro can render the header count
+ * from that read rather than from the request's now-stale count cookie.
+ * Absent on every other request, which is the ordinary case: the cookie is
+ * right and no Storefront call was made.
+ */
+declare namespace App {
+  interface Locals {
+    cartCount?: number
+  }
+}
+
+/**
  * Worker bindings.
  *
  * Astro 6+ removed `Astro.locals.runtime.env`. Bindings are read with

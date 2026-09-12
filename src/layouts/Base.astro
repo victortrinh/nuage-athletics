@@ -63,8 +63,15 @@ const showPrompt = SIGNUP_PROMPT_ENABLED && (routeId ? SHOWS_SIGNUP_PROMPT[route
 // Storefront call on every page view for anyone previewing. The cart page
 // itself (src/pages/panier.astro) always reads the real cart before
 // rendering it; this count is display-only.
+//
+// `Astro.locals.cartCount` is the exception, and it is set only by code that
+// has just done a real read on this same request: the cart pages, and the
+// once-per-checkout reconciliation in src/lib/cart.ts (#88 — a purchase
+// completes on Shopify's page, so nothing here ever wrote the cookie for
+// it). Preferring it means the header agrees with the cart on the render
+// that found out, not on the next one.
 const canBuy = await commerceEnabled(env, Astro.request.headers.get('Cookie'))
-const cartCount = readCartCount(Astro.request.headers.get('Cookie'))
+const cartCount = Astro.locals.cartCount ?? readCartCount(Astro.request.headers.get('Cookie'))
 const cartHref = route('cart', locale)
 
 // The prompt's own no-JS round trip. /api/subscribe redirects a form-encoded
