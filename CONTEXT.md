@@ -68,25 +68,24 @@ answers "may this request see prices," combining both.
   shows no product photography at all, by design, not only no price — see
   CLAUDE.md's product-page bullet. Founder preview is the only render that
   shows the current photos while this is still open.
-- A real price: landed cost (duty + freight on the China import, ADR-0002/ADR-0001)
+- A real price: landed cost (duty + freight on the China import, ADR-0002)
   computed, then set in Shopify — `catalogue.ts` has no price field to fill in
   any more (non-negotiable 5.5).
-- Real mailing address in `SENDER_IDENTITY.address` (`src/lib/consent.ts`) —
-  currently the literal placeholder string, rendered live in six places
-  (ADR-0003).
-- CA dealer number or full dealer address for textile labelling on the
-  physical garment (ADR-0003) — this blocks the product shipping, not the
-  site rendering, but drop one cannot ship without it.
-- `returns` and `shipping` pages built (#47, not yet landed — see ADR-0006)
-  and their `INDEXABLE` flags flipped once legally reviewed, alongside
-  `privacy`/`terms`/`precontract`, all currently `INDEXABLE: false` in
-  `src/i18n/utils.ts`.
-- Shopify's own policy slots (Refund/Shipping/Privacy/Terms/Contact) filled
-  in both locales — see ADR-0006's slot-mapping table.
-- Entity registered enough to hold a real merchant-identity block on the
-  terms page and the precontract-disclosure page
-  (`src/pages/informations-precontractuelles.astro` /
-  `src/pages/en/pre-contract-information.astro`) — see ADR-0001.
+- `privacy`, `terms` and `precontract` rewritten for drop one's informal
+  posture (#92) — draft banners removed, `INDEXABLE` flipped to `true` in
+  `src/i18n/utils.ts`. No mailing address or phone number is a gate any
+  more: ADR-0007 (2026-09-15) decided drop one ships without either, and
+  `senderAddressConfigured()` (#46) makes the address line disappear rather
+  than showing a placeholder.
+- Shopify admin configured to match (#93) and its policy slots filled to
+  mirror the rewritten pages (#66, superseding the #47/ADR-0006 returns
+  policy that ADR-0007 replaced with "no returns, email us").
+- `#90`'s checkout-return fix verified on the paid-plan store.
+
+ADR-0001's incorporation and ADR-0003's mailing-address/dealer-ID
+requirements are **not** gates for drop one — see ADR-0007 for why, and #44
+(the rewritten checklist) plus the `Post-drop-one` milestone (#47, #67) for
+what's deferred instead.
 
 **Founder preview** needs only `PREVIEW_PASSWORD` set and
 `SHOPIFY_STOREFRONT_TOKEN` + `SHOPIFY_STORE_DOMAIN` configured against a store

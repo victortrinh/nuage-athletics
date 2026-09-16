@@ -2,8 +2,12 @@
 
 ## Status
 
-Accepted (as a requirement); **blocked** pending the actual address and CA
-number.
+**Deferred to post-drop-one (ADR-0007).** Victor decided (2026-09-15) that
+drop one ships with no alternate mailing address and no CA number/dealer
+address at all — not blocked pending them, but knowingly without them. Both
+requirements below still stand as the target once the business moves past a
+one-person, one-drop operation; tracked at #67 (address + phone) and in
+#44's textile-labelling line, both in the `Post-drop-one` milestone.
 
 ## Context
 
