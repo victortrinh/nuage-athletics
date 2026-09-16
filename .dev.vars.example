@@ -4,6 +4,12 @@
 # set here also applies to the test suite.
 RESEND_API_KEY=re_xxxxxxxxxxxx
 
+# The CASL mailing address for outbound email and the six legal pages
+# (src/lib/consent.ts's senderAddressConfigured). Without it, sending a
+# confirmation email refuses and the pages omit the address line entirely
+# rather than showing a placeholder.
+SENDER_ADDRESS=123 Rue Exemple, Montréal QC H2X 1Y4
+
 # Shopify Storefront API. The price and the sold-out state on the product page
 # come from here and nowhere else, so without this the buy band never renders —
 # founder preview included. The token needs only the default read scopes; the

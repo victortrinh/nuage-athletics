@@ -8,10 +8,13 @@ import {
 } from '../src/lib/email'
 import { SENDER_IDENTITY } from '../src/lib/consent'
 
+const TEST_ADDRESS = '123 Rue Exemple, Montréal QC H2X 1Y4'
+
 describe('sendConfirmationEmail', () => {
   it('fails instead of pretending to send when no API key is configured', async () => {
     const res = await sendConfirmationEmail({
       apiKey: undefined,
+      address: TEST_ADDRESS,
       to: 'someone@example.com',
       locale: 'fr-CA',
       siteUrl: 'https://nuageathletics.com',
@@ -19,6 +22,32 @@ describe('sendConfirmationEmail', () => {
     })
     expect(res.ok).toBe(false)
     expect(res.error).toMatch(/RESEND_API_KEY/)
+  })
+
+  it('fails instead of pretending to send when no mailing address is configured', async () => {
+    const res = await sendConfirmationEmail({
+      apiKey: 'test-key',
+      address: undefined,
+      to: 'someone@example.com',
+      locale: 'fr-CA',
+      siteUrl: 'https://nuageathletics.com',
+      token: 'deadbeef',
+    })
+    expect(res.ok).toBe(false)
+    expect(res.error).toMatch(/SENDER_ADDRESS/)
+  })
+
+  it('treats a whitespace-only mailing address as not configured', async () => {
+    const res = await sendConfirmationEmail({
+      apiKey: 'test-key',
+      address: '   ',
+      to: 'someone@example.com',
+      locale: 'fr-CA',
+      siteUrl: 'https://nuageathletics.com',
+      token: 'deadbeef',
+    })
+    expect(res.ok).toBe(false)
+    expect(res.error).toMatch(/SENDER_ADDRESS/)
   })
 })
 
@@ -50,13 +79,20 @@ describe('renderEmailShell', () => {
     siteUrl: 'https://nuageathletics.com',
     heading: 'Heading',
     bodyHtml: '<p>Body</p>',
+    address: TEST_ADDRESS,
   }
 
   it('always includes the CASL sender identity block', () => {
     const html = renderEmailShell(base)
     expect(html).toContain(SENDER_IDENTITY.name)
-    expect(html).toContain(SENDER_IDENTITY.address)
+    expect(html).toContain(TEST_ADDRESS)
     expect(html).toContain(SENDER_IDENTITY.email)
+  })
+
+  it('escapes the mailing address before rendering it as HTML', () => {
+    const html = renderEmailShell({ ...base, address: '1 Rue A & B' })
+    expect(html).toContain('1 Rue A &amp; B')
+    expect(html).not.toContain('1 Rue A & B<br')
   })
 
   it('includes the unsubscribe link when unsubUrl is given', () => {
@@ -103,9 +139,14 @@ describe('renderEmailShell', () => {
 describe('renderEmailText', () => {
   it('includes the CASL sender identity block and the unsubscribe url', () => {
     const unsubUrl = 'https://nuageathletics.com/api/unsubscribe?token=abc'
-    const text = renderEmailText({ heading: 'Heading', bodyText: 'Body', unsubUrl })
+    const text = renderEmailText({
+      heading: 'Heading',
+      bodyText: 'Body',
+      unsubUrl,
+      address: TEST_ADDRESS,
+    })
     expect(text).toContain(SENDER_IDENTITY.name)
-    expect(text).toContain(SENDER_IDENTITY.address)
+    expect(text).toContain(TEST_ADDRESS)
     expect(text).toContain(SENDER_IDENTITY.email)
     expect(text).toContain(unsubUrl)
   })

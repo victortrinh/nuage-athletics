@@ -30,6 +30,14 @@ declare namespace Cloudflare {
 
     // Secrets — wrangler secret put <NAME>
     RESEND_API_KEY?: string
+    // The CASL mailing address for outbound email and the six legal pages
+    // (src/lib/consent.ts's senderAddressConfigured). A secret, not a
+    // [vars] entry — unlike SHOPIFY_STORE_DOMAIN below, which ships with
+    // the code because it's already public on any storefront URL, this is
+    // a home address in a public repo, and a public repo's git history is
+    // permanent. Unset means every render site omits the line and every
+    // send refuses rather than shipping a placeholder.
+    SENDER_ADDRESS?: string
     // The founder-preview password. A secret, never a [vars] entry — a
     // password committed to wrangler.toml is a password in the git history.
     PREVIEW_PASSWORD?: string

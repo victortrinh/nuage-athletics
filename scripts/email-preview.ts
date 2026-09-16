@@ -22,10 +22,18 @@ import {
   confirmationBodyHtml,
 } from '../src/lib/email.ts'
 import { UI } from '../src/i18n/ui.ts'
+import { senderAddressConfigured } from '../src/lib/consent.ts'
 
 const SITE_URL = process.env.PUBLIC_SITE_URL ?? 'https://nuageathletics.com'
 const OUT_DIR = 'tmp/email-preview'
 const FAKE_TOKEN = 'preview0000000000000000000000000'
+// This script never sends, so an unset secret gets a visible marker instead
+// of the refusal a real send would give (email.ts's sendConfirmationEmail,
+// scripts/broadcast.ts) — the point here is to eyeball the shell, not to
+// exercise the refusal path.
+const address = senderAddressConfigured(process.env.SENDER_ADDRESS)
+  ? process.env.SENDER_ADDRESS
+  : '[SENDER_ADDRESS unset]'
 
 mkdirSync(OUT_DIR, { recursive: true })
 
@@ -47,11 +55,13 @@ for (const locale of LOCALES) {
     preheader: d.mailBody,
     bodyHtml: confirmationBodyHtml(d, confirmUrl),
     unsubUrl,
+    address,
   })
   const confirmationText = renderEmailText({
     heading: d.mailHeading,
     bodyText: `${d.mailBody}\n\n${d.mailCta}: ${confirmUrl}\n\n${d.mailIgnore}`,
     unsubUrl,
+    address,
   })
   write(`confirmation-${locale}`, confirmationHtml, confirmationText)
 }
@@ -80,8 +90,9 @@ if (broadcastFile) {
       heading: subject,
       bodyHtml: styleMarkdownHtml(marked.parse(bodyMarkdown) as string),
       unsubUrl,
+      address,
     })
-    const text = renderEmailText({ heading: subject, bodyText: bodyMarkdown, unsubUrl })
+    const text = renderEmailText({ heading: subject, bodyText: bodyMarkdown, unsubUrl, address })
     write(`broadcast-${locale}`, html, text)
   }
 }

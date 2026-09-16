@@ -31,7 +31,7 @@
 import { readFileSync } from 'node:fs'
 import { marked } from 'marked'
 import { renderEmailShell, renderEmailText, styleMarkdownHtml, RESEND_ENDPOINT } from '../src/lib/email.ts'
-import { SENDER_IDENTITY } from '../src/lib/consent.ts'
+import { SENDER_IDENTITY, senderAddressConfigured } from '../src/lib/consent.ts'
 import { isLocale, type Locale } from '../src/i18n/config.ts'
 import { queryD1 } from './d1.ts'
 
@@ -123,11 +123,20 @@ function sleep(ms: number) {
 async function main() {
   const { file, dryRun, limit, remote } = parseArgs(process.argv.slice(2))
   const apiKey = process.env.RESEND_API_KEY
+  const address = process.env.SENDER_ADDRESS
 
   if (!dryRun && !apiKey) {
     console.error(
       'RESEND_API_KEY is not set. Pass --dry-run to preview without sending, or set the key to send for real.'
     )
+    process.exit(1)
+  }
+
+  // Refused even under --dry-run: the rendered sample it prints would
+  // otherwise carry no address at all where a real send needs one, and a
+  // dry run exists to preview exactly what a real send would do.
+  if (!senderAddressConfigured(address)) {
+    console.error('SENDER_ADDRESS is not set. Every commercial email requires a mailing address under CASL.')
     process.exit(1)
   }
 
@@ -152,11 +161,13 @@ async function main() {
       heading: broadcast.subject[locale],
       bodyHtml: broadcast.bodyHtml[locale],
       unsubUrl,
+      address,
     })
     const text = renderEmailText({
       heading: broadcast.subject[locale],
       bodyText: broadcast.bodyText[locale],
       unsubUrl,
+      address,
     })
     return { to: row.email, subject: broadcast.subject[locale], html, text, unsubUrl }
   })

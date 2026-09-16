@@ -94,12 +94,14 @@ export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
 
 /**
  * Kill switch for the prompt above, independent of the per-route table:
- * every outbound email — the double opt-in confirmation included — renders
- * `SENDER_IDENTITY.address` (src/lib/consent.ts) into its footer, and that's
- * still the CASL-non-compliant placeholder string. Collecting an address the
- * confirmation email can't legally reach is worse than not asking yet, so
- * this stays false until the real mailing address lands. Flip it back to
- * true then — see https://github.com/victortrinh/nuage-athletics/issues/67.
+ * every outbound email — the double opt-in confirmation included — needs a
+ * real mailing address to be CASL-compliant, and `sendConfirmationEmail`
+ * (src/lib/email.ts) refuses rather than sending without one (the
+ * `SENDER_ADDRESS` secret, src/lib/consent.ts's `senderAddressConfigured`).
+ * Prompting for a signup the confirmation email can't legally reach yet is
+ * worse than not asking, so this stays false until that secret is set in
+ * production. Flip it back to true then — see
+ * https://github.com/victortrinh/nuage-athletics/issues/67.
  */
 export const SIGNUP_PROMPT_ENABLED = false
 

@@ -11,13 +11,28 @@ export function consentText(locale: Locale): string {
   return UI[locale].consentLabel
 }
 
-/** Mailing address required in every commercial email under CASL. */
+/**
+ * Name and email for the CASL sender block. The mailing address CASL also
+ * requires is deliberately not here — this repo is public, and a home
+ * address committed to it is in the git history forever, even once it's
+ * replaced by a commercial mailbox. It comes from the `SENDER_ADDRESS`
+ * Worker secret / `process.env.SENDER_ADDRESS` instead — see
+ * `senderAddressConfigured` below and every call site that reads it.
+ */
 export const SENDER_IDENTITY = {
   name: 'Nuage Athletics',
   email: 'hello@nuageathletics.com',
-  // TODO: replace with the real registered mailing address before the first send.
-  address: '[ADRESSE POSTALE REQUISE / MAILING ADDRESS REQUIRED]',
 } as const
+
+/**
+ * True for a non-empty, trimmed `SENDER_ADDRESS`. Every render site and
+ * every outbound send gates on this rather than trusting a placeholder —
+ * see the module comment on `SENDER_IDENTITY` for why the address isn't a
+ * constant here at all.
+ */
+export function senderAddressConfigured(address: string | undefined): address is string {
+  return typeof address === 'string' && address.trim() !== ''
+}
 
 /**
  * Shopify's checkout marketing opt-in wording, transcribed from the store's

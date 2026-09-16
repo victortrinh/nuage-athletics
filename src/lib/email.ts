@@ -1,11 +1,12 @@
 import type { Locale } from '../i18n/config.ts'
 import { UI, type Dict } from '../i18n/ui.ts'
-import { SENDER_IDENTITY } from './consent.ts'
+import { SENDER_IDENTITY, senderAddressConfigured } from './consent.ts'
 
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 
 interface SendArgs {
   apiKey: string | undefined
+  address: string | undefined
   to: string
   locale: Locale
   siteUrl: string
@@ -97,6 +98,7 @@ export function renderEmailShell({
   unsubUrl,
   siteUrl,
   preheader,
+  address,
 }: {
   locale: Locale
   heading: string
@@ -104,6 +106,7 @@ export function renderEmailShell({
   unsubUrl?: string
   siteUrl: string
   preheader?: string
+  address: string
 }): string {
   const d = UI[locale]
   const t = EMAIL_THEME
@@ -176,7 +179,7 @@ export function renderEmailShell({
                   <tr>
                     <td align="center" style="font-size:12px;color:${t.mute};line-height:1.6;text-align:center;">
                       ${SENDER_IDENTITY.name}<br />
-                      ${escapeHtml(SENDER_IDENTITY.address)}<br />
+                      ${escapeHtml(address)}<br />
                       <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t.mute};">${SENDER_IDENTITY.email}</a>${
                         unsubUrl
                           ? `<br /><a href="${unsubUrl}" style="color:${t.mute};">${d.mailUnsub}</a>`
@@ -208,10 +211,12 @@ export function renderEmailText({
   heading,
   bodyText,
   unsubUrl,
+  address,
 }: {
   heading: string
   bodyText: string
   unsubUrl?: string
+  address: string
 }): string {
   const lines = [
     heading,
@@ -220,7 +225,7 @@ export function renderEmailText({
     '',
     '—',
     SENDER_IDENTITY.name,
-    SENDER_IDENTITY.address,
+    address,
     SENDER_IDENTITY.email,
   ]
   if (unsubUrl) lines.push(unsubUrl)
@@ -275,11 +280,20 @@ export function confirmationBodyHtml(d: Dict, confirmUrl: string): string {
  */
 export async function sendConfirmationEmail({
   apiKey,
+  address,
   to,
   locale,
   siteUrl,
   token,
 }: SendArgs): Promise<{ ok: boolean; error?: string }> {
+  // No address configured: refuse before rendering anything, same shape as
+  // the missing-RESEND_API_KEY refusal below — CASL requires a physical
+  // mailing address in every commercial email, and there is no placeholder
+  // to fall back to (src/lib/consent.ts).
+  if (!senderAddressConfigured(address)) {
+    return { ok: false, error: 'SENDER_ADDRESS is not configured' }
+  }
+
   const d = UI[locale]
   const confirmUrl = `${siteUrl}/api/confirm?token=${token}`
   const unsubUrl = `${siteUrl}/api/unsubscribe?token=${token}`
@@ -291,11 +305,13 @@ export async function sendConfirmationEmail({
     preheader: d.mailBody,
     bodyHtml: confirmationBodyHtml(d, confirmUrl),
     unsubUrl,
+    address,
   })
   const text = renderEmailText({
     heading: d.mailHeading,
     bodyText: `${d.mailBody}\n\n${d.mailCta}: ${confirmUrl}\n\n${d.mailIgnore}`,
     unsubUrl,
+    address,
   })
 
   // No key configured: log the confirm URL so local dev is still usable, but

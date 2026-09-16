@@ -67,6 +67,7 @@ with it (`unreachable;status=401` is the token, `;status=404` the domain).
 ```bash
 wrangler kv namespace create SESSION   # adapter expects a SESSION binding
 wrangler secret put RESEND_API_KEY
+wrangler secret put SENDER_ADDRESS
 wrangler secret put SHOPIFY_STOREFRONT_TOKEN
 npm run db:migrate:remote
 npm run deploy
