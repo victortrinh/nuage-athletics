@@ -148,6 +148,11 @@ describe('renderEmailShell', () => {
     // Outlook data-ogsc hook either: neither reaches every client, and a
     // design that is already dark needs neither. See EMAIL_THEME.
     expect(html).toContain('content="light dark"')
+    // Apple Mail 13+ ignores the meta pair alone and auto-inverts without
+    // this CSS property present somewhere — see the doc comment above
+    // renderEmailShell. A `:root` rule would need a <style> block; the
+    // inline attribute on <html> has the same effect without one.
+    expect(html).toMatch(/<html[^>]*style="[^"]*color-scheme:\s*light dark/)
     expect(html).not.toContain('<style')
     expect(html).not.toContain('prefers-color-scheme')
     expect(html).not.toContain('data-ogs')

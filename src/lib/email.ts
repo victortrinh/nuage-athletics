@@ -105,6 +105,17 @@ function escapeHtml(s: string): string {
  * either — see the doc comment on EMAIL_THEME for why there is no light
  * variant, no media query and no per-client hook.
  *
+ * The meta pair alone isn't enough on Apple Mail 13+ (Catalina and every
+ * iOS/macOS Mail since): it only honours the older `<meta name=
+ * "supported-color-scheme">` singular tag (Mail 12) or the CSS `color-scheme`
+ * *property*, not the meta-only declaration above — without the property, it
+ * falls back to auto-inverting, which flips the wordmark PNG's baked-in dark
+ * ground to light and turns the light-on-dark CTA button into Mail's own grey
+ * (issue: logo still showed light-card-black-text after the meta-only fix).
+ * `style="color-scheme: light dark;"` on `<html>` below is the same effect a
+ * `:root { color-scheme: light dark; }` rule would have, without needing the
+ * `<style>` block the rest of this shell deliberately has none of.
+ *
  * The message itself sits in a paper card — border, not shadow, matching the
  * site's own "no shadows" rule — floated on the sky backdrop (OUTER_BG /
  * SKY_BG_PATH, see the doc comment on OUTER_BG). `bgcolor`/`background`
@@ -141,7 +152,7 @@ export function renderEmailShell({
   const skyUrl = `${siteUrl}${SKY_BG_PATH}`
 
   return `<!doctype html>
-<html lang="${locale}">
+<html lang="${locale}" style="color-scheme: light dark;">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
