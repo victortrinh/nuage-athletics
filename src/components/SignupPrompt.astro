@@ -175,10 +175,17 @@ const { locale, d, redirectTo, initialOpen, initialSuccess, initialErrorCode } =
     // rather than a callback prop. idPrefix is this prompt's own, checked
     // defensively — SignupPrompt is the only SignupForm on any page today,
     // but the event is a page-wide signal and costs nothing to scope.
+    //
+    // origin distinguishes a hydrated submit resolving in place from the
+    // no-JS redirect's own forced-open, already-static confirmation
+    // (origin: 'initial') — only the former closes the band; the redirect's
+    // render is the page's only feedback and must stay put for whoever's
+    // reading it.
     window.addEventListener('nuage:signup-success', (event) => {
-      const detail = (event as CustomEvent<{ idPrefix?: string }>).detail
+      const detail = (event as CustomEvent<{ idPrefix?: string; origin?: string }>).detail
       if (detail?.idPrefix !== 'signup-prompt') return
       markSubscribed()
+      if (detail.origin === 'submit') requestClose()
     })
 
     // Already open means Base.astro forced it, because a no-JS submit from

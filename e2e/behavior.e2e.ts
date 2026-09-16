@@ -82,13 +82,15 @@ test('consent checkbox toggles by keyboard, and a bad email wires aria-invalid',
   await expect(page.locator(`#${describedBy}`)).toHaveText('Entrez une adresse courriel valide.')
 })
 
-test('focus moves into the success panel, and the live region announces it', async ({ page }) => {
+test('a hydrated submit closes the popup instead of showing a confirmation panel, after announcing it', async ({
+  page,
+}) => {
   test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
   await page.goto(ROUTES.home['fr-CA'])
 
   // The real endpoint always returns email_failed without RESEND_API_KEY
   // configured (by design — see README). Stub the response to exercise the
-  // client-side success rendering and focus-management in isolation.
+  // client-side success handling in isolation.
   await page.route('**/api/subscribe', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
   )
@@ -99,24 +101,29 @@ test('focus moves into the success panel, and the live region announces it', asy
   await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
   await page.getByRole('button', { name: /m.inscrire/i }).click({ force: true })
 
-  await expect(page.locator('p[tabindex="-1"]')).toBeFocused()
   // Scoped to the prompt: ProductCarousel has a live region of its own on this
-  // page, which the gate screen this test used to run on did not.
+  // page, which the gate screen this test used to run on did not. The
+  // announcement still fires even though no panel renders for it (issue
+  // #102) — a screen-reader visitor still learns the signup went through.
   await expect(page.locator('#signup-prompt [role="status"].sr-only')).toHaveText(
     'Vérifiez vos courriels'
   )
+  // No confirmation panel — the popup closes instead (this project runs
+  // with reducedMotion: 'reduce', so the close is immediate, no animation
+  // to wait out).
+  await expect(page.locator('p[tabindex="-1"]')).toHaveCount(0)
+  await expect(page.locator('#signup-prompt')).toBeHidden()
 })
 
 /**
- * The hydrated path above resolves in place — the URL never changes, and a
- * success panel replaces the form via React state. A submit that lands
- * before hydration can't do that: it's a genuine <form action="/api/subscribe">
- * POST, which follows /api/subscribe's 303 into a full-page navigation (see
- * the no-JS describe block below). This test pins the hydrated case as
- * staying put, so the two paths can't quietly collapse into one without a
- * test noticing.
+ * A submit that lands before hydration can't resolve in place — it's a
+ * genuine <form action="/api/subscribe"> POST, which follows
+ * /api/subscribe's 303 into a full-page navigation (see the no-JS describe
+ * block below), landing back on this same URL with the outcome in the query
+ * string. This test pins the hydrated case as staying put, so the two paths
+ * can't quietly collapse into one without a test noticing.
  */
-test('a hydrated submit resolves in place, without navigating', async ({ page }) => {
+test('a hydrated submit resolves without navigating', async ({ page }) => {
   test.skip(!SIGNUP_PROMPT_ENABLED, 'signup prompt disabled until email sending is ready — see #67')
   await page.goto(ROUTES.home['fr-CA'])
 
@@ -130,7 +137,7 @@ test('a hydrated submit resolves in place, without navigating', async ({ page })
   await page.getByRole('textbox', { name: /courriel/i }).fill('test@example.com')
   await page.getByRole('button', { name: /m.inscrire/i }).click({ force: true })
 
-  await expect(page.locator('p[tabindex="-1"]')).toHaveText('Vérifiez vos courriels')
+  await expect(page.locator('#signup-prompt')).toBeHidden()
   await expect(page).toHaveURL(new RegExp(`${ROUTES.home['fr-CA']}$`))
 })
 
