@@ -55,9 +55,11 @@ const orgId = organizationId(site)
  * ProductView.astro points its `brand` at.
  *
  * Name and email come from SENDER_IDENTITY so the site and the CASL sender
- * block can't drift into claiming two different identities. Its `address` is
- * deliberately NOT published: it is still a placeholder, and a wrong postal
- * address in structured data is worse than no postal address.
+ * block can't drift into claiming two different identities. The mailing
+ * address (the SENDER_ADDRESS secret, src/lib/consent.ts) is deliberately
+ * NOT published here even once it's set: it's an optional field on this
+ * schema, and there's no reason to feed a home address to aggregators just
+ * because it's already public elsewhere on the site.
  */
 const graph = {
   '@context': 'https://schema.org',

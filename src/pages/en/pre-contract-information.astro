@@ -6,7 +6,8 @@
 // (CpaDisclosure.astro); it's now its own page, linked from the footer, the
 // nav drawer, and directly under the buy control — see ProductStage.tsx.
 import Base from '../../layouts/Base.astro'
-import { SENDER_IDENTITY } from '../../lib/consent'
+import { SENDER_IDENTITY, senderAddressConfigured } from '../../lib/consent'
+import { env } from 'cloudflare:workers'
 import { route } from '../../i18n/utils'
 import { featuredProduct } from '../../lib/catalogue'
 
@@ -16,6 +17,9 @@ export const prerender = false
 
 const locale = 'en-CA' as const
 const product = featuredProduct(locale)
+// null when the SENDER_ADDRESS secret isn't set — the merchant line
+// below omits the address entirely rather than rendering a placeholder.
+const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS : null
 ---
 
 <Base
@@ -36,7 +40,7 @@ const product = featuredProduct(locale)
       <div>
         <dt class="font-medium opacity-100">Merchant</dt>
         <dd class="mt-1">
-          {SENDER_IDENTITY.name}, {SENDER_IDENTITY.address},{' '}
+          {SENDER_IDENTITY.name}, {address && <>{address}, </>}{' '}
           <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">
             {SENDER_IDENTITY.email}
           </a>

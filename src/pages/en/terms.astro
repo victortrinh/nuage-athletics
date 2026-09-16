@@ -4,13 +4,18 @@
 // disclosures (Quebec's Consumer Protection Act) will be added once online
 // sales go live.
 import Base from '../../layouts/Base.astro'
-import { SENDER_IDENTITY } from '../../lib/consent'
+import { SENDER_IDENTITY, senderAddressConfigured } from '../../lib/consent'
+import { env } from 'cloudflare:workers'
 
 // The gate in src/middleware.ts never runs for a prerendered page —
 // Workers serves those straight from assets. Do not remove.
 export const prerender = false
 
 const locale = 'en-CA' as const
+
+// null when the SENDER_ADDRESS secret isn't set — the contact block below
+// omits the line entirely rather than rendering a placeholder.
+const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS : null
 ---
 
 <Base
@@ -91,7 +96,7 @@ const locale = 'en-CA' as const
       <h2 class="text-lg font-semibold opacity-100">Contact</h2>
       <p class="mt-2">
         {SENDER_IDENTITY.name}<br />
-        {SENDER_IDENTITY.address}<br />
+        {address && <>{address}<br /></>}
         <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>
       </p>
     </div>

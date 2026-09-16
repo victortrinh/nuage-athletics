@@ -111,6 +111,7 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
 
     const resent = await sendConfirmationEmail({
       apiKey: env.RESEND_API_KEY,
+      address: env.SENDER_ADDRESS,
       to: input.email,
       locale: input.locale,
       siteUrl,
@@ -132,6 +133,7 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
 
   const sent = await sendConfirmationEmail({
     apiKey: env.RESEND_API_KEY,
+    address: env.SENDER_ADDRESS,
     to: input.email,
     locale: input.locale,
     siteUrl,

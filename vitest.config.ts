@@ -18,6 +18,11 @@ export default defineConfig({
           // Fixed test-only value so the Resend path runs instead of the
           // no-key dev branch. test/stub-resend.ts intercepts the request.
           RESEND_API_KEY: 're_test_not_a_real_key',
+          // Fixed test-only value so sendConfirmationEmail's address refusal
+          // (src/lib/consent.ts's senderAddressConfigured) doesn't fire for
+          // every subscribe test — test/email.test.ts covers that refusal
+          // directly with its own explicit (missing) address.
+          SENDER_ADDRESS: '123 Rue Test, Montréal QC H2X 1Y4',
           // Fixed test-only value so preview tests can mint valid tokens.
           PREVIEW_PASSWORD: 'test-preview-password',
           // Fixed test-only value so cart tests (test/cart.test.ts) can
