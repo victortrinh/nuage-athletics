@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted (2026-09-15).
+Accepted (2026-09-15). **Amended 2026-09-15**, same day: Decision 2
+(Address) reversed — see the amendment note below Decision 2 and the
+updated Decision 3/4/5. Everything else in this ADR is unchanged.
 
 ## Context
 
@@ -16,8 +18,9 @@ actually happened, and #44 tracked the work of making them happen.
 Victor decided otherwise for drop one specifically:
 
 - No incorporation and no REQ registration.
-- No alternate mailing address of any kind — not a commercial mailbox, not
-  a PO box. Home stays off every public surface.
+- ~~No alternate mailing address of any kind — not a commercial mailbox,
+  not a PO box. Home stays off every public surface.~~ **Amended
+  2026-09-15, same day:** home address may be public — see Decision 2.
 - No phone number.
 - Home address is acceptable on shipping labels and packing slips (the
   Shopify ship-from location), since a label reaches one buyer at a time
@@ -41,22 +44,42 @@ For drop one only:
 1. **Entity.** Victor operates as an individual. No REQ registration for
    "Nuage Athletics" as a business name. Every legal-page merchant block
    reads "Nuage Athletics" + `hello@nuageathletics.com`, nothing else.
-2. **Address.** No alternate address exists. `SENDER_IDENTITY.address`
+2. ~~**Address.** No alternate address exists. `SENDER_IDENTITY.address`
    stays unset; `senderAddressConfigured()` (#46) gates every render site
    so the placeholder string never ships on a live page, and the address
-   line is simply absent rather than shown as missing.
-3. **Phone.** Not published. CPA s. 54.4 (b) [address] and (c) [phone] are
-   both knowingly incomplete on the pre-contract disclosure (#92). Section
-   54.8 gives a buyer a 7-day cancellation right when 54.4 is incomplete —
-   accepted as the cost of this decision.
-4. **Mailing list.** Stays off. `SIGNUP_PROMPT_ENABLED` remains `false` —
-   not because sending is broken (Resend's DNS is fully configured), but
-   because there is no CASL-compliant address for the footer. The drop is
-   announced on social channels instead.
+   line is simply absent rather than shown as missing.~~
+
+   **Amended 2026-09-15, same day: home address is public.** Victor
+   reversed this specific call the day it was recorded — his home address
+   may appear on the legal pages, in email footers, and in Shopify's own
+   notification footers. It is **not** committed to `src/lib/consent.ts`
+   as a constant, because this repo is public and a constant would put a
+   home address in git history permanently. Instead it is the
+   `SENDER_ADDRESS` Worker secret (`wrangler secret put`), read via
+   `env.SENDER_ADDRESS` in the Worker and `process.env.SENDER_ADDRESS` in
+   scripts. `senderAddressConfigured()` (#46) now gates on the secret
+   being set, not on the placeholder being replaced — same mechanism,
+   inverted intent: it still means "never render a placeholder," but the
+   expected end state is the line rendering, not being omitted.
+   `Seo.astro`'s Organization JSON-LD still deliberately omits `address` —
+   that omission is no longer "it's a placeholder," it's "a home address
+   is not something to hand every aggregator just because it's readable
+   on a policy page."
+3. **Phone.** Not published. CPA s. 54.4 (c) [phone] is knowingly
+   incomplete on the pre-contract disclosure (#92) — (b) [address] is now
+   satisfied by the amendment above. Section 54.8 gives a buyer a 7-day
+   cancellation right when 54.4 is incomplete — accepted as the cost of
+   the phone gap alone, narrower than the address+phone exposure this ADR
+   originally accepted.
+4. **Mailing list.** ~~Stays off.~~ **Amended: comes back on once #67
+   lands.** `SIGNUP_PROMPT_ENABLED` returns to `true` once `SENDER_ADDRESS`
+   is set and #67's e2e un-skip lands — the reason it was `false` (no
+   CASL-compliant address for the confirmation footer) no longer applies.
+   The drop is announced on social *and* by email once this ships.
 5. **Shipping label / packing slip.** Home address is the Shopify ship-from
-   location and prints as the return address. Accepted: this is the one
-   surface where the address reaches someone who has already given us
-   theirs, individually, not published.
+   location and prints as the return address, as before — now alongside
+   being the address on every other surface, not the one exception to
+   "never published."
 6. **Returns.** No policy beyond contacting `hello@` — see #92 and #66 for
    the exact wording. #47's dedicated `/retours/` and `/livraison/` pages
    are deferred; the pre-contract page (#92) carries the whole disclosure
@@ -76,25 +99,30 @@ For drop one only:
 - ADR-0001 and ADR-0003 are **deferred**, not superseded in the sense of
   being wrong — their recommendations still apply whenever the business
   grows past a one-person, one-drop operation. Their statuses are updated
-  to point here.
-- #67 (mailing address + phone), #47 (returns/shipping pages), the
-  incorporation half of #44, and the CA-number half of ADR-0003 move to a
-  `Post-drop-one` milestone.
-- #46 is widened: `senderAddressConfigured()` now also gates the address
-  line on `confidentialite.astro`, `en/privacy.astro`, `conditions.astro`,
-  `en/terms.astro`, `informations-precontractuelles.astro`, and
-  `en/pre-contract-information.astro` — reversing that issue's earlier
-  decision to leave the placeholder rendering on those pages while they
-  were drafts. Once #92 removes the draft banners and makes them
-  indexable, a placeholder string on a live selling page is worse than an
-  omitted line.
-- `CONTEXT.md`'s "What blocks each flag" section drops the entity,
-  address, and CA-number gates on `COMMERCE_ENABLED`, replacing them with
-  a pointer here.
+  to point here. ADR-0003's address half is now **resolved differently**
+  rather than deferred (see its own amendment); only its dealer-ID half
+  remains deferred.
+- ~~#67 (mailing address + phone)~~ **Amended: #67 (now address + list
+  reactivation only) is back in drop one's scope, not deferred.** #47
+  (returns/shipping pages), the incorporation half of #44, and the
+  CA-number half of ADR-0003 stay in the `Post-drop-one` milestone. The
+  phone gap is a single bullet in #44, not its own issue.
+- #46 is rescoped, not widened the way originally planned: instead of
+  gating the address line *off* every render site because there's no
+  address, `senderAddressConfigured()` now gates it *on* — present when
+  `SENDER_ADDRESS` is set, omitted (never a placeholder) when it isn't.
+  Same six render sites: `confidentialite.astro`, `en/privacy.astro`,
+  `conditions.astro`, `en/terms.astro`,
+  `informations-precontractuelles.astro`, and
+  `en/pre-contract-information.astro`.
+- `CONTEXT.md`'s "What blocks each flag" section notes `SENDER_ADDRESS`
+  as a gate on `COMMERCE_ENABLED` (the pre-contract page's 54.4 (b) line
+  reads from it) — the entity and CA-number gates still drop, pointing
+  here.
 - This is a drop-one-sized bet, not a standing policy. Revisit before drop
-  two — the exposures accepted here (CPA disclosure gaps under s. 54.8, no
-  registered entity, no textile dealer ID) get harder to justify as volume
-  grows.
+  two — the exposures accepted here (CPA disclosure gap under s. 54.8 for
+  the phone alone, no registered entity, no textile dealer ID) get harder
+  to justify as volume grows.
 
 Not legal or accounting advice. Tracked in #44 (the rewritten checklist),
-#67, and #47 (both deferred).
+#67 (back in drop one's scope), and #47 (deferred).

@@ -73,19 +73,24 @@ answers "may this request see prices," combining both.
   any more (non-negotiable 5.5).
 - `privacy`, `terms` and `precontract` rewritten for drop one's informal
   posture (#92) — draft banners removed, `INDEXABLE` flipped to `true` in
-  `src/i18n/utils.ts`. No mailing address or phone number is a gate any
-  more: ADR-0007 (2026-09-15) decided drop one ships without either, and
-  `senderAddressConfigured()` (#46) makes the address line disappear rather
-  than showing a placeholder.
-- Shopify admin configured to match (#93) and its policy slots filled to
-  mirror the rewritten pages (#66, superseding the #47/ADR-0006 returns
-  policy that ADR-0007 replaced with "no returns, email us").
+  `src/i18n/utils.ts`. **The address is a gate**: `SENDER_ADDRESS` (a
+  Worker secret, not a repo constant — this repo is public) must be set
+  before this flips, since the pre-contract page's CPA s. 54.4 (b) line
+  reads from it via `senderAddressConfigured()` (#46, #67; ADR-0007
+  amended 2026-09-15). No phone number is a gate — that's the one
+  knowingly incomplete 54.4 item for drop one.
+- Shopify admin configured to match (#93 — including the abandoned-checkout
+  recovery email, now on since the footer has a real address) and its
+  policy slots filled to mirror the rewritten pages (#66, superseding the
+  #47/ADR-0006 returns policy that ADR-0007 replaced with "no returns,
+  email us").
 - `#90`'s checkout-return fix verified on the paid-plan store.
 
-ADR-0001's incorporation and ADR-0003's mailing-address/dealer-ID
-requirements are **not** gates for drop one — see ADR-0007 for why, and #44
-(the rewritten checklist) plus the `Post-drop-one` milestone (#47, #67) for
-what's deferred instead.
+ADR-0001's incorporation and ADR-0003's dealer-ID requirement are **not**
+gates for drop one — see ADR-0007 for why, and #44 (the rewritten
+checklist) plus the `Post-drop-one` milestone (#47) for what's deferred
+instead. ADR-0003's mailing-address requirement **is** resolved for drop
+one (home address, via `SENDER_ADDRESS`), not deferred.
 
 **Founder preview** needs only `PREVIEW_PASSWORD` set and
 `SHOPIFY_STOREFRONT_TOKEN` + `SHOPIFY_STORE_DOMAIN` configured against a store
