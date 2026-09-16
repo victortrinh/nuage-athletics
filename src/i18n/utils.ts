@@ -78,12 +78,23 @@ export const INDEXABLE: Record<RouteId, boolean> = {
  * Off for the two dead ends reached only from an email link: offering a
  * signup to someone who just subscribed, or just unsubscribed, is a
  * CASL-flavoured problem, not only a UX one.
+ *
+ * Also off for the three legal-disclosure pages (privacy, terms,
+ * precontract): the prompt is `position: fixed; bottom: 0` and stays open
+ * until dismissed, and these pages are short enough that once scrolled it
+ * permanently covers their last few sections — on `terms`, that includes
+ * the "Contact" heading itself (confirmed visually against `wrangler dev`,
+ * not by an automated assertion — see
+ * https://github.com/victortrinh/nuage-athletics/issues/67). A page whose
+ * entire purpose is a legal disclosure is the wrong place for anything to
+ * cover its own content, so this stays off here rather than fixing the
+ * overlay's layout.
  */
 export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   home: true,
-  privacy: true,
-  terms: true,
-  precontract: true,
+  privacy: false,
+  terms: false,
+  precontract: false,
   confirmed: false,
   unsubscribed: false,
   // The visitor is already mid-purchase-decision on this page; a signup
@@ -93,17 +104,14 @@ export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
 }
 
 /**
- * Kill switch for the prompt above, independent of the per-route table:
- * every outbound email — the double opt-in confirmation included — needs a
- * real mailing address to be CASL-compliant, and `sendConfirmationEmail`
- * (src/lib/email.ts) refuses rather than sending without one (the
- * `SENDER_ADDRESS` secret, src/lib/consent.ts's `senderAddressConfigured`).
- * Prompting for a signup the confirmation email can't legally reach yet is
- * worse than not asking, so this stays false until that secret is set in
- * production. Flip it back to true then — see
+ * Kill switch for the prompt above, independent of the per-route table.
+ * It stayed false until the `SENDER_ADDRESS` Worker secret existed to send
+ * a CASL-compliant confirmation email — see `sendConfirmationEmail`
+ * (src/lib/email.ts) and `senderAddressConfigured` (src/lib/consent.ts).
+ * That secret is now set in production —
  * https://github.com/victortrinh/nuage-athletics/issues/67.
  */
-export const SIGNUP_PROMPT_ENABLED = false
+export const SIGNUP_PROMPT_ENABLED = true
 
 /** Every indexable route's path, in every locale — the sitemap's allowlist. */
 export const INDEXABLE_PATHS: readonly string[] = (Object.keys(ROUTES) as RouteId[])
