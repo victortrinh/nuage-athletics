@@ -81,16 +81,17 @@ answers "may this request see prices," combining both.
   knowingly incomplete 54.4 item for drop one.
 - Shopify admin configured to match (#93 — including the abandoned-checkout
   recovery email, now on since the footer has a real address) and its
-  policy slots filled to mirror the rewritten pages (#66, superseding the
-  #47/ADR-0006 returns policy that ADR-0007 replaced with "no returns,
-  email us").
+  policy slots filled to mirror the rewritten pages, now including the
+  `retours.astro` / `livraison.astro` pages #47 shipped (#66).
 - `#90`'s checkout-return fix verified on the paid-plan store.
 
 ADR-0001's incorporation and ADR-0003's dealer-ID requirement are **not**
 gates for drop one — see ADR-0007 for why, and #44 (the rewritten
-checklist) plus the `Post-drop-one` milestone (#47) for what's deferred
-instead. ADR-0003's mailing-address requirement **is** resolved for drop
-one (home address, via `SENDER_ADDRESS`), not deferred.
+checklist) for what's deferred instead. #47 (returns/shipping pages) was
+pulled back into drop one's scope, same session ADR-0007 was amended a
+second time — see its amendment note. ADR-0003's mailing-address
+requirement **is** resolved for drop one (home address, via
+`SENDER_ADDRESS`), not deferred.
 
 **Founder preview** needs only `PREVIEW_PASSWORD` set and
 `SHOPIFY_STOREFRONT_TOKEN` + `SHOPIFY_STORE_DOMAIN` configured against a store
@@ -123,10 +124,12 @@ independently and never backfilled:
 ## Page inventory
 
 See ADR-0006 for the full table, including every page the site deliberately
-does not have and why. Current state: 7 route ids × 2 locales = 14 pages
+does not have and why. Current state: 9 route ids × 2 locales = 18 pages
 (`ROUTES` in `src/i18n/utils.ts`), plus the product page (its slug lives in
-the catalogue, not `ROUTES`). `returns` and `shipping` (#47) are designed but
-not yet built, which would bring the total to 9 route ids + the product page.
+the catalogue, not `ROUTES`) — 10 templates × 2 locales = 20 pages total.
+`returns` and `shipping` (#47) landed on top of #92's rewrite, mirroring the
+pre-contract page's already-decided wording rather than the 30-day policy
+ADR-0006 originally described.
 
 ## Where the checklist lives
 

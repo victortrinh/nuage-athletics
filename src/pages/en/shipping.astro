@@ -1,0 +1,62 @@
+---
+// Built for #47, on top of #92's rewrite. States nothing the pre-contract
+// page (en/pre-contract-information.astro) doesn't already say — no
+// shipping rate (that's #64) and no numbers beyond the delivery-delay clause
+// already there. Gives Shopify's checkout footer (Shipping policy slot,
+// #66) a page on our own domain to point at.
+import Base from '../../layouts/Base.astro'
+import { route } from '../../i18n/utils'
+
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
+export const prerender = false
+
+const locale = 'en-CA' as const
+---
+
+<Base
+  {locale}
+  routeId="shipping"
+  title="Shipping - Nuage Athletics"
+  description="Nuage Athletics shipping policy: destinations, cost and timelines."
+>
+  <section class="max-w-2xl py-24 space-y-8 text-sm leading-relaxed opacity-90">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight opacity-100">Shipping</h1>
+      <p class="mt-4 opacity-70">Last updated: September 15, 2026</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Destinations</h2>
+      <p class="mt-2">We ship to Canada only, via Canada Post.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Cost</h2>
+      <p class="mt-2">
+        Flat national rate, free above a threshold, calculated at checkout. No sales tax is
+        charged: as a small supplier, we aren't registered for GST or QST.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Timelines</h2>
+      <p class="mt-2">
+        The estimated timeframe is shown at checkout. If the goods aren't delivered within 30 days
+        of the agreed date, you may terminate the contract.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Ship-from address</h2>
+      <p class="mt-2">Orders ship from Quebec, Canada.</p>
+    </div>
+
+    <div>
+      <p class="mt-2">
+        For the full pre-contract disclosure — merchant, price, right of withdrawal — see{' '}
+        <a href={route('precontract', locale)} class="underline">Pre-contract information</a>.
+      </p>
+    </div>
+  </section>
+</Base>

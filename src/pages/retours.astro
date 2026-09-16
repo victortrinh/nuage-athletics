@@ -1,0 +1,71 @@
+---
+// Built for #47, on top of #92's rewrite: a bilingual page a buyer can read
+// and keep before the distance contract forms (LPC retention requirement),
+// and something for Shopify's checkout footer (Refund policy slot, #66) to
+// point at that isn't a Shopify default. States nothing the pre-contract
+// page (informations-precontractuelles.astro) doesn't already say — no
+// return window, no numbers beyond what's there.
+import Base from '../layouts/Base.astro'
+import { SENDER_IDENTITY } from '../lib/consent'
+import { route } from '../i18n/utils'
+
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
+export const prerender = false
+
+const locale = 'fr-CA' as const
+---
+
+<Base
+  {locale}
+  routeId="returns"
+  title="Retours - Nuage Athletics"
+  description="Politique de retours, garantie légale et modifications de commande pour Nuage Athletics."
+>
+  <section class="max-w-2xl py-24 space-y-8 text-sm leading-relaxed opacity-90">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight opacity-100">Retours</h1>
+      <p class="mt-4 opacity-70">Dernière mise à jour : 15 septembre 2026</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Retours et échanges</h2>
+      <p class="mt-2">
+        Aucun retour ni échange pour ce premier lancement. Un problème avec votre commande ?
+        Écrivez-nous à{' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
+        La garantie légale s'applique.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Garantie légale</h2>
+      <p class="mt-2">
+        Cette politique ne remplace pas la garantie légale prévue par la Loi sur la protection du
+        consommateur : un bien doit être propre à l'usage auquel il est normalement destiné, d'une
+        durabilité raisonnable compte tenu de son prix et conforme à ce qui a été annoncé. Si votre
+        article est défectueux ou ne correspond pas à ce qui a été commandé, écrivez-nous à{' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>{' '}
+        et nous réglons la situation au cas par cas.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Modifications de commande</h2>
+      <p class="mt-2">
+        Vous pouvez annuler ou modifier votre commande tant qu'elle n'a pas été expédiée en nous
+        écrivant à{' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
+        Une fois la commande expédiée, elle est régie par la politique de retours ci-dessus.
+      </p>
+    </div>
+
+    <div>
+      <p class="mt-2">
+        Pour l'ensemble des informations précontractuelles — commerçant, prix, livraison, droit de
+        résolution — voir la page{' '}
+        <a href={route('precontract', locale)} class="underline">Informations précontractuelles</a>.
+      </p>
+    </div>
+  </section>
+</Base>

@@ -37,6 +37,8 @@ const year = new Date().getFullYear()
 // reached from the page itself, not from chrome.
 const navLinks = [
   { href: route('home', locale), label: d.navHome },
+  { href: route('returns', locale), label: d.returns },
+  { href: route('shipping', locale), label: d.shipping },
   { href: route('privacy', locale), label: d.privacy },
   { href: route('terms', locale), label: d.terms },
   { href: route('precontract', locale), label: d.precontract },
@@ -338,13 +340,19 @@ const promptRedirectTo = Astro.url.pathname + Astro.url.search
     <footer class="mt-24 px-6 py-10 text-xs text-mute sm:px-10">
       <div class="mx-auto max-w-7xl">
         {/*
-          underline-sweep, not `hover:underline`: these three are the only
+          underline-sweep, not `hover:underline`: these five are the only
           links on the site with no underline of their own, and a rule that
           draws itself in from the left is the same hairline the layout is
           already built from. It answers :focus-visible too, so tabbing the
           footer gets the affordance and not only the focus outline.
         */}
         <nav aria-label={d.navFooterLabel} class="flex flex-wrap gap-x-6 gap-y-2 mb-4">
+          <a href={route('returns', locale)} class="underline-sweep hover:text-accent-ink">
+            {d.returns}
+          </a>
+          <a href={route('shipping', locale)} class="underline-sweep hover:text-accent-ink">
+            {d.shipping}
+          </a>
           <a href={route('privacy', locale)} class="underline-sweep hover:text-accent-ink">
             {d.privacy}
           </a>

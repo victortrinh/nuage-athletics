@@ -78,7 +78,9 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
       <div>
         <dt class="font-medium opacity-100">Livraison</dt>
         <dd class="mt-1">
-          Au Canada seulement, par Postes Canada. Délai estimé indiqué au moment du paiement.
+          Au Canada seulement, par Postes Canada. Délai estimé indiqué au moment du paiement. Voir
+          la page{' '}
+          <a href={route('shipping', locale)} class="underline">Livraison</a> pour les détails.
         </dd>
       </div>
       <div>
@@ -95,7 +97,9 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
           Aucun retour ni échange pour ce premier lancement. Un problème avec votre commande ?
           Écrivez-nous à{' '}
           <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
-          La garantie légale s'applique.
+          La garantie légale s'applique. Voir la page{' '}
+          <a href={route('returns', locale)} class="underline">Retours</a> pour les modifications
+          de commande et la garantie légale.
         </dd>
       </div>
       <div>

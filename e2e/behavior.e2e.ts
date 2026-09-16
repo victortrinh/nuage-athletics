@@ -660,13 +660,15 @@ test('nav drawer opens from its trigger, traps focus, and Escape returns focus t
   expect(stillInsideDialog).toBe(true)
 
   const links = dialog.getByRole('link')
-  await expect(links).toHaveCount(6)
+  await expect(links).toHaveCount(8)
   await expect(links.nth(0)).toHaveText('Accueil')
-  await expect(links.nth(1)).toHaveText('Confidentialité')
-  await expect(links.nth(2)).toHaveText('Conditions')
-  await expect(links.nth(3)).toHaveText('Informations précontractuelles')
-  await expect(links.nth(4)).toHaveText('Contact')
-  await expect(links.nth(5)).toHaveText('Instagram')
+  await expect(links.nth(1)).toHaveText('Retours')
+  await expect(links.nth(2)).toHaveText('Livraison')
+  await expect(links.nth(3)).toHaveText('Confidentialité')
+  await expect(links.nth(4)).toHaveText('Conditions')
+  await expect(links.nth(5)).toHaveText('Informations précontractuelles')
+  await expect(links.nth(6)).toHaveText('Contact')
+  await expect(links.nth(7)).toHaveText('Instagram')
 
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
@@ -1193,4 +1195,42 @@ test('the pre-contract information page is reachable from the footer, the nav dr
   await bandLink.click()
   await expect(page).toHaveURL(new RegExp(`${ROUTES.precontract['fr-CA']}$`))
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Informations précontractuelles')
+})
+
+/**
+ * The returns and shipping pages (#47) are reachable from the footer and the
+ * nav drawer, like the pre-contract page above, and each states the
+ * drop-one policy that's already on the pre-contract page — no invented
+ * return window or shipping rate.
+ */
+test('the returns and shipping pages are reachable from the footer and the nav drawer', async ({
+  page,
+}) => {
+  await page.goto(ROUTES.home['fr-CA'])
+
+  await expect(
+    page.locator('footer').getByRole('link', { name: 'Retours', exact: true })
+  ).toHaveAttribute('href', ROUTES.returns['fr-CA'])
+  await expect(
+    page.locator('footer').getByRole('link', { name: 'Livraison', exact: true })
+  ).toHaveAttribute('href', ROUTES.shipping['fr-CA'])
+
+  await page.getByRole('button', { name: 'Menu' }).click()
+  await expect(
+    page.getByRole('dialog').getByRole('link', { name: 'Retours', exact: true })
+  ).toHaveAttribute('href', ROUTES.returns['fr-CA'])
+  await expect(
+    page.getByRole('dialog').getByRole('link', { name: 'Livraison', exact: true })
+  ).toHaveAttribute('href', ROUTES.shipping['fr-CA'])
+  await page.keyboard.press('Escape')
+
+  await page.goto(ROUTES.returns['fr-CA'])
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Retours')
+  await expect(
+    page.getByText('Aucun retour ni échange pour ce premier lancement.')
+  ).toBeVisible()
+
+  await page.goto(ROUTES.shipping['fr-CA'])
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Livraison')
+  await expect(page.getByText('Postes Canada', { exact: false })).toBeVisible()
 })

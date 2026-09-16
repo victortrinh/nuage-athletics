@@ -1,0 +1,64 @@
+---
+// Built for #47, on top of #92's rewrite. States nothing the pre-contract
+// page (informations-precontractuelles.astro) doesn't already say — no
+// shipping rate (that's #64) and no numbers beyond the delivery-delay clause
+// already there. Gives Shopify's checkout footer (Shipping policy slot,
+// #66) a page on our own domain to point at.
+import Base from '../layouts/Base.astro'
+import { route } from '../i18n/utils'
+
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
+export const prerender = false
+
+const locale = 'fr-CA' as const
+---
+
+<Base
+  {locale}
+  routeId="shipping"
+  title="Livraison - Nuage Athletics"
+  description="Politique de livraison de Nuage Athletics : destinations, frais et délais."
+>
+  <section class="max-w-2xl py-24 space-y-8 text-sm leading-relaxed opacity-90">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight opacity-100">Livraison</h1>
+      <p class="mt-4 opacity-70">Dernière mise à jour : 15 septembre 2026</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Destinations</h2>
+      <p class="mt-2">Nous expédions au Canada seulement, par Postes Canada.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Frais</h2>
+      <p class="mt-2">
+        Taux fixe national, gratuit à partir d'un certain montant, calculé au moment du paiement.
+        Aucune taxe de vente n'est perçue : à titre de petit fournisseur, nous ne sommes pas
+        inscrits à la TPS ni à la TVQ.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Délais</h2>
+      <p class="mt-2">
+        Le délai estimé est indiqué au moment du paiement. Si le bien n'est pas livré dans les 30
+        jours suivant la date convenue, vous pouvez résoudre le contrat.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Adresse d'expédition</h2>
+      <p class="mt-2">Les commandes sont expédiées depuis le Québec, Canada.</p>
+    </div>
+
+    <div>
+      <p class="mt-2">
+        Pour l'ensemble des informations précontractuelles — commerçant, prix, droit de résolution
+        — voir la page{' '}
+        <a href={route('precontract', locale)} class="underline">Informations précontractuelles</a>.
+      </p>
+    </div>
+  </section>
+</Base>

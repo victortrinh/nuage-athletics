@@ -4,7 +4,10 @@
 
 Accepted (2026-09-15). **Amended 2026-09-15**, same day: Decision 2
 (Address) reversed — see the amendment note below Decision 2 and the
-updated Decision 3/4/5. Everything else in this ADR is unchanged.
+updated Decision 3/4/5. **Amended again 2026-09-15**, same day: Decision 6
+(Returns) narrowed — the no-returns *policy* stands, but "no dedicated
+returns/shipping pages" is reversed. See the amendment note below Decision
+6. Everything else in this ADR is unchanged.
 
 ## Context
 
@@ -80,10 +83,24 @@ For drop one only:
    location and prints as the return address, as before — now alongside
    being the address on every other surface, not the one exception to
    "never published."
-6. **Returns.** No policy beyond contacting `hello@` — see #92 and #66 for
+6. ~~**Returns.** No policy beyond contacting `hello@` — see #92 and #66 for
    the exact wording. #47's dedicated `/retours/` and `/livraison/` pages
    are deferred; the pre-contract page (#92) carries the whole disclosure
-   for drop one.
+   for drop one.~~
+
+   **Amended 2026-09-15, same day: #47 is built, not deferred.** The
+   no-returns policy itself is unchanged — still "no returns or exchanges
+   for this first release, email hello@, the legal warranty applies," now
+   on `retours.astro` / `en/returns.astro` verbatim from the pre-contract
+   page. What reversed is only "no dedicated pages": a policy readable
+   solely inside Shopify's checkout settings isn't something a buyer can
+   retain before the contract forms (the LPC requirement #47 exists for),
+   and Shopify auto-links its Refund/Shipping policy slots in the hosted
+   checkout footer regardless (#66) — those slots now point at real pages
+   on this domain instead of a Shopify default or nothing. `livraison.astro`
+   / `en/shipping.astro` carry the same delivery terms already on the
+   pre-contract page (Canada only, Canada Post, 30-day delivery-delay
+   termination right) with no shipping rate, since #64 hasn't set one.
 7. **Textile labelling.** No CA number obtained, no dealer address printed
    on the garment. The Textile Labelling Act's dealer-identification
    requirement is knowingly not met.
@@ -103,10 +120,11 @@ For drop one only:
   rather than deferred (see its own amendment); only its dealer-ID half
   remains deferred.
 - ~~#67 (mailing address + phone)~~ **Amended: #67 (now address + list
-  reactivation only) is back in drop one's scope, not deferred.** #47
-  (returns/shipping pages), the incorporation half of #44, and the
-  CA-number half of ADR-0003 stay in the `Post-drop-one` milestone. The
-  phone gap is a single bullet in #44, not its own issue.
+  reactivation only) is back in drop one's scope, not deferred.** The
+  incorporation half of #44 and the CA-number half of ADR-0003 stay in the
+  `Post-drop-one` milestone. The phone gap is a single bullet in #44, not
+  its own issue. **#47 (returns/shipping pages) is also back in drop one's
+  scope**, not deferred — see Decision 6's amendment.
 - #46 is rescoped, not widened the way originally planned: instead of
   gating the address line *off* every render site because there's no
   address, `senderAddressConfigured()` now gates it *on* — present when
@@ -124,5 +142,5 @@ For drop one only:
   the phone alone, no registered entity, no textile dealer ID) get harder
   to justify as volume grows.
 
-Not legal or accounting advice. Tracked in #44 (the rewritten checklist),
-#67 (back in drop one's scope), and #47 (deferred).
+Not legal or accounting advice. Tracked in #44 (the rewritten checklist)
+and #67 and #47 (both back in drop one's scope).

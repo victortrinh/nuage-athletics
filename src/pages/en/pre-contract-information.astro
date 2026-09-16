@@ -75,7 +75,10 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
       </div>
       <div>
         <dt class="font-medium opacity-100">Delivery</dt>
-        <dd class="mt-1">Canada only, via Canada Post. Estimated timeframe shown at checkout.</dd>
+        <dd class="mt-1">
+          Canada only, via Canada Post. Estimated timeframe shown at checkout. See the{' '}
+          <a href={route('shipping', locale)} class="underline">Shipping</a> page for details.
+        </dd>
       </div>
       <div>
         <dt class="font-medium opacity-100">Right of withdrawal</dt>
@@ -90,7 +93,9 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
           No returns or exchanges for this first release. A problem with your order? Write to us
           at{' '}
           <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
-          The legal warranty still applies.
+          The legal warranty still applies. See the{' '}
+          <a href={route('returns', locale)} class="underline">Returns</a> page for order changes
+          and the legal warranty.
         </dd>
       </div>
       <div>
