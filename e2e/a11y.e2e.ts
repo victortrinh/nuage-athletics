@@ -85,11 +85,45 @@ async function openHiddenContent(page: Page) {
   })
 }
 
+/**
+ * axe's color-contrast check only samples pixels the browser actually
+ * painted for the current viewport — it has no notion of "below the fold".
+ * An element straddling the viewport's bottom edge is genuinely unpainted
+ * on its lower portion, so axe reports the same "partially
+ * obscured/obscuring" incomplete result it uses for a real stacking overlap
+ * (issue #98), but `relatedNodes` comes back empty (or names an unrelated
+ * background layer) because nothing is really on top — confirmed with
+ * `elementsFromPoint` at the flagged node's box, same technique as the
+ * consent-checkbox/pre-contract cases above: nothing renders there because
+ * the browser hasn't painted that far down the page at all.
+ *
+ * `conditions.astro` / `en/terms.astro`'s "No warranty" section is the
+ * case that surfaced this: at the suite's default 1280×720 it lands at
+ * y≈694–740, straddling y=720 purely by how much copy happens to precede
+ * it — borderline enough that it only reproduces for one locale at a time
+ * depending on what else renders in the header that day. Growing the
+ * viewport to the full document height before the scan makes every element
+ * paint at once, matching what a visitor actually sees once they scroll,
+ * and is done last so it sees the final DOM (`openHiddenContent`'s forced
+ * `<details>`/signup-prompt reveal can change the document's height).
+ * `#signup-prompt` (`fixed inset-x-0 bottom-0`) simply re-anchors to the
+ * bottom of the grown viewport along with the resize, the same as it would
+ * re-anchor to the bottom of a real, shorter browser viewport a visitor
+ * scrolled within — there's nothing further down a grown viewport for it
+ * to newly overlap.
+ */
+async function growViewportToFullPage(page: Page) {
+  const height = await page.evaluate(() => document.documentElement.scrollHeight)
+  const viewport = page.viewportSize()
+  await page.setViewportSize({ width: viewport?.width ?? 1280, height })
+}
+
 for (const path of paths) {
   test(`a11y: ${path}`, async ({ page }) => {
     await page.goto(path)
     await openHiddenContent(page)
     await neutralizeUnresolvableBackgrounds(page)
+    await growViewportToFullPage(page)
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
