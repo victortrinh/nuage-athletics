@@ -17,8 +17,8 @@ Shopify admin (part of #93's checklist). This file is that runbook.
 
 Shopify notification templates can't `{% render %}` a shared snippet
 between them, and each is pasted as a standalone blob — so the branded
-shell (dark-mode CSS, wordmark, sky backdrop, footer) would otherwise be
-copy-pasted eight times and drift the first time one copy got a fix the
+shell (always-dark palette, wordmark, sky backdrop, footer) would otherwise
+be copy-pasted eight times and drift the first time one copy got a fix the
 others didn't. `shopify/src/shell.ts` + `blocks.ts` are that shared
 partial, written once in TypeScript and reused by every
 `shopify/src/templates/*.ts`; `t(fr, en)` is the Liquid analogue of
@@ -64,8 +64,9 @@ what's actually available. For each template below:
    with `<file>.subject.liquid`. Save.
 4. **Send test.** Check: the wordmark loads, the sky backdrop appears
    (Shopify's test send may block/cache images differently than a real
-   inbox), dark mode looks right in a client that supports it (e.g.
-   Apple Mail in dark appearance), and `view-source` shows the
+   inbox), the CTA button still reads ink-on-paper in Outlook.com or the
+   Outlook mobile app (its auto-invert defense — see `EMAIL_THEME`'s doc
+   comment in `src/lib/email.ts`), and `view-source` shows the
    `na-locale` comment.
 
 ## Store address

@@ -2,7 +2,12 @@
  * Body fragments shared across the notification templates — line-item
  * tables, totals, addresses, tracking, the CTA button. Same styling tokens
  * as shell.ts/src/lib/email.ts's confirmationBodyHtml, so a paragraph here
- * reads identically to one in the Resend-sent mail.
+ * reads identically to one in the Resend-sent mail. Every colour is a
+ * literal hex inlined on the element, same as src/lib/email.ts — the email
+ * is dark in every client by design (see EMAIL_THEME's doc comment), so
+ * there's no light/dark toggle and no class needed to drive one; `email-btn`
+ * is the one class in this whole shell, reserved for the CTA button's
+ * `[data-ogsc]`/`[data-ogsb]` Outlook-auto-invert defense (shell.ts).
  *
  * Shopify's own variable set differs by notification family and isn't fully
  * documented in one place (Shopify's own "Notifications variables
@@ -18,10 +23,10 @@ import { t, money, moneyWithCurrency, isoDate } from './liquid.ts'
 const theme = EMAIL_THEME
 
 const P = (body: string) =>
-  `<p class="email-ink" style="font-size:15px;line-height:1.6;margin:0 0 16px;color:${theme.ink};text-align:left;">${body}</p>`
+  `<p style="font-size:15px;line-height:1.6;margin:0 0 16px;color:${theme.ink};text-align:left;">${body}</p>`
 
 const SMALL = (body: string) =>
-  `<p class="email-mute" style="font-size:13px;color:${theme.mute};line-height:1.6;margin:0 0 16px;text-align:left;">${body}</p>`
+  `<p style="font-size:13px;color:${theme.mute};line-height:1.6;margin:0 0 16px;text-align:left;">${body}</p>`
 
 /**
  * Renders a Liquid `{% for %}` over a line-item collection. `loopVar` is the
@@ -34,11 +39,11 @@ export function lineItemTable(loopVar: string, itemPath: string, priceExpr = `${
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
   {% for line in ${loopVar} %}
   <tr>
-    <td class="email-ink email-line" style="padding:8px 0;border-bottom:1px solid ${theme.line};font-size:14px;line-height:1.5;color:${theme.ink};text-align:left;vertical-align:top;">
-      {{ ${itemPath}.title }}{% if ${itemPath}.variant_title %}<br /><span class="email-mute" style="font-size:12px;color:${theme.mute};">{{ ${itemPath}.variant_title }}</span>{% endif %}
+    <td style="padding:8px 0;border-bottom:1px solid ${theme.line};font-size:14px;line-height:1.5;color:${theme.ink};text-align:left;vertical-align:top;">
+      {{ ${itemPath}.title }}{% if ${itemPath}.variant_title %}<br /><span style="font-size:12px;color:${theme.mute};">{{ ${itemPath}.variant_title }}</span>{% endif %}
     </td>
-    <td class="email-mute email-line" style="padding:8px 0;border-bottom:1px solid ${theme.line};font-size:14px;color:${theme.mute};text-align:center;white-space:nowrap;">× {{ line.quantity }}</td>
-    <td class="email-ink email-line" style="padding:8px 0;border-bottom:1px solid ${theme.line};font-size:14px;color:${theme.ink};text-align:right;white-space:nowrap;">${money(priceExpr)}</td>
+    <td style="padding:8px 0;border-bottom:1px solid ${theme.line};font-size:14px;color:${theme.mute};text-align:center;white-space:nowrap;">× {{ line.quantity }}</td>
+    <td style="padding:8px 0;border-bottom:1px solid ${theme.line};font-size:14px;color:${theme.ink};text-align:right;white-space:nowrap;">${money(priceExpr)}</td>
   </tr>
   {% endfor %}
 </table>`
@@ -53,13 +58,13 @@ export function lineItemTable(loopVar: string, itemPath: string, priceExpr = `${
  */
 export function totalsTable(): string {
   const row = (label: string, value: string) =>
-    `<tr><td class="email-mute" style="padding:4px 0;font-size:13px;color:${theme.mute};text-align:left;">${label}</td><td class="email-ink" style="padding:4px 0;font-size:13px;color:${theme.ink};text-align:right;">${value}</td></tr>`
+    `<tr><td style="padding:4px 0;font-size:13px;color:${theme.mute};text-align:left;">${label}</td><td style="padding:4px 0;font-size:13px;color:${theme.ink};text-align:right;">${value}</td></tr>`
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
   ${row(t('Sous-total', 'Subtotal'), money('subtotal_price'))}
   {% if total_discounts != 0 %}${row(t('Rabais', 'Discount'), '-' + money('total_discounts'))}{% endif %}
   ${row(t('Livraison', 'Shipping'), money('shipping_method.price'))}
   {% for tax_line in tax_lines %}${row(`{{ tax_line.title }}`, money('tax_line.price'))}{% endfor %}
-  <tr><td class="email-ink email-line" style="padding:12px 0 0;border-top:1px solid ${theme.line};font-size:15px;font-weight:600;color:${theme.ink};text-align:left;">${t('Total', 'Total')}</td><td class="email-ink email-line" style="padding:12px 0 0;border-top:1px solid ${theme.line};font-size:15px;font-weight:600;color:${theme.ink};text-align:right;">${moneyWithCurrency('total_price')}</td></tr>
+  <tr><td style="padding:12px 0 0;border-top:1px solid ${theme.line};font-size:15px;font-weight:600;color:${theme.ink};text-align:left;">${t('Total', 'Total')}</td><td style="padding:12px 0 0;border-top:1px solid ${theme.line};font-size:15px;font-weight:600;color:${theme.ink};text-align:right;">${moneyWithCurrency('total_price')}</td></tr>
 </table>`
 }
 
@@ -69,12 +74,12 @@ export function totalsTable(): string {
 export function addressesBlock(): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
   <tr>
-    <td class="email-mute" width="50%" style="padding:0 8px 0 0;vertical-align:top;font-size:13px;line-height:1.6;color:${theme.mute};text-align:left;">
-      <strong class="email-ink" style="color:${theme.ink};">${t('Livraison', 'Shipping')}</strong><br />
+    <td width="50%" style="padding:0 8px 0 0;vertical-align:top;font-size:13px;line-height:1.6;color:${theme.mute};text-align:left;">
+      <strong style="color:${theme.ink};">${t('Livraison', 'Shipping')}</strong><br />
       {{ shipping_address | format_address }}
     </td>
-    <td class="email-mute" width="50%" style="padding:0 0 0 8px;vertical-align:top;font-size:13px;line-height:1.6;color:${theme.mute};text-align:left;">
-      <strong class="email-ink" style="color:${theme.ink};">${t('Facturation', 'Billing')}</strong><br />
+    <td width="50%" style="padding:0 0 0 8px;vertical-align:top;font-size:13px;line-height:1.6;color:${theme.mute};text-align:left;">
+      <strong style="color:${theme.ink};">${t('Facturation', 'Billing')}</strong><br />
       {{ billing_address | format_address }}
     </td>
   </tr>
@@ -88,7 +93,7 @@ export function addressesBlock(): string {
  * info), hence the guards. */
 export function trackingBlock(): string {
   const company = '{{ fulfillment.tracking_company }}'
-  const trackingLink = `<a href="{{ fulfillment.tracking_url }}" class="email-accent" style="color:${theme.accentInk};">{{ fulfillment.tracking_number }}</a>`
+  const trackingLink = `<a href="{{ fulfillment.tracking_url }}" style="color:${theme.accentInk};">{{ fulfillment.tracking_number }}</a>`
   const trackingLine = t(
     `Numéro de suivi (${company})&nbsp;: ${trackingLink}`,
     `Tracking number (${company}): ${trackingLink}`
@@ -106,7 +111,9 @@ ${SMALL(deliveryLine)}
 }
 
 /** The single call-to-action button, styled exactly like
- * src/lib/email.ts's `.email-btn` (ink on paper, no radius). */
+ * src/lib/email.ts's `.email-btn` (ink on paper, no radius) — `email-btn` is
+ * the one class this shell uses, reserved for shell.ts's
+ * `[data-ogsc]`/`[data-ogsb]` Outlook-auto-invert defense. */
 export function ctaButton(label: string, urlExpr: string): string {
   return `<p style="margin:0 0 24px;text-align:left;"><a href="${urlExpr}" class="email-btn" style="display:inline-block;background:${theme.ink};color:${theme.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${label}</a></p>`
 }

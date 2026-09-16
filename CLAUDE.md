@@ -228,7 +228,9 @@ of us to see the real buy flow on the real site before it opens.
 - **Shopify's own customer notifications (order confirmation, shipping,
   abandoned checkout, etc.) are custom Liquid, generated, not pasted by
   hand.** Source lives in `shopify/src/` (mirrors `src/lib/email.ts`'s
-  brand tokens and dark-mode fix); `npm run shopify:notifications` writes
+  always-dark `EMAIL_THEME` and its Outlook-auto-invert defense on the CTA
+  button — see that file's doc comments for why); `npm run
+  shopify:notifications` writes
   `shopify/notifications/*.liquid`, and `--check` (wired into `npm run
   check`) fails if a committed file is stale — edit the source, never the
   generated `.liquid` directly. There's no API for notification template

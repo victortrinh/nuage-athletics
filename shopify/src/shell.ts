@@ -5,9 +5,9 @@
  * Shopify order email must not look like a different company than the
  * Resend-sent mail a subscriber already got. Read renderEmailShell's doc
  * comments for *why* each Outlook/Gmail workaround exists (table layout, the
- * `background=` attribute, the dark-mode `@media` block instead of
- * `color-scheme: light only`, `bgcolor`/`background` riding alongside CSS) —
- * they apply identically here and aren't repeated line by line.
+ * `background=` attribute, the always-dark palette instead of a
+ * light/dark toggle, the `[data-ogsc]`/`[data-ogsb]` override on the one CTA
+ * button) — they apply identically here and aren't repeated line by line.
  *
  * Three differences from the Resend shell, all because Shopify notifications
  * aren't rendered by this codebase:
@@ -22,16 +22,7 @@
  *    domain (`SITE_URL` below), because a Shopify-rendered email has no
  *    origin of its own to be relative to.
  */
-import {
-  EMAIL_THEME,
-  EMAIL_THEME_DARK,
-  WORDMARK_PATH,
-  WORDMARK_DARK_PATH,
-  SKY_BG_PATH,
-  SKY_BG_DARK_PATH,
-  OUTER_BG,
-  OUTER_BG_DARK,
-} from '../../src/lib/email.ts'
+import { EMAIL_THEME, WORDMARK_PATH, SKY_BG_PATH, OUTER_BG } from '../../src/lib/email.ts'
 import { SENDER_IDENTITY } from '../../src/lib/consent.ts'
 import { LOCALE_PRELUDE, t } from './liquid.ts'
 
@@ -64,22 +55,19 @@ export interface ShellArgs {
  * every later `{% if en %}` in heading/body/footer has `en` defined.
  */
 export function renderShell({ heading, preheader, bodyLiquid, includeUnsubscribe }: ShellArgs): string {
-  const lt = EMAIL_THEME
-  const dt = EMAIL_THEME_DARK
+  const t_ = EMAIL_THEME
   const wordmarkUrl = `${SITE_URL}${WORDMARK_PATH}`
-  const wordmarkDarkUrl = `${SITE_URL}${WORDMARK_DARK_PATH}`
   const skyUrl = `${SITE_URL}${SKY_BG_PATH}`
-  const skyDarkUrl = `${SITE_URL}${SKY_BG_DARK_PATH}`
   const htmlLang = t('fr-CA', 'en-CA')
   const brandAlt = SENDER_IDENTITY.name
 
   const contactLine = t(
-    `Une question sur votre commande&nbsp;? Écrivez-nous à <a href="mailto:${SENDER_IDENTITY.email}" class="email-accent" style="color:${lt.accentInk};">${SENDER_IDENTITY.email}</a>.`,
-    `A question about your order? Write to us at <a href="mailto:${SENDER_IDENTITY.email}" class="email-accent" style="color:${lt.accentInk};">${SENDER_IDENTITY.email}</a>.`
+    `Une question sur votre commande&nbsp;? Écrivez-nous à <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t_.accentInk};">${SENDER_IDENTITY.email}</a>.`,
+    `A question about your order? Write to us at <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t_.accentInk};">${SENDER_IDENTITY.email}</a>.`
   )
 
   const unsubscribeLine = includeUnsubscribe
-    ? `{% if unsubscribe_url %}<br /><a href="{{ unsubscribe_url }}" class="email-mute" style="color:${lt.mute};">${t('Se désabonner', 'Unsubscribe')}</a>{% endif %}`
+    ? `{% if unsubscribe_url %}<br /><a href="{{ unsubscribe_url }}" style="color:${t_.mute};">${t('Se désabonner', 'Unsubscribe')}</a>{% endif %}`
     : ''
 
   return `{% comment %}
@@ -87,7 +75,7 @@ export function renderShell({ heading, preheader, bodyLiquid, includeUnsubscribe
 {% endcomment %}
 ${LOCALE_PRELUDE}
 <!doctype html>
-<html lang="${htmlLang}">
+<html lang="${htmlLang}" style="color-scheme: light dark;">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -104,31 +92,23 @@ ${LOCALE_PRELUDE}
     <![endif]-->
     <title>${heading}</title>
     <style>
-      @media (prefers-color-scheme: dark) {
-        .email-outer-bg { background-color: ${OUTER_BG_DARK} !important; }
-        table.email-outer-bg { background-image: url('${skyDarkUrl}') !important; }
-        .email-card { background-color: ${dt.paper} !important; border-color: ${dt.line} !important; }
-        .email-ink { color: ${dt.ink} !important; }
-        .email-mute { color: ${dt.mute} !important; }
-        .email-accent { color: ${dt.accentInk} !important; }
-        .email-line { border-top-color: ${dt.line} !important; border-bottom-color: ${dt.line} !important; }
-        .email-btn { background-color: ${dt.ink} !important; color: ${dt.paper} !important; }
-        .email-logo-light { display: none !important; }
-        .email-logo-dark { display: block !important; }
+      [data-ogsc] .email-btn, [data-ogsb] .email-btn {
+        background-color: ${t_.ink} !important;
+        color: ${t_.paper} !important;
       }
     </style>
   </head>
-  <body class="email-outer-bg" style="margin:0;padding:0;background-color:${OUTER_BG};">
+  <body style="margin:0;padding:0;background-color:${OUTER_BG};">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-outer-bg" bgcolor="${OUTER_BG}" background="${skyUrl}" style="background-color:${OUTER_BG};background-image:url('${skyUrl}');background-repeat:no-repeat;background-position:center top;background-size:cover;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${OUTER_BG}" background="${skyUrl}" style="background-color:${OUTER_BG};background-image:url('${skyUrl}');background-repeat:no-repeat;background-position:center top;background-size:cover;">
       <tr>
         <td align="center" style="padding:48px 16px;">
           <!--[if mso]>
           <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0"><tr><td>
           <![endif]-->
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-card" bgcolor="${lt.paper}" style="max-width:520px;background-color:${lt.paper};border:1px solid ${lt.line};">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${t_.paper}" style="max-width:520px;background-color:${t_.paper};border:1px solid ${t_.line};">
             <tr>
-              <td align="center" class="email-ink" style="padding:40px 32px;font-family:${lt.fontSans};color:${lt.ink};text-align:center;">
+              <td align="center" style="padding:40px 32px;font-family:${t_.fontSans};color:${t_.ink};text-align:center;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td align="center" style="padding:0 0 28px;text-align:center;">
@@ -137,21 +117,12 @@ ${LOCALE_PRELUDE}
                         width="${WORDMARK_WIDTH}"
                         height="${WORDMARK_HEIGHT}"
                         alt="${brandAlt}"
-                        class="email-logo-light"
                         style="display:block;margin:0 auto;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
-                      />
-                      <img
-                        src="${wordmarkDarkUrl}"
-                        width="${WORDMARK_WIDTH}"
-                        height="${WORDMARK_HEIGHT}"
-                        alt="${brandAlt}"
-                        class="email-logo-dark"
-                        style="display:none;margin:0 auto;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
                       />
                     </td>
                   </tr>
                   <tr>
-                    <td align="center" style="padding:0 0 16px;font-family:${lt.fontDisplay};font-size:22px;font-weight:600;line-height:1.3;text-align:center;">
+                    <td align="center" style="padding:0 0 16px;font-family:${t_.fontDisplay};font-size:22px;font-weight:600;line-height:1.3;text-align:center;">
                       ${heading}
                     </td>
                   </tr>
@@ -161,13 +132,13 @@ ${LOCALE_PRELUDE}
                     </td>
                   </tr>
                   <tr>
-                    <td align="center" class="email-mute" style="padding:8px 0 0;font-size:13px;color:${lt.mute};line-height:1.6;text-align:center;">
+                    <td align="center" style="padding:8px 0 0;font-size:13px;color:${t_.mute};line-height:1.6;text-align:center;">
                       ${contactLine}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding:32px 0 16px;">
-                      <div class="email-line" style="border-top:1px solid ${lt.line};line-height:0;font-size:0;">&nbsp;</div>
+                      <div style="border-top:1px solid ${t_.line};line-height:0;font-size:0;">&nbsp;</div>
                     </td>
                   </tr>
                   <!-- No CASL sender block: this shell serves Shopify's own
@@ -180,10 +151,10 @@ ${LOCALE_PRELUDE}
                        shop.address, resolved by whatever Settings → Store
                        details holds (see #93 and this directory's README). -->
                   <tr>
-                    <td align="center" class="email-mute" style="font-size:12px;color:${lt.mute};line-height:1.6;text-align:center;">
+                    <td align="center" style="font-size:12px;color:${t_.mute};line-height:1.6;text-align:center;">
                       ${SENDER_IDENTITY.name}<br />
                       {{ shop.address.summary }}<br />
-                      <a href="mailto:${SENDER_IDENTITY.email}" class="email-mute" style="color:${lt.mute};">${SENDER_IDENTITY.email}</a>${unsubscribeLine}
+                      <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t_.mute};">${SENDER_IDENTITY.email}</a>${unsubscribeLine}
                     </td>
                   </tr>
                 </table>
