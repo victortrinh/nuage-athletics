@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMAIL_THEME,
-  EMAIL_THEME_DARK,
   renderEmailShell,
   renderEmailText,
   sendConfirmationEmail,
@@ -53,37 +52,30 @@ describe('sendConfirmationEmail', () => {
 })
 
 /**
- * EMAIL_THEME is a hand-copied snapshot of src/styles/global.css — email
- * can't reference CSS custom properties, so there is nothing enforcing that
- * the copy stays accurate except this test.
- *
- * This asserts against literals rather than parsing global.css directly:
- * the Workers pool this suite runs under (@cloudflare/vitest-pool-workers,
- * see vitest.config.ts) sandboxes the filesystem, so neither `node:fs` nor a
- * Vite `?raw` import can reach the real file from here. If you change a
- * token in global.css, update both this test and EMAIL_THEME together.
+ * EMAIL_THEME.ink / .paper are baked into public/img/wordmark-email.png by
+ * scripts/email-wordmark.mjs, and OUTER_BG into email-sky.png by
+ * scripts/email-sky-bg.mjs — literal hexes in scripts nothing else imports.
+ * This pins the exports against those literals so the card and the image
+ * sitting on it can't silently drift apart. (It asserts against literals
+ * rather than reading the scripts: the Workers pool this suite runs under —
+ * @cloudflare/vitest-pool-workers, see vitest.config.ts — sandboxes the
+ * filesystem.) Change a colour in one place, update all three.
  */
 describe('EMAIL_THEME', () => {
-  it('matches the site tokens in src/styles/global.css', () => {
-    expect(EMAIL_THEME.ink).toBe('#0a0a0a') // --color-ink
-    expect(EMAIL_THEME.paper).toBe('#fafafa') // --color-paper
-    expect(EMAIL_THEME.mute).toBe('#63696e') // --color-mute
-    expect(EMAIL_THEME.line).toBe('#dcdcdc') // --color-line
-    expect(EMAIL_THEME.accentInk).toBe('#3a5fd9') // --color-accent-ink
+  it('matches the literals baked into the email assets', () => {
+    expect(EMAIL_THEME.ink).toBe('#f2f2f0') // email-wordmark.mjs INK
+    expect(EMAIL_THEME.paper).toBe('#161616') // email-wordmark.mjs PAPER
     expect(EMAIL_THEME.trackingLabel).toBe('0.18em') // --tracking-label
   })
-})
 
-/**
- * scripts/email-wordmark.mjs bakes DARK_INK/DARK_PAPER literals into
- * wordmark-email-dark.png — this pins those against EMAIL_THEME_DARK the
- * same way EMAIL_THEME's test above pins the light asset, so the two can't
- * silently drift apart.
- */
-describe('EMAIL_THEME_DARK', () => {
-  it('matches the literals baked into wordmark-email-dark.png by email-wordmark.mjs', () => {
-    expect(EMAIL_THEME_DARK.ink).toBe('#f2f2f0') // DARK_INK
-    expect(EMAIL_THEME_DARK.paper).toBe('#161616') // DARK_PAPER
+  it('is dark, not a copy of the site tokens', () => {
+    // The whole point of the palette — see the doc comment on EMAIL_THEME.
+    // A light card is what clients' dark-mode inverters rewrite; a dark one
+    // is what they all leave alone.
+    const lum = (hex: string) =>
+      [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).reduce((a, b) => a + b) / 3
+    expect(lum(EMAIL_THEME.paper)).toBeLessThan(64)
+    expect(lum(EMAIL_THEME.ink)).toBeGreaterThan(192)
   })
 })
 
@@ -137,7 +129,7 @@ describe('renderEmailShell', () => {
     // The legacy HTML attribute, not just the CSS — Outlook's Word engine
     // ignores background-image in style= entirely.
     expect(html).toMatch(/background="[^"]*email-sky\.png"/)
-    expect(html).toContain('bgcolor="#e8e8e6"')
+    expect(html).toContain('bgcolor="#0d0d0d"')
   })
 
   it('centers content — table-cell text-align doesn\'t reliably inherit down nested tables', () => {
@@ -149,44 +141,27 @@ describe('renderEmailShell', () => {
     expect(centeredCells.length).toBeGreaterThanOrEqual(4)
   })
 
-  it('declares both colour schemes rather than opting out of dark mode', () => {
+  it('renders one dark theme with nothing for a client to switch', () => {
     const html = renderEmailShell(base)
-    // Not "light only" — see the doc comment on EMAIL_THEME_DARK. Clients
-    // like Outlook.com auto-dark-mode a message regardless of that opt-out,
-    // so the fix is to actually declare a dark theme rather than ask to be
-    // left alone.
+    // Not "light only" — Outlook.com and Gmail mobile auto-dark-mode a
+    // message regardless of that opt-out. But not a media query or an
+    // Outlook data-ogsc hook either: neither reaches every client, and a
+    // design that is already dark needs neither. See EMAIL_THEME.
     expect(html).toContain('content="light dark"')
-    expect(html).toContain('@media (prefers-color-scheme: dark)')
+    expect(html).not.toContain('<style')
+    expect(html).not.toContain('prefers-color-scheme')
+    expect(html).not.toContain('data-ogs')
+    expect(html).toContain(`bgcolor="${EMAIL_THEME.paper}"`)
+    expect(html).toContain('bgcolor="#0d0d0d"')
   })
 
-  it('overrides every themed colour under the dark media query, not just the card', () => {
-    const html = renderEmailShell({ ...base, unsubUrl: 'https://x/y' })
-    const darkBlock = html.match(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\}\s*<\/style>/)?.[1] ?? ''
-    for (const [cls, value] of [
-      ['.email-outer-bg', '#0d0d0d'],
-      ['.email-card', EMAIL_THEME_DARK.paper],
-      ['.email-ink', EMAIL_THEME_DARK.ink],
-      ['.email-mute', EMAIL_THEME_DARK.mute],
-      ['.email-line', EMAIL_THEME_DARK.line],
-    ]) {
-      expect(darkBlock).toContain(cls)
-      expect(darkBlock).toContain(value)
-    }
-  })
-
-  it('swaps the wordmark for a dark-safe asset instead of relying on transparency', () => {
+  it('ships exactly one wordmark, on the card\'s own ground', () => {
     const html = renderEmailShell(base)
-    expect(html).toContain('/img/wordmark-email-dark.png')
-    expect(html).toContain('class="email-logo-light"')
-    expect(html).toContain('class="email-logo-dark"')
-    // Hidden by default so clients that ignore the media query still show
-    // the light-mode wordmark rather than nothing.
-    expect(html).toMatch(/class="email-logo-dark"[^>]*style="display:none/)
-  })
-
-  it('floats the dark card on a dark sky backdrop too', () => {
-    const html = renderEmailShell(base)
-    expect(html).toContain('/img/email-sky-dark.png')
+    expect(html.match(/wordmark-email/g)).toHaveLength(1)
+    expect(html).toContain('/img/wordmark-email.png')
+    expect(html).not.toContain('wordmark-email-dark')
+    expect(html).toContain('/img/email-sky.png')
+    expect(html).not.toContain('email-sky-dark')
   })
 })
 
@@ -209,7 +184,7 @@ describe('renderEmailText', () => {
 describe('styleMarkdownHtml', () => {
   it('inlines a style onto paragraphs and links', () => {
     const styled = styleMarkdownHtml('<p>Hello <a href="https://x">link</a></p>')
-    expect(styled).toMatch(/<p class="email-ink" style="[^"]+">/)
-    expect(styled).toMatch(/<a class="email-accent" style="[^"]+" href="https:\/\/x">/)
+    expect(styled).toMatch(/<p style="[^"]+">/)
+    expect(styled).toMatch(/<a style="[^"]+" href="https:\/\/x">/)
   })
 })

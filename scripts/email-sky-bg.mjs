@@ -1,22 +1,18 @@
 /**
- * Regenerates public/img/email-sky.png and public/img/email-sky-dark.png —
- * the backdrop behind the message card in every outbound email
- * (src/lib/email.ts:renderEmailShell).
+ * Regenerates public/img/email-sky.png — the backdrop behind the message
+ * card in every outbound email (src/lib/email.ts:renderEmailShell).
  *
  * Run by hand (`node scripts/email-sky-bg.mjs`), not part of the build, same
  * contract as scripts/og-image.mjs and scripts/email-wordmark.mjs.
  *
  * Email can't run Sky.astro's WebGL canvas, so this stands in for it the
- * way the `sky-fallback` utility (global.css) does on the site itself: soft
- * grey masses over a light wash, same rgb(158,158,158) hue and the same mass
- * positions. The base tone is darker than sky-fallback's near-white,
- * deliberately — sky-fallback sits directly behind page text, but this sits
- * behind a paper-white card (renderEmailShell), and needs to read as a
- * backdrop the card floats on rather than disappear into it. The dark
- * variant (`prefers-color-scheme: dark`, see EMAIL_THEME_DARK in email.ts)
- * keeps the same masses and hue but inverts the base wash to near-black, so
- * a dark-mode render still reads as an overcast deck rather than a random
- * grey smear on black.
+ * way the `sky-fallback` utility (global.css) does on the site itself: the
+ * same soft masses at the same positions — but over a near-black wash
+ * rather than sky-fallback's near-white, because the email is dark in every
+ * client by design (see EMAIL_THEME in email.ts). The masses are a lighter
+ * grey than sky-fallback's rgb(158,158,158) so they still read as lit cloud
+ * against that base rather than disappearing into it, and the wash sits
+ * slightly below the card's own `#161616` so the card floats on it.
  *
  * It's a raster reproduction of that CSS rather than a literal port —
  * email's CSS `background-image` support is too inconsistent to build nine
@@ -37,11 +33,8 @@ import sharp from 'sharp'
 const WIDTH = 1600
 const HEIGHT = 1200
 
-/** Same grey the site's sky-fallback masses use. */
-const GREY = '158,158,158'
-/** Lighter grey so the masses still read as lit cloud against a near-black
- * base — the light variant's mid-grey would nearly disappear into it. */
-const DARK_GREY = '110,110,112'
+/** Lighter than sky-fallback's rgb(158,158,158) — see the header comment. */
+const GREY = '110,110,112'
 
 /**
  * Position/size/opacity lifted straight from the `sky-fallback` utility's
@@ -87,16 +80,10 @@ function svgFor({ stops, grey }) {
 </svg>`
 }
 
-const lightSvg = svgFor({
+const svg = svgFor({
   grey: GREY,
-  stops: [
-    { offset: '0%', color: '#f2f2f0' },
-    { offset: '40%', color: '#eaeae8' },
-    { offset: '100%', color: '#e2e2e0' },
-  ],
-})
-const darkSvg = svgFor({
-  grey: DARK_GREY,
+  // The 40% stop is OUTER_BG in email.ts — the solid colour clients show
+  // before images load, so the two must agree.
   stops: [
     { offset: '0%', color: '#141414' },
     { offset: '40%', color: '#0d0d0d' },
@@ -104,7 +91,6 @@ const darkSvg = svgFor({
   ],
 })
 
-await sharp(Buffer.from(lightSvg)).png({ quality: 82 }).toFile('public/img/email-sky.png')
-await sharp(Buffer.from(darkSvg)).png({ quality: 82 }).toFile('public/img/email-sky-dark.png')
+await sharp(Buffer.from(svg)).png({ quality: 82 }).toFile('public/img/email-sky.png')
 
-console.log(`Wrote public/img/email-sky.png + email-sky-dark.png (${WIDTH}x${HEIGHT})`)
+console.log(`Wrote public/img/email-sky.png (${WIDTH}x${HEIGHT})`)

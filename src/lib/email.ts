@@ -14,19 +14,40 @@ interface SendArgs {
 }
 
 /**
- * The site's design tokens (src/styles/global.css), flattened to literal
- * hexes and font stacks. Email cannot reference CSS custom properties —
- * Outlook's Word renderer drops `var()` entirely and Gmail's sanitizer strips
- * unrecognised declarations — so this is a copy, not a reference, and a copy
- * can drift. test/email.test.ts parses global.css and asserts these still
- * match it; update both together.
+ * The email's palette. Dark on purpose, and the same in every client.
+ *
+ * Email has no reliable dark mode. Standards clients (Apple Mail, iOS Mail)
+ * evaluate `prefers-color-scheme`; Outlook.com and the new Outlook apps
+ * ignore it and instead auto-invert the message, exposing `data-ogsc` /
+ * `data-ogsb` attributes as the only hook; Gmail's iOS/Android apps ignore
+ * both and invert on their own with no hook at all. Every one of those
+ * inverters works the same way: light backgrounds go dark, dark text goes
+ * light, and raster images are left alone. So a light card carrying a
+ * paper-ground wordmark PNG ends up as a white box on a client-drawn grey
+ * card (issue #103), and no CSS reaches every client to swap the image —
+ * both the media query and the Outlook hooks were shipped and Gmail mobile
+ * still had the box.
+ *
+ * What every inverter leaves alone is a design that is already dark. So
+ * this palette is not a copy of global.css (the site has no dark mode — see
+ * CLAUDE.md's non-negotiables); it is a dark palette chosen for legibility
+ * on `paper` below, rendered identically whether the client is in light or
+ * dark mode, with one wordmark and one sky asset and nothing to switch.
+ * Font stacks are the site's. `ink`/`paper` are baked into
+ * public/img/wordmark-email.png by scripts/email-wordmark.mjs and the
+ * `#0d0d0d` base of email-sky.png by scripts/email-sky-bg.mjs;
+ * test/email.test.ts pins the literals so they can't drift.
+ *
+ * Email cannot reference CSS custom properties — Outlook's Word renderer
+ * drops `var()` and Gmail's sanitizer strips unrecognised declarations — so
+ * these are literal hexes, inlined on every element.
  */
 export const EMAIL_THEME = {
-  ink: '#0a0a0a',
-  paper: '#fafafa',
-  mute: '#63696e',
-  line: '#dcdcdc',
-  accentInk: '#3a5fd9',
+  ink: '#f2f2f0',
+  paper: '#161616',
+  mute: '#9a9fa4',
+  line: '#3a3a3a',
+  accentInk: '#8fa8ff',
   fontSans: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif`,
   // Wordmark + headings only, same as the site — falls back through other
   // geometric sans before the system default, no webfont shipped.
@@ -34,47 +55,8 @@ export const EMAIL_THEME = {
   trackingLabel: '0.18em',
 } as const
 
-/**
- * Dark-mode counterpart to EMAIL_THEME. Unlike the light tokens, these don't
- * mirror anything in global.css — the site itself has no dark mode (see
- * CLAUDE.md's non-negotiables); this palette exists only for mail clients
- * that render one.
- *
- * The old approach was `color-scheme: light only` / `supported-color-schemes:
- * light only` on the shell, asking clients to leave the message alone. That
- * fails in practice: several major webmail clients (Outlook.com among them —
- * see issue #103) auto-dark-mode a message regardless of that meta pair,
- * inverting or relightening every colour they can see in the markup while
- * leaving raster images untouched. The paper-background wordmark PNG was
- * built to survive exactly that (email-wordmark.mjs's old doc comment), but
- * it only survives being left alone — once the surrounding card inverts to
- * near-black around it, the image's own light background reads as a stray
- * white box (the bug in the screenshot on #103).
- *
- * The fix is to stop opting out and actually declare both themes: an
- * explicit `@media (prefers-color-scheme: dark)` block in the shell's <style>
- * is what tells Outlook.com's renderer (and others with the same heuristic)
- * that this message already handles dark mode, which is what turns off their
- * auto-invert for it — a well-documented behaviour, not a guess. Every
- * colour below is chosen independently of the light palette (not just an
- * algorithmic invert) so it stays legible and on-brand once that block is
- * the thing actually drawing the dark render, and the wordmark/sky assets
- * get true dark siblings (wordmark-email-dark.png, email-sky-dark.png)
- * rather than relying on transparency.
- */
-export const EMAIL_THEME_DARK = {
-  ink: '#f2f2f0',
-  paper: '#161616',
-  mute: '#9a9fa4',
-  line: '#3a3a3a',
-  accentInk: '#8fa8ff',
-} as const
-
 /** Absolute path to the committed wordmark PNG. See scripts/email-wordmark.mjs. */
 export const WORDMARK_PATH = '/img/wordmark-email.png'
-/** Dark-mode sibling, swapped in by the `prefers-color-scheme: dark` block
- * in renderEmailShell. See scripts/email-wordmark.mjs. */
-export const WORDMARK_DARK_PATH = '/img/wordmark-email-dark.png'
 /** Displayed width; the source asset (320x79, scripts/email-wordmark.mjs) is
  * more than 2x this, so it stays sharp at retina. Small on purpose — this
  * sits inside a padded card now, not full-width across the message. */
@@ -84,23 +66,19 @@ const WORDMARK_HEIGHT = 29
 /**
  * The outer backdrop around the message card, standing in for the site's own
  * background (Sky.astro's WebGL canvas / the `sky-fallback` utility in
- * global.css) — email can't run either. OUTER_BG_IMAGE is a raster
- * reproduction of sky-fallback's soft grey masses (scripts/email-sky-bg.mjs,
- * public/img/email-sky.png), wired in through the legacy HTML `background=`
+ * global.css) — email can't run either. SKY_BG_PATH is a raster
+ * reproduction of sky-fallback's soft grey masses over a near-black wash
+ * (scripts/email-sky-bg.mjs, public/img/email-sky.png — dark for the reason
+ * EMAIL_THEME is), wired in through the legacy HTML `background=`
  * attribute — Outlook's Word engine ignores CSS `background-image` outright
  * but has always honoured that attribute on <table>/<td>. OUTER_BG is the
  * solid colour every client falls back to first: images are typically
  * blocked until a recipient explicitly loads them, so most opens see this,
  * not the picture.
  */
-const OUTER_BG = '#e8e8e6'
-/** Dark-mode counterpart to OUTER_BG, set via the `prefers-color-scheme:
- * dark` block — see EMAIL_THEME_DARK. */
-const OUTER_BG_DARK = '#0d0d0d'
+const OUTER_BG = '#0d0d0d'
 /** Absolute path to the committed sky asset. See scripts/email-sky-bg.mjs. */
 export const SKY_BG_PATH = '/img/email-sky.png'
-/** Dark-mode sibling. See scripts/email-sky-bg.mjs. */
-export const SKY_BG_DARK_PATH = '/img/email-sky-dark.png'
 
 function escapeHtml(s: string): string {
   return s
@@ -122,11 +100,10 @@ function escapeHtml(s: string): string {
  * Table-based layout, not divs: Outlook's Word rendering engine ignores
  * max-width on a div but honours a fixed-width <table>, and the MSO
  * conditional comment below is what keeps the column at 520px there instead
- * of full-bleed. `color-scheme: light dark` plus the `@media
- * (prefers-color-scheme: dark)` block below declare both themes explicitly —
- * see the doc comment on EMAIL_THEME_DARK for why that's what actually stops
- * clients like Outlook.com from auto-dark-moding this message on their own
- * terms.
+ * of full-bleed. The `color-scheme: light dark` meta pair says the message
+ * handles both schemes itself; it does so by being the same dark render in
+ * either — see the doc comment on EMAIL_THEME for why there is no light
+ * variant, no media query and no per-client hook.
  *
  * The message itself sits in a paper card — border, not shadow, matching the
  * site's own "no shadows" rule — floated on the sky backdrop (OUTER_BG /
@@ -138,14 +115,8 @@ function escapeHtml(s: string): string {
  * not just the outer wrapper) because table-cell alignment doesn't reliably
  * inherit down through nested tables in every client.
  *
- * Every colour that needs to flip in dark mode carries both an inline style
- * (the value every client renders by default, including ones that ignore
- * the media query entirely) and one of the `email-*` classes the `<style>`
- * block below overrides with `!important` — inline styles otherwise always
- * win over a stylesheet, media query or not, so the class rules have no
- * other way to take effect. The wordmark is the same idea applied to an
- * image instead of a colour: two `<img>`s, one hidden by default and shown
- * only under the dark media query.
+ * Every colour is inlined on the element that uses it; there is no
+ * `<style>` block, because there is nothing conditional for one to do.
  */
 export function renderEmailShell({
   locale,
@@ -166,11 +137,8 @@ export function renderEmailShell({
 }): string {
   const d = UI[locale]
   const t = EMAIL_THEME
-  const td = EMAIL_THEME_DARK
   const wordmarkUrl = `${siteUrl}${WORDMARK_PATH}`
-  const wordmarkDarkUrl = `${siteUrl}${WORDMARK_DARK_PATH}`
   const skyUrl = `${siteUrl}${SKY_BG_PATH}`
-  const skyDarkUrl = `${siteUrl}${SKY_BG_DARK_PATH}`
 
   return `<!doctype html>
 <html lang="${locale}">
@@ -189,36 +157,22 @@ export function renderEmailShell({
     </noscript>
     <![endif]-->
     <title>${escapeHtml(heading)}</title>
-    <style>
-      @media (prefers-color-scheme: dark) {
-        .email-outer-bg { background-color: ${OUTER_BG_DARK} !important; }
-        table.email-outer-bg { background-image: url('${skyDarkUrl}') !important; }
-        .email-card { background-color: ${td.paper} !important; border-color: ${td.line} !important; }
-        .email-ink { color: ${td.ink} !important; }
-        .email-mute { color: ${td.mute} !important; }
-        .email-accent { color: ${td.accentInk} !important; }
-        .email-line { border-top-color: ${td.line} !important; }
-        .email-btn { background-color: ${td.ink} !important; color: ${td.paper} !important; }
-        .email-logo-light { display: none !important; }
-        .email-logo-dark { display: block !important; }
-      }
-    </style>
   </head>
-  <body class="email-outer-bg" style="margin:0;padding:0;background-color:${OUTER_BG};">
+  <body style="margin:0;padding:0;background-color:${OUTER_BG};">
     ${
       preheader
         ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>`
         : ''
     }
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-outer-bg" bgcolor="${OUTER_BG}" background="${skyUrl}" style="background-color:${OUTER_BG};background-image:url('${skyUrl}');background-repeat:no-repeat;background-position:center top;background-size:cover;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${OUTER_BG}" background="${skyUrl}" style="background-color:${OUTER_BG};background-image:url('${skyUrl}');background-repeat:no-repeat;background-position:center top;background-size:cover;">
       <tr>
         <td align="center" style="padding:48px 16px;">
           <!--[if mso]>
           <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0"><tr><td>
           <![endif]-->
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-card" bgcolor="${t.paper}" style="max-width:520px;background-color:${t.paper};border:1px solid ${t.line};">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${t.paper}" style="max-width:520px;background-color:${t.paper};border:1px solid ${t.line};">
             <tr>
-              <td align="center" class="email-ink" style="padding:40px 32px;font-family:${t.fontSans};color:${t.ink};text-align:center;">
+              <td align="center" style="padding:40px 32px;font-family:${t.fontSans};color:${t.ink};text-align:center;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td align="center" style="padding:0 0 28px;text-align:center;">
@@ -227,16 +181,7 @@ export function renderEmailShell({
                         width="${WORDMARK_WIDTH}"
                         height="${WORDMARK_HEIGHT}"
                         alt="${escapeHtml(d.brand)}"
-                        class="email-logo-light"
                         style="display:block;margin:0 auto;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
-                      />
-                      <img
-                        src="${wordmarkDarkUrl}"
-                        width="${WORDMARK_WIDTH}"
-                        height="${WORDMARK_HEIGHT}"
-                        alt="${escapeHtml(d.brand)}"
-                        class="email-logo-dark"
-                        style="display:none;margin:0 auto;border:0;outline:none;width:${WORDMARK_WIDTH}px;height:auto;"
                       />
                     </td>
                   </tr>
@@ -252,19 +197,19 @@ export function renderEmailShell({
                   </tr>
                   <tr>
                     <td style="padding:32px 0 16px;">
-                      <div class="email-line" style="border-top:1px solid ${t.line};line-height:0;font-size:0;">&nbsp;</div>
+                      <div style="border-top:1px solid ${t.line};line-height:0;font-size:0;">&nbsp;</div>
                     </td>
                   </tr>
                   <!-- CASL: sender identification + physical address are mandatory on
                        every commercial message; unsubscribe only applies when unsubUrl
                        is given (see doc comment above). -->
                   <tr>
-                    <td align="center" class="email-mute" style="font-size:12px;color:${t.mute};line-height:1.6;text-align:center;">
+                    <td align="center" style="font-size:12px;color:${t.mute};line-height:1.6;text-align:center;">
                       ${SENDER_IDENTITY.name}<br />
                       ${escapeHtml(address)}<br />
-                      <a href="mailto:${SENDER_IDENTITY.email}" class="email-mute" style="color:${t.mute};">${SENDER_IDENTITY.email}</a>${
+                      <a href="mailto:${SENDER_IDENTITY.email}" style="color:${t.mute};">${SENDER_IDENTITY.email}</a>${
                         unsubUrl
-                          ? `<br /><a href="${unsubUrl}" class="email-mute" style="color:${t.mute};">${d.mailUnsub}</a>`
+                          ? `<br /><a href="${unsubUrl}" style="color:${t.mute};">${d.mailUnsub}</a>`
                           : ''
                       }
                     </td>
@@ -324,10 +269,10 @@ export function renderEmailText({
 export function styleMarkdownHtml(html: string): string {
   const t = EMAIL_THEME
   return html
-    .replace(/<h2>/g, `<h2 class="email-ink" style="font-family:${t.fontDisplay};font-size:18px;font-weight:600;line-height:1.3;margin:24px 0 12px;color:${t.ink};text-align:center;">`)
-    .replace(/<h3>/g, `<h3 class="email-ink" style="font-family:${t.fontDisplay};font-size:16px;font-weight:600;line-height:1.3;margin:20px 0 10px;color:${t.ink};text-align:center;">`)
-    .replace(/<p>/g, `<p class="email-ink" style="font-size:15px;line-height:1.6;margin:0 0 16px;color:${t.ink};text-align:center;">`)
-    .replace(/<li>/g, `<li class="email-ink" style="font-size:15px;line-height:1.6;color:${t.ink};">`)
+    .replace(/<h2>/g, `<h2 style="font-family:${t.fontDisplay};font-size:18px;font-weight:600;line-height:1.3;margin:24px 0 12px;color:${t.ink};text-align:center;">`)
+    .replace(/<h3>/g, `<h3 style="font-family:${t.fontDisplay};font-size:16px;font-weight:600;line-height:1.3;margin:20px 0 10px;color:${t.ink};text-align:center;">`)
+    .replace(/<p>/g, `<p style="font-size:15px;line-height:1.6;margin:0 0 16px;color:${t.ink};text-align:center;">`)
+    .replace(/<li>/g, `<li style="font-size:15px;line-height:1.6;color:${t.ink};">`)
     // The list itself centers as a block (inline-block + an auto side margin
     // has no anchor to center against in table-cell layout, so this rides on
     // the ancestor td's text-align:center instead); list items stay
@@ -335,8 +280,8 @@ export function styleMarkdownHtml(html: string): string {
     // broken, not intentional.
     .replace(/<ul>/g, `<ul style="display:inline-block;text-align:left;margin:0 0 16px;padding-left:20px;">`)
     .replace(/<ol>/g, `<ol style="display:inline-block;text-align:left;margin:0 0 16px;padding-left:20px;">`)
-    .replace(/<a href=/g, `<a class="email-accent" style="color:${t.accentInk};" href=`)
-    .replace(/<hr\s*\/?>/g, `<hr class="email-line" style="border:none;border-top:1px solid ${t.line};margin:24px 0;" />`)
+    .replace(/<a href=/g, `<a style="color:${t.accentInk};" href=`)
+    .replace(/<hr\s*\/?>/g, `<hr style="border:none;border-top:1px solid ${t.line};margin:24px 0;" />`)
     .replace(/<img /g, `<img style="width:100%;max-width:520px;display:block;margin:0 auto;border:0;" `)
 }
 
@@ -348,11 +293,11 @@ export function styleMarkdownHtml(html: string): string {
 export function confirmationBodyHtml(d: Dict, confirmUrl: string): string {
   const t = EMAIL_THEME
   return `
-      <p class="email-ink" style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};text-align:center;">${d.mailBody}</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};text-align:center;">${d.mailBody}</p>
       <p style="margin:0 0 32px;text-align:center;">
-        <a href="${confirmUrl}" class="email-btn" style="display:inline-block;background:${t.ink};color:${t.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${d.mailCta}</a>
+        <a href="${confirmUrl}" style="display:inline-block;background:${t.ink};color:${t.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${d.mailCta}</a>
       </p>
-      <p class="email-mute" style="font-size:13px;color:${t.mute};line-height:1.6;margin:0 0 24px;text-align:center;">${d.mailIgnore}</p>`
+      <p style="font-size:13px;color:${t.mute};line-height:1.6;margin:0 0 24px;text-align:center;">${d.mailIgnore}</p>`
 }
 
 /**
