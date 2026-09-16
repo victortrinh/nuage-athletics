@@ -174,6 +174,23 @@ describe('renderEmailShell', () => {
     }
   })
 
+  it('repeats every dark rule under Outlook\'s data-ogsc/data-ogsb hooks', () => {
+    const html = renderEmailShell(base)
+    // Outlook.com and the new Outlook apps never evaluate the media query;
+    // they auto-invert and stamp these attributes on what they recoloured.
+    // The logo swap in particular has to fire there, or the light wordmark's
+    // paper ground sits as a white box on their grey card.
+    const mediaBlock = html.match(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n      \}/)?.[1] ?? ''
+    const rules = mediaBlock.trim().split('\n').map((l) => l.trim())
+    expect(rules.length).toBeGreaterThanOrEqual(8)
+    for (const rule of rules) {
+      const [sel, decl] = rule.split(/ \{ /)
+      expect(html).toContain(`[data-ogsc] ${sel}, [data-ogsb] ${sel} { ${decl}`)
+    }
+    expect(html).toContain('[data-ogsc] .email-logo-dark, [data-ogsb] .email-logo-dark { display: block !important; }')
+    expect(html).toContain('[data-ogsc] .email-logo-light, [data-ogsb] .email-logo-light { display: none !important; }')
+  })
+
   it('swaps the wordmark for a dark-safe asset instead of relying on transparency', () => {
     const html = renderEmailShell(base)
     expect(html).toContain('/img/wordmark-email-dark.png')

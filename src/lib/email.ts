@@ -51,16 +51,21 @@ export const EMAIL_THEME = {
  * near-black around it, the image's own light background reads as a stray
  * white box (the bug in the screenshot on #103).
  *
- * The fix is to stop opting out and actually declare both themes: an
- * explicit `@media (prefers-color-scheme: dark)` block in the shell's <style>
- * is what tells Outlook.com's renderer (and others with the same heuristic)
- * that this message already handles dark mode, which is what turns off their
- * auto-invert for it — a well-documented behaviour, not a guess. Every
- * colour below is chosen independently of the light palette (not just an
- * algorithmic invert) so it stays legible and on-brand once that block is
- * the thing actually drawing the dark render, and the wordmark/sky assets
- * get true dark siblings (wordmark-email-dark.png, email-sky-dark.png)
- * rather than relying on transparency.
+ * The fix is to stop opting out and actually declare both themes, through
+ * both hooks that exist: an explicit `@media (prefers-color-scheme: dark)`
+ * block for clients that evaluate one, and the same rules again under
+ * Outlook's `[data-ogsc]` / `[data-ogsb]` attributes for the ones that don't
+ * (see `darkRules` in renderEmailShell — the media query alone was tried
+ * first and Outlook still drew its own grey card around the light wordmark).
+ * Every colour below is chosen independently of the light palette (not just
+ * an algorithmic invert) so it stays legible and on-brand once these rules
+ * are the thing actually drawing the dark render, and the wordmark/sky
+ * assets get true dark siblings (wordmark-email-dark.png,
+ * email-sky-dark.png) rather than relying on transparency. Gmail's mobile
+ * apps offer neither hook — they invert on their own and honour no
+ * selector — so that render is still whatever Gmail makes of the light
+ * one; the opaque paper ground on the light wordmark is what keeps it at
+ * least legible there.
  */
 export const EMAIL_THEME_DARK = {
   ink: '#f2f2f0',
@@ -123,10 +128,10 @@ function escapeHtml(s: string): string {
  * max-width on a div but honours a fixed-width <table>, and the MSO
  * conditional comment below is what keeps the column at 520px there instead
  * of full-bleed. `color-scheme: light dark` plus the `@media
- * (prefers-color-scheme: dark)` block below declare both themes explicitly —
- * see the doc comment on EMAIL_THEME_DARK for why that's what actually stops
- * clients like Outlook.com from auto-dark-moding this message on their own
- * terms.
+ * (prefers-color-scheme: dark)` block below declare both themes explicitly,
+ * and the `[data-ogsc]`/`[data-ogsb]` copies of the same rules reach the
+ * Outlook clients that never read the media query — see the doc comment on
+ * EMAIL_THEME_DARK.
  *
  * The message itself sits in a paper card — border, not shadow, matching the
  * site's own "no shadows" rule — floated on the sky backdrop (OUTER_BG /
@@ -172,6 +177,35 @@ export function renderEmailShell({
   const skyUrl = `${siteUrl}${SKY_BG_PATH}`
   const skyDarkUrl = `${siteUrl}${SKY_BG_DARK_PATH}`
 
+  // One dark theme, declared twice. The media query is what standards
+  // clients (Apple Mail, iOS Mail, Thunderbird, Gmail web/desktop) evaluate.
+  // Outlook.com and the new Outlook apps never evaluate it: they run their
+  // own auto-invert instead — relightening the card and text on their own
+  // terms while leaving raster images alone, which is how the paper-ground
+  // wordmark ends up as a white box on a grey card — and the only hook they
+  // offer is the `data-ogsc` (colour) / `data-ogsb` (background) attribute
+  // they stamp on every element they recoloured. A selector prefixed with
+  // either wins over their rewrite, so every rule goes out a second time
+  // under both prefixes (which one lands on which ancestor depends on what
+  // that ancestor declared, so each rule hooks both rather than guessing),
+  // and the logo swap along with them.
+  const darkRules = [
+    ['.email-outer-bg', `background-color: ${OUTER_BG_DARK} !important;`],
+    ['table.email-outer-bg', `background-image: url('${skyDarkUrl}') !important;`],
+    ['.email-card', `background-color: ${td.paper} !important; border-color: ${td.line} !important;`],
+    ['.email-ink', `color: ${td.ink} !important;`],
+    ['.email-mute', `color: ${td.mute} !important;`],
+    ['.email-accent', `color: ${td.accentInk} !important;`],
+    ['.email-line', `border-top-color: ${td.line} !important;`],
+    ['.email-btn', `background-color: ${td.ink} !important; color: ${td.paper} !important;`],
+    ['.email-logo-light', 'display: none !important;'],
+    ['.email-logo-dark', 'display: block !important;'],
+  ] as const
+  const mediaBlock = darkRules.map(([sel, decl]) => `        ${sel} { ${decl} }`).join('\n')
+  const outlookBlock = darkRules
+    .map(([sel, decl]) => `      [data-ogsc] ${sel}, [data-ogsb] ${sel} { ${decl} }`)
+    .join('\n')
+
   return `<!doctype html>
 <html lang="${locale}">
   <head>
@@ -191,17 +225,9 @@ export function renderEmailShell({
     <title>${escapeHtml(heading)}</title>
     <style>
       @media (prefers-color-scheme: dark) {
-        .email-outer-bg { background-color: ${OUTER_BG_DARK} !important; }
-        table.email-outer-bg { background-image: url('${skyDarkUrl}') !important; }
-        .email-card { background-color: ${td.paper} !important; border-color: ${td.line} !important; }
-        .email-ink { color: ${td.ink} !important; }
-        .email-mute { color: ${td.mute} !important; }
-        .email-accent { color: ${td.accentInk} !important; }
-        .email-line { border-top-color: ${td.line} !important; }
-        .email-btn { background-color: ${td.ink} !important; color: ${td.paper} !important; }
-        .email-logo-light { display: none !important; }
-        .email-logo-dark { display: block !important; }
+${mediaBlock}
       }
+${outlookBlock}
     </style>
   </head>
   <body class="email-outer-bg" style="margin:0;padding:0;background-color:${OUTER_BG};">
