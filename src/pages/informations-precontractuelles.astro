@@ -1,5 +1,4 @@
 ---
-// BROUILLON — en attente de révision juridique avant le lancement commercial.
 // Quebec's Consumer Protection Act (Loi sur la protection du consommateur)
 // requires specific disclosures before a distance contract is formed. This
 // used to be a closed <details> at the bottom of the product page
@@ -31,9 +30,7 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
   <section class="max-w-2xl py-24 space-y-8 text-sm leading-relaxed opacity-90">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight opacity-100">Informations précontractuelles</h1>
-      <p class="mt-3 text-xs uppercase tracking-wide text-warn">
-        Brouillon, en attente de révision juridique. Ne reflète pas nécessairement le texte final.
-      </p>
+      <p class="mt-4 opacity-70">Dernière mise à jour : 15 septembre 2026</p>
     </div>
 
     <dl class="space-y-6">
@@ -44,6 +41,8 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
           <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">
             {SENDER_IDENTITY.email}
           </a>
+          . Nous n'affichons pas de numéro de téléphone; écrivez-nous par courriel plutôt — nous
+          répondons aux mêmes questions qu'un appel couvrirait.
         </dd>
       </div>
       <div>
@@ -56,8 +55,10 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
       <div>
         <dt class="font-medium opacity-100">Prix</dt>
         <dd class="mt-1">
-          Indiqué sur la fiche produit, taxes en sus le cas échéant. Frais de livraison calculés
-          au moment du paiement (taux fixe national, gratuit à partir d'un certain montant).
+          Indiqué sur la fiche produit. Aucune taxe de vente n'est perçue : à titre de petit
+          fournisseur, nous ne sommes pas inscrits à la TPS ni à la TVQ. Frais de livraison
+          calculés au moment du paiement (taux fixe national, gratuit à partir d'un certain
+          montant).
         </dd>
       </div>
       <div>
@@ -76,7 +77,9 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
       </div>
       <div>
         <dt class="font-medium opacity-100">Livraison</dt>
-        <dd class="mt-1">Au Canada seulement. Délai estimé indiqué au moment du paiement.</dd>
+        <dd class="mt-1">
+          Au Canada seulement, par Postes Canada. Délai estimé indiqué au moment du paiement.
+        </dd>
       </div>
       <div>
         <dt class="font-medium opacity-100">Droit de résolution</dt>
@@ -84,6 +87,15 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
           Vous pouvez annuler votre commande tant qu'elle n'a pas été expédiée en nous écrivant.
           Si le bien n'est pas livré dans les 30 jours suivant la date convenue, vous pouvez
           résoudre le contrat.
+        </dd>
+      </div>
+      <div>
+        <dt class="font-medium opacity-100">Retours</dt>
+        <dd class="mt-1">
+          Aucun retour ni échange pour ce premier lancement. Un problème avec votre commande ?
+          Écrivez-nous à{' '}
+          <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
+          La garantie légale s'applique.
         </dd>
       </div>
       <div>

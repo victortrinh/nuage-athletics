@@ -1,11 +1,10 @@
 ---
-// DRAFT — pending legal review before commercial launch.
-// Scope deliberately limited to a marketing / waitlist site: distance-contract
-// disclosures (Quebec's Consumer Protection Act) will be added once online
-// sales go live.
+// The distance-contract disclosures Quebec's Consumer Protection Act
+// requires live on their own page — see pre-contract-information.astro.
 import Base from '../../layouts/Base.astro'
 import { SENDER_IDENTITY, senderAddressConfigured } from '../../lib/consent'
 import { env } from 'cloudflare:workers'
+import { route } from '../../i18n/utils'
 
 // The gate in src/middleware.ts never runs for a prerendered page —
 // Workers serves those straight from assets. Do not remove.
@@ -27,19 +26,18 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
   <section class="max-w-2xl py-24 space-y-8 text-sm leading-relaxed opacity-90">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight opacity-100">Terms of Use</h1>
-      <p class="mt-3 text-xs uppercase tracking-wide text-warn">
-        Draft, pending legal review. May not reflect the final text.
-      </p>
-      <p class="mt-4 opacity-70">Last updated: August 5, 2026</p>
+      <p class="mt-4 opacity-70">Last updated: September 15, 2026</p>
     </div>
 
     <div>
       <h2 class="text-lg font-semibold opacity-100">Scope</h2>
       <p class="mt-2">
-        This site currently exists to announce the launch of the first collection from{' '}
-        {SENDER_IDENTITY.name} and to collect signups for our mailing list. No sales take place on this site
-        at this time. Once online sales go live, these terms will be updated to include the
-        distance-contract disclosures required by Quebec's Consumer Protection Act.
+        {SENDER_IDENTITY.name} sells its first collection directly on this site. These terms
+        govern use of the site itself; the terms specific to an order (price, payment, delivery,
+        right of withdrawal) are disclosed separately on the{' '}
+        <a href={route('precontract', locale)} class="underline">Pre-contract information</a>{' '}
+        page before you place an order, as Quebec's Consumer Protection Act requires. Nothing in
+        these terms limits the rights that law guarantees you.
       </p>
     </div>
 
@@ -61,18 +59,12 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
     </div>
 
     <div>
-      <h2 class="text-lg font-semibold opacity-100">No warranty</h2>
+      <h2 class="text-lg font-semibold opacity-100">Site availability</h2>
       <p class="mt-2">
-        This site is provided "as is," without warranty of any kind, to the extent permitted by
-        law. We do not guarantee that the site will be error-free or available at all times.
-      </p>
-    </div>
-
-    <div>
-      <h2 class="text-lg font-semibold opacity-100">Limitation of liability</h2>
-      <p class="mt-2">
-        To the extent permitted by law, {SENDER_IDENTITY.name} will not be liable for any
-        indirect, incidental, or consequential damages arising from your use of this site.
+        We do not guarantee that the site will be error-free or available at all times. This
+        reservation is about how the site itself runs (outages, maintenance, content) — it does
+        not affect the legal warranty on the products sold, or the remedies Quebec's Consumer
+        Protection Act guarantees you on an order.
       </p>
     </div>
 
@@ -87,8 +79,8 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
     <div>
       <h2 class="text-lg font-semibold opacity-100">Changes</h2>
       <p class="mt-2">
-        We may update these terms from time to time, in particular once online sales go live. The
-        last-updated date at the top of this page reflects the most recent change.
+        We may update these terms from time to time. The last-updated date at the top of this
+        page reflects the most recent change.
       </p>
     </div>
 

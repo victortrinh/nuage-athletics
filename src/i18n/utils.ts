@@ -51,11 +51,11 @@ export function alternates(id: RouteId): { locale: Locale; path: string }[] {
  */
 export const INDEXABLE: Record<RouteId, boolean> = {
   home: true,
-  // Drafts pending legal review — see the notice at the top of each. Flip
-  // these when the reviewed text ships and the sitemap follows on its own.
-  privacy: false,
-  terms: false,
-  precontract: false,
+  // Rewritten for drop one's actual posture (#92) — the draft banners are
+  // gone and the sitemap follows on its own.
+  privacy: true,
+  terms: true,
+  precontract: true,
   // Dead ends reached only from an email link. Nothing on them is worth
   // ranking, and they leak an intent we have no business publishing.
   confirmed: false,

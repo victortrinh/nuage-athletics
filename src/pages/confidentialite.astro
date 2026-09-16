@@ -1,6 +1,4 @@
 ---
-// BROUILLON — en attente de révision juridique avant le lancement commercial.
-// Ne pas retirer cet avis avant qu'un·e avocat·e ait approuvé le texte.
 import Base from '../layouts/Base.astro'
 import { SENDER_IDENTITY, senderAddressConfigured } from '../lib/consent'
 import { env } from 'cloudflare:workers'
@@ -25,18 +23,15 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
   <section class="max-w-2xl py-24 space-y-8 text-sm leading-relaxed opacity-90">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight opacity-100">Politique de confidentialité</h1>
-      <p class="mt-3 text-xs uppercase tracking-wide text-warn">
-        Brouillon, en attente de révision juridique. Ne reflète pas nécessairement le texte final.
-      </p>
-      <p class="mt-4 opacity-70">Dernière mise à jour : 5 août 2026</p>
+      <p class="mt-4 opacity-70">Dernière mise à jour : 15 septembre 2026</p>
     </div>
 
     <div>
       <h2 class="text-lg font-semibold opacity-100">Qui nous sommes</h2>
       <p class="mt-2">
-        {SENDER_IDENTITY.name} exploite ce site pour faire connaître le lancement de sa première
-        collection de vêtements techniques, conçus au Québec. Pour toute question relative à la
-        présente politique, écrivez-nous à{' '}
+        {SENDER_IDENTITY.name} vend sa première collection de vêtements techniques, conçus au
+        Québec, directement sur ce site. Pour toute question relative à la présente politique,
+        écrivez-nous à{' '}
         <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
       </p>
     </div>
@@ -53,8 +48,17 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
         <li>l'horodatage et le texte exact du consentement que vous avez donné.</li>
       </ul>
       <p class="mt-2">
-        Nous ne recueillons aucun renseignement financier ou de paiement : le site n'effectue
-        actuellement aucune vente.
+        Lorsque vous passez une commande, le paiement se fait sur la page de caisse hébergée de
+        Shopify, jamais sur ce site : votre nom, votre adresse de livraison, votre courriel et vos
+        renseignements de paiement sont recueillis et traités par Shopify, qui agit à titre de
+        sous-traitant. Nous ne voyons ni ne stockons votre numéro de carte. Le site pose aussi un
+        témoin (cookie) technique qui identifie votre panier auprès de Shopify, afin qu'il reste
+        associé à vous d'une page à l'autre; ce témoin ne sert à aucun autre usage.
+      </p>
+      <p class="mt-2">
+        Le site n'utilise aucun outil d'analytique ou de suivi publicitaire : pas de Google
+        Analytics, pas de pixel, aucun profilage. C'est pourquoi il ne présente pas de bandeau de
+        consentement aux témoins — il n'y a rien de facultatif à y consentir.
       </p>
     </div>
 
@@ -67,6 +71,7 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
           Conserver la preuve du consentement exprès qu'exige la Loi canadienne anti-pourriel
           (LCAP). Le fardeau de la preuve du consentement repose sur nous, pas sur vous.
         </li>
+        <li>Traiter, expédier et suivre votre commande.</li>
       </ul>
     </div>
 
@@ -84,7 +89,8 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
       <p class="mt-2">Nous faisons appel aux sous-traitants suivants pour exploiter le site :</p>
       <ul class="mt-2 list-disc pl-5 space-y-1">
         <li>Cloudflare (hébergement, infrastructure, base de données);</li>
-        <li>Resend (envoi des courriels transactionnels et de marketing).</li>
+        <li>Resend (envoi des courriels transactionnels et de marketing);</li>
+        <li>Shopify (paiement, panier, expédition et service à la clientèle des commandes).</li>
       </ul>
       <p class="mt-2">
         Nous ne vendons ni ne louons vos renseignements personnels à des tiers à des fins de
@@ -99,7 +105,9 @@ const address = senderAddressConfigured(env.SENDER_ADDRESS) ? env.SENDER_ADDRESS
         aussi longtemps que nécessaire pour faire la preuve du consentement exigée par la LCAP,
         ou jusqu'à ce que vous exerciez vos droits ci-dessous. Le retrait de votre consentement
         (désabonnement) met fin à l'envoi de courriels; certains renseignements minimaux peuvent
-        être conservés plus longtemps afin de démontrer que le retrait a bien été respecté.
+        être conservés plus longtemps afin de démontrer que le retrait a bien été respecté. Les
+        renseignements liés à une commande sont conservés par Shopify selon ses propres modalités,
+        notamment pour nos obligations comptables et fiscales.
       </p>
     </div>
 
