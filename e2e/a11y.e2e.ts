@@ -3,8 +3,9 @@ import AxeBuilder from '@axe-core/playwright'
 import { ROUTES } from '../src/i18n/utils'
 import { LOCALES } from '../src/i18n/config'
 
-// Every ROUTES entry × both locales — 14 URLs. All of them are public now
-// that the pre-launch gate is gone, so the scan needs no authentication.
+// Every ROUTES entry × both locales — 18 URLs (9 route ids since #47 added
+// returns/shipping). All of them are public now that the pre-launch gate is
+// gone, so the scan needs no authentication.
 const paths = LOCALES.flatMap((locale) =>
   (Object.keys(ROUTES) as (keyof typeof ROUTES)[]).map((id) => ROUTES[id][locale])
 )

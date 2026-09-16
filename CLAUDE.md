@@ -225,6 +225,14 @@ of us to see the real buy flow on the real site before it opens.
   one answer drives both the page's `robots` meta and whether the URL reaches
   the sitemap, which is why pages no longer pass `noindex` themselves.
 - API routes need `export const prerender = false`.
+- **`retours.astro` / `en/returns.astro` and `livraison.astro` /
+  `en/shipping.astro` (#47) state nothing the pre-contract page
+  (`informations-precontractuelles.astro` / `en/pre-contract-information.astro`)
+  doesn't already say.** No return window, no shipping rate, no delivery-day
+  count beyond the 30-day delivery-delay clause already on the pre-contract
+  page. A shipping rate isn't set until #64 lands real numbers — adding one
+  to these pages first would be the same mistake non-negotiable 5.5 guards
+  against for price, aimed at a different field.
 - React islands only where interaction requires it. Default to zero JS.
 - Tailwind utility classes inline; no component CSS files.
 - Conventional commit prefixes. Commit bodies explain *why*, not what.
@@ -408,7 +416,7 @@ to reconcile against these files' existing conventions, not a replacement for th
 every island to full HTML before any hydration runs, so the crawlable content —
 headings, descriptions, the spec list, `Seo.astro`'s JSON-LD, `ProductView.astro`'s
 `<noscript>` image grid — is in the first response regardless of what hydrates
-afterward, and React only appears on two of sixteen routes in the first place
+afterward, and React only appears on two of twenty routes in the first place
 (`SignupForm`, `ProductStage`). What RAC buys — roving-
 tabindex radiogroups, forced-colors indicators, live-region announcements, focus
 restoration — is pinned by ~30 assertions in `e2e/`; hand-rolling the same
@@ -502,7 +510,7 @@ defer behind; it stays `client:load`.
 
 ## Accessibility
 
-`npm run test:a11y` runs `@axe-core/playwright` across all 14 routes plus
+`npm run test:a11y` runs `@axe-core/playwright` across all 18 routes plus
 behavioural assertions in `e2e/`, wired into CI (`.github/workflows/ci.yml`).
 Two things worth knowing before touching it:
 

@@ -123,19 +123,24 @@ const jsonLd = live
           ? 'https://schema.org/InStock'
           : 'https://schema.org/SoldOut',
         /**
-         * shippingDetails and hasMerchantReturnPolicy are Search Console's
-         * remaining non-critical asks here. Deliberately not added: the only
-         * shipping/return terms this site states anywhere are the draft CPA
-         * disclosure (informations-precontractuelles.astro /
-         * pre-contract-information.astro), which is marked "Draft, pending
-         * legal review. May not reflect the final text." and doesn't even
-         * commit to a return policy. Structured data is a claim a shopping
-         * engine will show verbatim; publishing invented numbers (a return
-         * window, a free-shipping threshold) to silence a non-critical
-         * warning would be the same mistake 5.5 in CLAUDE.md guards against
-         * for price, just aimed at a different field. Add these once real,
-         * legally-reviewed terms exist to source them from.
+         * hasMerchantReturnPolicy was one of Search Console's two non-critical
+         * asks here (#78). It's addable now that #47 shipped a real,
+         * decided returns page (retours.astro / en/returns.astro) — this is
+         * a true claim, not an invented one: MerchantReturnNotPermitted
+         * mirrors that page's "no returns or exchanges for this first
+         * release" wording exactly, and returnPolicyUrl points at the page
+         * that states it. shippingDetails stays out: it needs a rate, and
+         * #64 hasn't set one yet. Publishing an OfferShippingDetails with no
+         * real rate would be the same mistake 5.5 in CLAUDE.md guards
+         * against for price, aimed at a different field. Add it once #64
+         * lands.
          */
+        hasMerchantReturnPolicy: {
+          '@type': 'MerchantReturnPolicy',
+          applicableCountry: 'CA',
+          returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
+          returnPolicyUrl: new URL(route('returns', locale), Astro.site).href,
+        },
       },
     }
   : null

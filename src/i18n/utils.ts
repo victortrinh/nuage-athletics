@@ -22,6 +22,8 @@ export const ROUTES = {
   confirmed: { 'fr-CA': '/inscription-confirmee/', 'en-CA': '/en/confirmed/' },
   unsubscribed: { 'fr-CA': '/desabonnement/', 'en-CA': '/en/unsubscribed/' },
   cart: { 'fr-CA': '/panier/', 'en-CA': '/en/cart/' },
+  returns: { 'fr-CA': '/retours/', 'en-CA': '/en/returns/' },
+  shipping: { 'fr-CA': '/livraison/', 'en-CA': '/en/shipping/' },
 } as const
 
 export type RouteId = keyof typeof ROUTES
@@ -63,6 +65,10 @@ export const INDEXABLE: Record<RouteId, boolean> = {
   // A visitor's own working cart — nothing on it is worth ranking, and the
   // same reasoning INDEXABLE gives confirmed/unsubscribed applies here too.
   cart: false,
+  // Built for #47, mirroring the pre-contract page's already-decided
+  // wording rather than a draft — same posture as privacy/terms/precontract.
+  returns: true,
+  shipping: true,
 }
 
 /**
@@ -101,6 +107,14 @@ export const SHOWS_SIGNUP_PROMPT: Record<RouteId, boolean> = {
   // prompt competing with the checkout button for attention is the wrong
   // moment for it.
   cart: false,
+  // Ordinary content pages, not the CPA disclosure itself (that's
+  // `precontract`, which stays off above) — on, same as privacy/terms were
+  // before #92 shortened them. The fixed band may cover the closing
+  // paragraph until dismissed; accepted rather than reopening the
+  // legal-pages reasoning here, since these are shorter still and nobody's
+  // signing anything on them.
+  returns: true,
+  shipping: true,
 }
 
 /**

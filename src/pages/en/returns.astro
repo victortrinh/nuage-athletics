@@ -1,0 +1,70 @@
+---
+// Built for #47, on top of #92's rewrite: a bilingual page a buyer can read
+// and keep before the distance contract forms (LPC retention requirement),
+// and something for Shopify's checkout footer (Refund policy slot, #66) to
+// point at that isn't a Shopify default. States nothing the pre-contract
+// page (en/pre-contract-information.astro) doesn't already say — no return
+// window, no numbers beyond what's there.
+import Base from '../../layouts/Base.astro'
+import { SENDER_IDENTITY } from '../../lib/consent'
+import { route } from '../../i18n/utils'
+
+// The gate in src/middleware.ts never runs for a prerendered page —
+// Workers serves those straight from assets. Do not remove.
+export const prerender = false
+
+const locale = 'en-CA' as const
+---
+
+<Base
+  {locale}
+  routeId="returns"
+  title="Returns - Nuage Athletics"
+  description="Return policy, legal warranty and order changes for Nuage Athletics."
+>
+  <section class="max-w-2xl py-24 space-y-8 text-sm leading-relaxed opacity-90">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight opacity-100">Returns</h1>
+      <p class="mt-4 opacity-70">Last updated: September 15, 2026</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Returns and exchanges</h2>
+      <p class="mt-2">
+        No returns or exchanges for this first release. A problem with your order? Write to us at
+        {' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
+        The legal warranty still applies.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Legal warranty</h2>
+      <p class="mt-2">
+        This policy does not replace the legal warranty under Quebec's Consumer Protection Act: a
+        good must be fit for the use it's normally intended for, of reasonable durability given its
+        price, and match what was advertised. If your item is defective or doesn't match what you
+        ordered, write to us at{' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>{' '}
+        and we'll sort it out case by case.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold opacity-100">Order changes</h2>
+      <p class="mt-2">
+        You may cancel or change your order any time before it ships by writing to us at{' '}
+        <a href={`mailto:${SENDER_IDENTITY.email}`} class="underline">{SENDER_IDENTITY.email}</a>.
+        Once an order has shipped, it's covered by the returns policy above.
+      </p>
+    </div>
+
+    <div>
+      <p class="mt-2">
+        For the full pre-contract disclosure — merchant, price, delivery, right of withdrawal —
+        see{' '}
+        <a href={route('precontract', locale)} class="underline">Pre-contract information</a>.
+      </p>
+    </div>
+  </section>
+</Base>

@@ -34,7 +34,8 @@ import type { Locale } from './config.ts'
  *     understood on the first hearing beats charm.
  *   - Anything legal or transactional — consentLabel, unsubTitle/unsubBody,
  *     mailUnsub, mailSubject/mailHeading/mailCta, privacy, terms,
- *     precontract, rights, productOutOfStock, productAddToCart.
+ *     precontract, returns, shipping, rights, productOutOfStock,
+ *     productAddToCart.
  *   - dropAnnounceAvailability most of the rest: it is the only place the site
  *     tells a shopper when they can buy, on a page anyone can now reach. A
  *     stated availability date is a representation, so it says a real date
@@ -83,6 +84,8 @@ export type Dict = {
   privacy: string
   terms: string
   precontract: string
+  returns: string
+  shipping: string
   contact: string
   rights: string
   switchTo: string
@@ -210,6 +213,8 @@ export const UI: Record<Locale, Dict> = {
     privacy: 'Confidentialité',
     terms: 'Conditions',
     precontract: 'Informations précontractuelles',
+    returns: 'Retours',
+    shipping: 'Livraison',
     contact: 'Contact',
     rights: 'Tous droits réservés.',
     switchTo: 'English',
@@ -303,6 +308,8 @@ export const UI: Record<Locale, Dict> = {
     privacy: 'Privacy',
     terms: 'Terms',
     precontract: 'Pre-contract information',
+    returns: 'Returns',
+    shipping: 'Shipping',
     contact: 'Contact',
     rights: 'All rights reserved.',
     switchTo: 'Français',

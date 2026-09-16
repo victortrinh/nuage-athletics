@@ -2,11 +2,12 @@
 
 ## Status
 
-Accepted. The "planned" rows below (`returns`, `shipping`) are designed but
-**not yet built** — tracked in
-[#47](https://github.com/victortrinh/nuage-athletics/issues/47). This ADR
-records the rejections and the planned pages together, per that issue's own
-sequencing note, rather than only the pages that exist today.
+Accepted. **Amended 2026-09-15**: `returns` and `shipping`, once only
+designed and tracked in [#47](https://github.com/victortrinh/nuage-athletics/issues/47),
+are now built — landed on top of #92's legal-page rewrite, mirroring its
+already-decided wording rather than the 30-day policy this ADR originally
+described (that policy was retired by ADR-0007 before these pages existed).
+This ADR still records the rejected pages below.
 
 ## Context
 
@@ -23,13 +24,20 @@ useful if the reason survived the asking.
 
 | Route id | fr-CA | en-CA | `INDEXABLE` | Notes |
 |---|---|---|---|---|
-| `home` | `/` | `/en/` | **true** | The only indexable routes today. |
-| `privacy` | `/confidentialite/` | `/en/privacy/` | false | Draft, pending legal review (ADR-0001/0003 for the missing address, ADR-0001 for a named *responsable de la protection des renseignements personnels*). |
-| `terms` | `/conditions/` | `/en/terms/` | false | Draft, pending legal review and a real merchant-identity block (ADR-0001). |
-| `precontract` | `/informations-precontractuelles/` | `/en/pre-contract-information/` | false | Quebec LPC pre-contract distance-sale disclosures. Was a `<details>` on the product page (`CpaDisclosure.astro`); is now its own page, linked from the footer, the nav drawer, and directly under the buy control. |
+| `home` | `/` | `/en/` | **true** | Public since launch. |
+| `returns` | `/retours/` | `/en/returns/` | **true** | Built for #47, on top of #92's rewrite. No-returns policy verbatim from `precontract`, plus a legal-warranty note and an order-changes section carrying the LPC pre-shipment cancellation right (see "Folded in," below). No 30-day window, no return-shipping terms — ADR-0007 retired that policy before this page existed. |
+| `shipping` | `/livraison/` | `/en/shipping/` | **true** | Built for #47, on top of #92's rewrite. States only what `precontract` already says: Canada only via Canada Post, flat rate calculated at checkout (no amount — #64 hasn't set one), the 30-day delivery-delay termination right. Non-negotiable 5.5 applies to a shipping rate as much as to the product price. |
+| `privacy` | `/confidentialite/` | `/en/privacy/` | **true** | Rewritten for drop one's actual posture (#92) — draft banner removed. |
+| `terms` | `/conditions/` | `/en/terms/` | **true** | Rewritten for drop one's actual posture (#92) — draft banner removed. |
+| `precontract` | `/informations-precontractuelles/` | `/en/pre-contract-information/` | **true** | Quebec LPC pre-contract distance-sale disclosures. Was a `<details>` on the product page (`CpaDisclosure.astro`); is now its own page, linked from the footer, the nav drawer, and directly under the buy control. Rewritten by #92; its Delivery and Returns entries now link to `shipping`/`returns` for detail. |
 | `confirmed` | `/inscription-confirmee/` | `/en/confirmed/` | false | Dead end reached only from a confirmation email link; nothing on it is worth ranking. |
 | `unsubscribed` | `/desabonnement/` | `/en/unsubscribed/` | false | Same reasoning as `confirmed`. |
 | `cart` | `/panier/` | `/en/cart/` | false | A visitor's own working cart; nothing on it is worth ranking. |
+
+`SHOWS_SIGNUP_PROMPT` is `true` for `returns`/`shipping` (ordinary content
+pages, unlike `precontract`, which stays off — see `src/i18n/utils.ts`'s
+comment) and `false` for `privacy`/`terms`/`precontract` (the fixed prompt
+band would permanently cover a short disclosure page's last sections).
 
 Plus the **product page**, not keyed in `ROUTES` because its slug is part of
 the catalogue and differs per locale (`productPath`/`productAlternates` in
@@ -37,38 +45,13 @@ the catalogue and differs per locale (`productPath`/`productAlternates` in
 publicly with no price/buy band while `COMMERCE_ENABLED` is off, per
 non-negotiable 5.5.
 
-**Current total: 7 route ids + the product page = 8 templates × 2 locales =
-16 pages.**
+**Current total: 9 route ids + the product page = 10 templates × 2 locales =
+20 pages.**
 
-### Planned route ids (designed, not yet built — #47)
-
-| Route id | fr-CA | en-CA | `INDEXABLE` (at first) | `SHOWS_SIGNUP_PROMPT` |
-|---|---|---|---|---|
-| `returns` | `/retours/` | `/en/returns/` | false | true |
-| `shipping` | `/livraison/` | `/en/shipping/` | false | true |
-
-Content, per the policy already decided in
-[#30](https://github.com/victortrinh/nuage-athletics/issues/30):
-
-- **`returns`**: 30 days from delivery, unused with tags, customer pays
-  return shipping, exchange handled as return-and-reorder (no direct swap, no
-  inventory held back), sale items final. Plus an **order-changes** section
-  on this same page (see "Folded in," below) carrying the LPC pre-shipment
-  cancellation right already stated on the `precontract` page.
-- **`shipping`**: the weight-tiered flat rate from #30 (once the bands are
-  set), Canada only (matching the existing `shipping_address_collection`
-  restriction), and the delivery-delay terms already on the `precontract`
-  page (terminate if undelivered 30 days after the agreed date). No prices
-  render on this page while `COMMERCE_ENABLED` is off — non-negotiable 5.5
-  applies to a shipping rate as much as to the product price.
-
-Neither is added to any gate-bypass list: the pre-launch password gate that
-`OPEN_PREFIXES` in `src/lib/gate.ts` once governed has been removed entirely
-(see CONTEXT.md's "two real gates" section) — this concern from the original
-#47 scoping no longer applies.
-
-**Resulting inventory once #47 lands: 9 route ids + the product page = 10
-templates × 2 locales = 20 pages.**
+Neither `returns` nor `shipping` is added to any gate-bypass list: the
+pre-launch password gate that `OPEN_PREFIXES` in `src/lib/gate.ts` once
+governed has been removed entirely (see CONTEXT.md's "two real gates"
+section) — this concern from the original #47 scoping no longer applies.
 
 ### Shopify policy-slot mapping
 
