@@ -93,10 +93,10 @@ const WORDMARK_HEIGHT = 29
  * blocked until a recipient explicitly loads them, so most opens see this,
  * not the picture.
  */
-const OUTER_BG = '#e8e8e6'
+export const OUTER_BG = '#e8e8e6'
 /** Dark-mode counterpart to OUTER_BG, set via the `prefers-color-scheme:
  * dark` block — see EMAIL_THEME_DARK. */
-const OUTER_BG_DARK = '#0d0d0d'
+export const OUTER_BG_DARK = '#0d0d0d'
 /** Absolute path to the committed sky asset. See scripts/email-sky-bg.mjs. */
 export const SKY_BG_PATH = '/img/email-sky.png'
 /** Dark-mode sibling. See scripts/email-sky-bg.mjs. */

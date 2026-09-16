@@ -225,6 +225,19 @@ of us to see the real buy flow on the real site before it opens.
   one answer drives both the page's `robots` meta and whether the URL reaches
   the sitemap, which is why pages no longer pass `noindex` themselves.
 - API routes need `export const prerender = false`.
+- **Shopify's own customer notifications (order confirmation, shipping,
+  abandoned checkout, etc.) are custom Liquid, generated, not pasted by
+  hand.** Source lives in `shopify/src/` (mirrors `src/lib/email.ts`'s
+  brand tokens and dark-mode fix); `npm run shopify:notifications` writes
+  `shopify/notifications/*.liquid`, and `--check` (wired into `npm run
+  check`) fails if a committed file is stale — edit the source, never the
+  generated `.liquid` directly. There's no API for notification template
+  content, so a human still pastes the output into Settings →
+  Notifications; `shopify/notifications/README.md` is that runbook. The
+  address in the footer is Shopify's own `{{ shop.address.summary }}`, on
+  purpose — same reason `src/lib/consent.ts` keeps no address constant
+  (ADR-0007): this repo is public. French is the locale prelude's `else`
+  branch, not English, matching non-negotiable #1.
 - **`retours.astro` / `en/returns.astro` and `livraison.astro` /
   `en/shipping.astro` (#47) state nothing the pre-contract page
   (`informations-precontractuelles.astro` / `en/pre-contract-information.astro`)

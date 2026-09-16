@@ -7,7 +7,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "wrangler dev",
-    "check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json && bash scripts/check-guards.sh",
+    "check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json && bash scripts/check-guards.sh && node scripts/shopify-notifications.ts --check",
     "test": "vitest run",
     "test:a11y": "playwright test",
     "deploy": "astro build && wrangler deploy",
@@ -19,6 +19,7 @@
     "broadcast": "node scripts/broadcast.ts",
     "email:preview": "node scripts/email-preview.ts",
     "shopify:check": "node scripts/shopify-check.ts",
+    "shopify:notifications": "node scripts/shopify-notifications.ts",
     "email:wordmark": "node scripts/email-wordmark.mjs"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "@playwright/test": "^1.62.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "liquidjs": "^10.29.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10",
     "wrangler": "^4.42.0"
