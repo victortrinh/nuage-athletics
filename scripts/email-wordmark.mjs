@@ -1,6 +1,7 @@
 /**
- * Regenerates public/img/wordmark-email.png — the brand mark used in the
- * header of every outbound email (src/lib/email.ts:renderEmailShell).
+ * Regenerates public/img/wordmark-email.png and
+ * public/img/wordmark-email-dark.png — the brand mark used in the header of
+ * every outbound email (src/lib/email.ts:renderEmailShell).
  *
  * Run by hand (`node scripts/email-wordmark.mjs`), not part of the build:
  * the output is a brand asset that changes only when the artwork does,
@@ -14,14 +15,18 @@
  *      resolve against inside a message.
  *   2. Logo.astro inlines these paths with fill="currentColor" so the header
  *      can hand it ink and a dark ground can hand it paper. Email has no
- *      such context to inherit — the fill has to be baked in, and it's baked
- *      to ink (not the source file's own #9AA0A6, which is a logo grey at
- *      2.3:1, not a colour anything is meant to read at this size).
+ *      such context to inherit — the fill has to be baked in.
  *
- * Paper background, not transparency: a transparent PNG in a client that
- * ignores the shell's `color-scheme: light only` (auto-dark-mode inversion)
- * would composite ink-on-dark and disappear. This site has no dark mode of
- * its own, so the email shouldn't gain one by accident.
+ * Two opaque assets, not one transparent one: renderEmailShell swaps between
+ * them with a `prefers-color-scheme` media query (see the doc comment on
+ * EMAIL_THEME_DARK in email.ts for why that's a real fix and not the
+ * `color-scheme: light only` opt-out this used to lean on), but the swap
+ * itself is a CSS `display` toggle a handful of clients don't honour. A
+ * transparent mark composited by one of those clients' own auto-dark-mode
+ * filter onto a darkened card would still disappear or mismatch, so each
+ * variant carries its own matching card-colour background baked in — same
+ * failure mode the original one-asset version was built to avoid, now
+ * covered on both themes instead of just one.
  *
  * sharp is not a direct dependency — it arrives with Astro, whose image
  * service the Cloudflare adapter runs at build time (`imageService:
@@ -32,6 +37,11 @@ import sharp from 'sharp'
 /** src/styles/global.css --color-ink / --color-paper. */
 const INK = '#0a0a0a'
 const PAPER = '#fafafa'
+
+/** email.ts EMAIL_THEME_DARK.ink / .paper — keep these three literals in
+ * sync with that export; test/email.test.ts asserts it. */
+const DARK_INK = '#f2f2f0'
+const DARK_PAPER = '#161616'
 
 /** The wordmark's six paths from public/logo-nuage.svg, verbatim — see the
  * header comment in src/components/Logo.astro for why the mark reuses these
@@ -56,11 +66,14 @@ const SCALE = 320 / VIEWBOX.width
 const width = Math.round(VIEWBOX.width * SCALE)
 const height = Math.round(VIEWBOX.height * SCALE)
 
-const svg = `<svg width="${width}" height="${height}" viewBox="${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="${VIEWBOX.x}" y="${VIEWBOX.y}" width="${VIEWBOX.width}" height="${VIEWBOX.height}" fill="${PAPER}" />
-  ${PATHS.map((d) => `<path d="${d}" fill="${INK}" />`).join('\n  ')}
+function svgFor(bg, fg) {
+  return `<svg width="${width}" height="${height}" viewBox="${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="${VIEWBOX.x}" y="${VIEWBOX.y}" width="${VIEWBOX.width}" height="${VIEWBOX.height}" fill="${bg}" />
+  ${PATHS.map((d) => `<path d="${d}" fill="${fg}" />`).join('\n  ')}
 </svg>`
+}
 
-await sharp(Buffer.from(svg)).png().toFile('public/img/wordmark-email.png')
+await sharp(Buffer.from(svgFor(PAPER, INK))).png().toFile('public/img/wordmark-email.png')
+await sharp(Buffer.from(svgFor(DARK_PAPER, DARK_INK))).png().toFile('public/img/wordmark-email-dark.png')
 
-console.log(`Wrote public/img/wordmark-email.png (${width}x${height})`)
+console.log(`Wrote public/img/wordmark-email.png + wordmark-email-dark.png (${width}x${height})`)
