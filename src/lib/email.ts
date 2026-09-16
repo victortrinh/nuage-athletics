@@ -17,26 +17,37 @@ interface SendArgs {
  * The email's palette. Dark on purpose, and the same in every client.
  *
  * Email has no reliable dark mode. Standards clients (Apple Mail, iOS Mail)
- * evaluate `prefers-color-scheme`; Outlook.com and the new Outlook apps
- * ignore it and instead auto-invert the message, exposing `data-ogsc` /
- * `data-ogsb` attributes as the only hook; Gmail's iOS/Android apps ignore
- * both and invert on their own with no hook at all. Every one of those
- * inverters works the same way: light backgrounds go dark, dark text goes
- * light, and raster images are left alone. So a light card carrying a
- * paper-ground wordmark PNG ends up as a white box on a client-drawn grey
- * card (issue #103), and no CSS reaches every client to swap the image —
- * both the media query and the Outlook hooks were shipped and Gmail mobile
- * still had the box.
+ * evaluate `prefers-color-scheme`; Outlook.com and the Outlook mobile apps
+ * (iOS/Android) ignore it and instead auto-invert the message, exposing
+ * `data-ogsc` / `data-ogsb` attributes on whatever they recoloured as the
+ * only hook; Gmail's iOS/Android apps ignore both and invert on their own
+ * with no hook at all. Every one of those inverters works the same way:
+ * light backgrounds go dark, dark text goes light. So a light card carrying
+ * a paper-ground wordmark PNG ends up as a white box on a client-drawn grey
+ * card (issue #103).
  *
- * What every inverter leaves alone is a design that is already dark. So
- * this palette is not a copy of global.css (the site has no dark mode — see
- * CLAUDE.md's non-negotiables); it is a dark palette chosen for legibility
- * on `paper` below, rendered identically whether the client is in light or
- * dark mode, with one wordmark and one sky asset and nothing to switch.
- * Font stacks are the site's. `ink`/`paper` are baked into
+ * A design that is already dark is what every inverter is supposed to leave
+ * alone. So this palette is not a copy of global.css (the site has no dark
+ * mode — see CLAUDE.md's non-negotiables); it is a dark palette chosen for
+ * legibility on `paper` below, rendered identically whether the client is in
+ * light or dark mode, with one wordmark and one sky asset and nothing to
+ * switch. Font stacks are the site's. `ink`/`paper` are baked into
  * public/img/wordmark-email.png by scripts/email-wordmark.mjs and the
  * `#0d0d0d` base of email-sky.png by scripts/email-sky-bg.mjs;
  * test/email.test.ts pins the literals so they can't drift.
+ *
+ * The one element in the shell that isn't dark is the CTA button
+ * (`confirmationBodyHtml` below) — `background: t.ink` on purpose, for
+ * contrast against the dark card. That's exactly the shape Outlook's
+ * auto-invert is looking for: a light background it decides to darken,
+ * turning our light-on-dark button into Outlook's own mid-grey with white
+ * text (reported against the Outlook mobile app, after the meta-only /
+ * `color-scheme`-property fixes above, neither of which reaches Outlook's
+ * own heuristic). `.email-btn`'s `[data-ogsc]`/`[data-ogsb]` override in
+ * `renderEmailShell` re-asserts the intended colours once Outlook has
+ * already decided to recolour it — the one place this shell still needs a
+ * `<style>` block, because it's the one element with something conditional
+ * to defend against.
  *
  * Email cannot reference CSS custom properties — Outlook's Word renderer
  * drops `var()` and Gmail's sanitizer strips unrecognised declarations — so
@@ -105,6 +116,17 @@ function escapeHtml(s: string): string {
  * either — see the doc comment on EMAIL_THEME for why there is no light
  * variant, no media query and no per-client hook.
  *
+ * The meta pair alone isn't enough on Apple Mail 13+ (Catalina and every
+ * iOS/macOS Mail since): it only honours the older `<meta name=
+ * "supported-color-scheme">` singular tag (Mail 12) or the CSS `color-scheme`
+ * *property*, not the meta-only declaration above — without the property, it
+ * falls back to auto-inverting, which flips the wordmark PNG's baked-in dark
+ * ground to light and turns the light-on-dark CTA button into Mail's own grey
+ * (issue: logo still showed light-card-black-text after the meta-only fix).
+ * `style="color-scheme: light dark;"` on `<html>` below is the same effect a
+ * `:root { color-scheme: light dark; }` rule would have, without needing the
+ * `<style>` block the rest of this shell deliberately has none of.
+ *
  * The message itself sits in a paper card — border, not shadow, matching the
  * site's own "no shadows" rule — floated on the sky backdrop (OUTER_BG /
  * SKY_BG_PATH, see the doc comment on OUTER_BG). `bgcolor`/`background`
@@ -115,8 +137,9 @@ function escapeHtml(s: string): string {
  * not just the outer wrapper) because table-cell alignment doesn't reliably
  * inherit down through nested tables in every client.
  *
- * Every colour is inlined on the element that uses it; there is no
- * `<style>` block, because there is nothing conditional for one to do.
+ * Every colour is inlined on the element that uses it, except the CTA
+ * button's Outlook override below — see the doc comment on EMAIL_THEME for
+ * why that one element needs a `<style>` block and nothing else does.
  */
 export function renderEmailShell({
   locale,
@@ -141,7 +164,7 @@ export function renderEmailShell({
   const skyUrl = `${siteUrl}${SKY_BG_PATH}`
 
   return `<!doctype html>
-<html lang="${locale}">
+<html lang="${locale}" style="color-scheme: light dark;">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -157,6 +180,12 @@ export function renderEmailShell({
     </noscript>
     <![endif]-->
     <title>${escapeHtml(heading)}</title>
+    <style>
+      [data-ogsc] .email-btn, [data-ogsb] .email-btn {
+        background-color: ${t.ink} !important;
+        color: ${t.paper} !important;
+      }
+    </style>
   </head>
   <body style="margin:0;padding:0;background-color:${OUTER_BG};">
     ${
@@ -295,7 +324,7 @@ export function confirmationBodyHtml(d: Dict, confirmUrl: string): string {
   return `
       <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:${t.ink};text-align:center;">${d.mailBody}</p>
       <p style="margin:0 0 32px;text-align:center;">
-        <a href="${confirmUrl}" style="display:inline-block;background:${t.ink};color:${t.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${d.mailCta}</a>
+        <a href="${confirmUrl}" class="email-btn" style="display:inline-block;background:${t.ink};color:${t.paper};text-decoration:none;padding:12px 22px;font-size:15px;">${d.mailCta}</a>
       </p>
       <p style="font-size:13px;color:${t.mute};line-height:1.6;margin:0 0 24px;text-align:center;">${d.mailIgnore}</p>`
 }

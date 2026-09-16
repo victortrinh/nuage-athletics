@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMAIL_THEME,
+  confirmationBodyHtml,
   renderEmailShell,
   renderEmailText,
   sendConfirmationEmail,
   styleMarkdownHtml,
 } from '../src/lib/email'
 import { SENDER_IDENTITY } from '../src/lib/consent'
+import { UI } from '../src/i18n/ui'
 
 const TEST_ADDRESS = '123 Rue Exemple, Montréal QC H2X 1Y4'
 
@@ -141,18 +143,35 @@ describe('renderEmailShell', () => {
     expect(centeredCells.length).toBeGreaterThanOrEqual(4)
   })
 
-  it('renders one dark theme with nothing for a client to switch', () => {
+  it('renders one dark theme with nothing for most of the shell to switch', () => {
     const html = renderEmailShell(base)
     // Not "light only" — Outlook.com and Gmail mobile auto-dark-mode a
-    // message regardless of that opt-out. But not a media query or an
-    // Outlook data-ogsc hook either: neither reaches every client, and a
-    // design that is already dark needs neither. See EMAIL_THEME.
+    // message regardless of that opt-out. See EMAIL_THEME.
     expect(html).toContain('content="light dark"')
-    expect(html).not.toContain('<style')
+    // Apple Mail 13+ ignores the meta pair alone and auto-inverts without
+    // this CSS property present somewhere — see the doc comment above
+    // renderEmailShell. A `:root` rule would need a <style> block; the
+    // inline attribute on <html> has the same effect without one.
+    expect(html).toMatch(/<html[^>]*style="[^"]*color-scheme:\s*light dark/)
     expect(html).not.toContain('prefers-color-scheme')
-    expect(html).not.toContain('data-ogs')
     expect(html).toContain(`bgcolor="${EMAIL_THEME.paper}"`)
     expect(html).toContain('bgcolor="#0d0d0d"')
+  })
+
+  it('re-asserts the CTA button\'s colours against Outlook\'s auto-invert', () => {
+    // The button is the one light-background element in an otherwise dark
+    // shell (contrast on purpose) — exactly what Outlook.com/the Outlook
+    // mobile apps auto-darken, stamping data-ogsc/data-ogsb on what they
+    // recoloured. This is the one place the shell still needs a <style>
+    // block; nothing else in it is conditional. See the doc comment on
+    // EMAIL_THEME.
+    const html = renderEmailShell({
+      ...base,
+      bodyHtml: confirmationBodyHtml(UI['en-CA'], 'https://nuageathletics.com/api/confirm?token=x'),
+    })
+    expect(html).toMatch(/<style>[\s\S]*\[data-ogsc\] \.email-btn[\s\S]*<\/style>/)
+    expect(html).toMatch(/\[data-ogsc\] \.email-btn, \[data-ogsb\] \.email-btn \{[^}]*background-color:\s*#f2f2f0 !important;[^}]*color:\s*#161616 !important;/)
+    expect(html).toContain('class="email-btn"')
   })
 
   it('ships exactly one wordmark, on the card\'s own ground', () => {
