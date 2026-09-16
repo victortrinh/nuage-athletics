@@ -2,8 +2,12 @@
 
 ## Status
 
-**Proposed** — awaiting confirmation from all four founders. Nothing here is
-implemented; no entity is registered as of this writing.
+**Deferred to post-drop-one; superseded for drop one by ADR-0007.** Victor
+decided (2026-09-15) to run drop one as an individual with no incorporation
+and no REQ registration. This ADR's recommendation stands for whenever the
+business grows past a one-person, one-drop operation — it isn't withdrawn,
+just not what drop one does. Nothing here is implemented; no entity is
+registered as of this writing.
 
 ## Context
 
