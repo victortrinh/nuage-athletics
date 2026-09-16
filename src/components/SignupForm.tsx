@@ -47,7 +47,11 @@ interface Props {
 type State =
   | { kind: 'idle' }
   | { kind: 'submitting' }
-  | { kind: 'success' }
+  // `origin` distinguishes the no-JS redirect's static confirmation (the
+  // page's only feedback, since there's no script to dismiss anything) from
+  // a hydrated submit resolving in place, which the popup instead closes
+  // for — see the render branch below and SignupPrompt.astro's listener.
+  | { kind: 'success'; origin: 'initial' | 'submit' }
   | { kind: 'error'; code: string; message: string }
 
 function errorMessage(d: Dict, code: string): string {
@@ -72,7 +76,7 @@ export default function SignupForm({
   initialSuccess,
 }: Props) {
   const [state, setState] = useState<State>(() => {
-    if (initialSuccess) return { kind: 'success' }
+    if (initialSuccess) return { kind: 'success', origin: 'initial' }
     if (initialErrorCode) {
       return { kind: 'error', code: initialErrorCode, message: errorMessage(d, initialErrorCode) }
     }
@@ -82,21 +86,30 @@ export default function SignupForm({
   const [consent, setConsent] = useState(false)
   const successHeadingRef = useRef<HTMLParagraphElement>(null)
 
-  // Moves focus into the success panel once it replaces the form — without
-  // this, focus (which was on the submit button) is dropped to <body> when
-  // that button unmounts.
+  // Moves focus into the success panel once it replaces the form — only
+  // applies to the no-JS redirect's static confirmation (origin: 'initial');
+  // a hydrated submit renders no panel to focus, since the popup closes
+  // instead (see the render branch below) — without this guard, focus
+  // (which was on the submit button) is dropped to <body> when that button
+  // unmounts either way, but there'd be nothing left on screen to focus.
+  const successOrigin = state.kind === 'success' ? state.origin : undefined
   useEffect(() => {
-    if (state.kind !== 'success') return
-    successHeadingRef.current?.focus()
+    if (successOrigin === undefined) return
+    if (successOrigin === 'initial') successHeadingRef.current?.focus()
     // A plain window event, not a prop: an island's props are serialized to
     // hydrate it, so a live callback can't cross that boundary the way it
     // could between two components in one React tree. SignupPrompt.astro
     // listens for this (filtered by idPrefix) to suppress itself
     // permanently once its own form succeeds, without this component
     // needing to know that listener exists — same coupling-by-string as the
-    // 'sent'/'se' query params already shared with subscribe.ts.
-    window.dispatchEvent(new CustomEvent('nuage:signup-success', { detail: { idPrefix } }))
-  }, [state.kind, idPrefix])
+    // 'sent'/'se' query params already shared with subscribe.ts. `origin` is
+    // read there too, to close the popup only for a live submit — the
+    // no-JS redirect's confirmation is the page's only feedback and must
+    // stay put.
+    window.dispatchEvent(
+      new CustomEvent('nuage:signup-success', { detail: { idPrefix, origin: successOrigin } })
+    )
+  }, [successOrigin, idPrefix])
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -131,7 +144,7 @@ export default function SignupForm({
       const data = (await res.json()) as { ok: boolean; code?: string }
 
       if (data.ok) {
-        setState({ kind: 'success' })
+        setState({ kind: 'success', origin: 'submit' })
         return
       }
 
@@ -163,14 +176,14 @@ export default function SignupForm({
         {liveMessage}
       </p>
 
-      {state.kind === 'success' ? (
+      {state.kind === 'success' && state.origin === 'initial' ? (
         <div className="max-w-md">
           <p ref={successHeadingRef} tabIndex={-1} className="text-lg font-medium focus:outline-none">
             {d.successTitle}
           </p>
           <p className="mt-2 text-sm text-mute">{d.successBody}</p>
         </div>
-      ) : (
+      ) : state.kind === 'success' ? null : (
         <form
           method="POST"
           action="/api/subscribe"
