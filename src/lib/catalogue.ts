@@ -19,6 +19,28 @@ export const SLUGS: Record<string, Record<Locale, string>> = {
 }
 
 /**
+ * The parent SKU of a product: the prefix every one of its own variant SKUs
+ * extends (`NA-LS01` → `NA-LS01-CLA-M` and the thirteen others).
+ *
+ * Keyed by product id like SLUGS above, and read by `variants()` below
+ * rather than passed in beside the id, so the prefix the real SKUs are
+ * built from and the one `ProductView.astro` publishes as the product's
+ * structured-data identifier are the same string by construction — a
+ * renamed SKU scheme can't leave a stale identifier behind in the JSON-LD.
+ * `test/catalogue.test.ts` pins the prefix relation itself.
+ */
+const SKU_BASE: Record<string, string> = {
+  'ls-01': 'NA-LS01',
+}
+
+/** Throws rather than returning undefined — same rule as `featuredProduct`. */
+export function skuBaseFor(id: string): string {
+  const base = SKU_BASE[id]
+  if (!base) throw new Error(`no SKU base for ${id}`)
+  return base
+}
+
+/**
  * Copy, minus the price.
  *
  * There is no price in this file at all — `PLACEHOLDER_PRICE_CENTS` used to
@@ -70,7 +92,8 @@ const FIT_NAMES: Record<Locale, Record<FitId, string>> = {
  * from a (fit, size) selection without re-deriving the id scheme in a second
  * file.
  */
-function variants(productId: string, skuBase: string, locale: Locale): CatalogueVariant[] {
+function variants(productId: string, locale: Locale): CatalogueVariant[] {
+  const skuBase = skuBaseFor(productId)
   return FIT_IDS.flatMap((fit) =>
     SIZES.map((size) => ({
       id: `${productId}-${fit}-${size.toLowerCase()}`,
@@ -160,7 +183,7 @@ export const CATALOGUE: Record<Locale, CatalogueProduct[]> = {
       description:
         'Un chandail à manches longues en laine mérinos et modal, conçu au Québec et fabriqué en Chine.',
       images: allImagePaths(),
-      variants: variants('ls-01', 'NA-LS01', 'fr-CA'),
+      variants: variants('ls-01', 'fr-CA'),
     },
   ],
   'en-CA': [
@@ -172,7 +195,7 @@ export const CATALOGUE: Record<Locale, CatalogueProduct[]> = {
       description:
         'A long sleeve in merino wool and modal, designed in Quebec and made in China.',
       images: allImagePaths(),
-      variants: variants('ls-01', 'NA-LS01', 'en-CA'),
+      variants: variants('ls-01', 'en-CA'),
     },
   ],
 }
