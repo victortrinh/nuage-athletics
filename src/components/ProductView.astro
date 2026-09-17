@@ -4,7 +4,15 @@ import ProductDetails from './ProductDetails.astro'
 import { fmt, t } from '../i18n/ui'
 import { HTML_LANG, type Locale } from '../i18n/config'
 import { organizationId } from '../lib/brand'
-import { editorialFor, featuredProduct, formatPrice, DEFAULT_FIT, FIT_IDS, type FitId } from '../lib/catalogue'
+import {
+  editorialFor,
+  featuredProduct,
+  formatPrice,
+  skuBaseFor,
+  DEFAULT_FIT,
+  FIT_IDS,
+  type FitId,
+} from '../lib/catalogue'
 import type { Product } from '../lib/commerce/types'
 import { route } from '../i18n/utils'
 
@@ -87,6 +95,23 @@ const jsonLd = live
       url: productUrl,
       name: product.name,
       description: product.description,
+      /**
+       * Google's Merchant listing rules want a product identifier — `gtin`
+       * first, `mpn`/`sku` otherwise. `sku` is the one this site can state
+       * truthfully: it is the join key Shopify is already read by
+       * (`INVENTORY_QUERY` in src/lib/commerce/shopify.ts), so a SKU here is
+       * a SKU the store answered to. A GTIN would be Shopify's `barcode`,
+       * which nothing in this repo reads or sets — if one is ever assigned,
+       * check whether the Storefront API exposes it before planning on it.
+       *
+       * The parent SKU rather than a variant's, because this page makes one
+       * `Offer` covering all fourteen — publishing `NA-LS01-CLA-M` here
+       * would say the page *is* the classic medium. It comes from the same
+       * constant those fourteen SKUs are built from (`skuBaseFor` in
+       * catalogue.ts), so it cannot drift into naming something Shopify has
+       * never heard of.
+       */
+      sku: skuBaseFor(product.id),
       image: product.images.map((src) => new URL(src, Astro.site).href),
       /**
        * A reference, not a copy — but with `@type` repeated inline. This used
@@ -115,6 +140,14 @@ const jsonLd = live
       inLanguage: HTML_LANG[locale],
       offers: {
         '@type': 'Offer',
+        /**
+         * Recommended by Google's Merchant listing rules, and free of any
+         * claim this brand can't make good on: there is no used or
+         * refurbished channel to sell through. An Offer that omits it is
+         * assumed new anyway, so this states the default rather than
+         * changing it — it just stops a shopping engine having to assume.
+         */
+        itemCondition: 'https://schema.org/NewCondition',
         priceCurrency: live.price.currency,
         price: (live.price.amount / 100).toFixed(2),
         // Real availability, not a constant: a drop that has sold through
