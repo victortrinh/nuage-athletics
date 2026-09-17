@@ -87,7 +87,7 @@ const WORDMARK_HEIGHT = 29
  * blocked until a recipient explicitly loads them, so most opens see this,
  * not the picture.
  */
-const OUTER_BG = '#0d0d0d'
+export const OUTER_BG = '#0d0d0d'
 /** Absolute path to the committed sky asset. See scripts/email-sky-bg.mjs. */
 export const SKY_BG_PATH = '/img/email-sky.png'
 

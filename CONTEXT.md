@@ -83,6 +83,12 @@ answers "may this request see prices," combining both.
   recovery email, now on since the footer has a real address) and its
   policy slots filled to mirror the rewritten pages, now including the
   `retours.astro` / `livraison.astro` pages #47 shipped (#66).
+- Shopify's own customer notifications (order confirmation, shipping,
+  abandoned checkout — #91) pasted into Settings → Notifications from
+  `shopify/notifications/` and "Send test"-verified in both locales
+  (`shopify/notifications/README.md`). Generated from `shopify/src/`;
+  there's no API for notification template content, so this is a manual
+  step no code path can flip for you.
 - `#90`'s checkout-return fix verified on the paid-plan store.
 
 ADR-0001's incorporation and ADR-0003's dealer-ID requirement are **not**
