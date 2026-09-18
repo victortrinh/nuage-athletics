@@ -239,7 +239,38 @@ of us to see the real buy flow on the real site before it opens.
   address in the footer is Shopify's own `{{ shop.address.summary }}`, on
   purpose — same reason `src/lib/consent.ts` keeps no address constant
   (ADR-0007): this repo is public. French is the locale prelude's `else`
-  branch, not English, matching non-negotiable #1.
+  branch, not English, matching non-negotiable #1. A template may ship
+  *no* subject (`NotificationTemplate.subject` is optional) — only
+  `contact-customer` does, because that notification's subject is typed
+  per message in the admin dialog and generating one would replace what
+  was typed. Which notifications are deliberately **not** generated
+  (returns, customer accounts, pickup, gift cards, POS, payment retries)
+  is a table in that README, so a missing template reads as a decision;
+  the one operational consequence is that a refund must be issued from
+  the order page, not through Shopify's returns flow, or it fires
+  unbranded return mail instead of `order-refund`.
+- **What Shopify *prints* is a second, inverted family: `shopify/src/print/`
+  → `shopify/print/*.liquid`, via `npm run shopify:print` (`--check` also
+  wired into `npm run check`).** Today that's the packing slip, the one
+  branded thing that physically goes in the box. It is a separate generator
+  with a separate lint on purpose, because several of its rules are the
+  *inverse* of the notification ones: `PRINT_THEME` (`shopify/src/print/
+  theme.ts`) is ink on paper, not `EMAIL_THEME`'s always-dark, because
+  paper has no auto-inverting mail client and a dark sheet is just toner;
+  nothing paints a page background at all; there's a real `<style>` block
+  (a printed document needs `@page` and `page-break-inside`, neither of
+  which can be inlined); and an unsubscribe link or a CTA button is a lint
+  failure rather than a judgement call, because nothing on paper is
+  clickable. The lint rejects any `EMAIL_THEME` hex appearing in a print
+  document — that rule is what makes the split enforceable instead of a
+  convention. Its wordmark is its own asset too (`npm run print:wordmark`
+  → `public/img/wordmark-print.png`, dark lettering on a transparent
+  ground at ~575 dpi); the artwork is shared with the email one through
+  `scripts/lib/wordmark-art.mjs` so the mark itself is never transcribed
+  twice. **Shipping labels are not in this family and never will be** —
+  the artwork is the carrier's and Shopify only renders what Canada Post
+  returns, so there is no template, no logo slot and no colour to set
+  (#109). `shopify/print/README.md` is the runbook.
 - **`retours.astro` / `en/returns.astro` and `livraison.astro` /
   `en/shipping.astro` (#47) state nothing the pre-contract page
   (`informations-precontractuelles.astro` / `en/pre-contract-information.astro`)

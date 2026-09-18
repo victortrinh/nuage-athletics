@@ -7,7 +7,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "wrangler dev",
-    "check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json && bash scripts/check-guards.sh && node scripts/shopify-notifications.ts --check",
+    "check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json && bash scripts/check-guards.sh && node scripts/shopify-notifications.ts --check && node scripts/shopify-print.ts --check",
     "test": "vitest run",
     "test:a11y": "playwright test",
     "deploy": "astro build && wrangler deploy",
@@ -20,7 +20,9 @@
     "email:preview": "node scripts/email-preview.ts",
     "shopify:check": "node scripts/shopify-check.ts",
     "shopify:notifications": "node scripts/shopify-notifications.ts",
-    "email:wordmark": "node scripts/email-wordmark.mjs"
+    "email:wordmark": "node scripts/email-wordmark.mjs",
+    "shopify:print": "node scripts/shopify-print.ts",
+    "print:wordmark": "node scripts/print-wordmark.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.1.7",
