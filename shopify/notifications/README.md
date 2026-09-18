@@ -1,7 +1,7 @@
 # Shopify customer notification templates
 
 Custom Liquid for every customer-facing Shopify notification this drop
-needs (#91). **Generated** from `shopify/src/` by
+needs (#91, extended by #110). **Generated** from `shopify/src/` by
 `npm run shopify:notifications` — never hand-edit a `.liquid` file in this
 directory, edit the source under `shopify/src/` and regenerate. `npm run
 check` runs `shopify-notifications.ts --check` and fails if a committed
@@ -94,6 +94,48 @@ order they placed than on the page they placed it from.
 | `abandoned-checkout` | Abandoned checkout | `checkout.customer_locale` | **The only template with an unsubscribe link** (`unsubscribe_url`) — this is Shopify's one marketing notification in scope (#93's amendment: CASL implied-consent-via-inquiry covers it). Reuses `cartNoHold` verbatim from `src/i18n/ui.ts` so the site and the email say the same thing about holds. |
 | `order-cancelled` | Order cancelled | `order.customer_locale` | No cancellation reason shown (Shopify's `cancel_reason` is a code, not customer-facing wording). |
 | `order-refund` | Order refund | `order.customer_locale` | Uses `refund_line_items` / `amount` — **verify against the stock template**; naming here varies by Shopify API version. |
+| `order-invoice` | Order invoice | `order.customer_locale` | For orders that never came through the site (keyed in by hand, replacements). **Verify `invoice_url`** — an unpaid order's pay link is not `order_status_url` and Shopify's reference doesn't pin its name down. Also check whether the admin lists a separate "Draft order invoice" slot; if so it needs its own template. |
+| `order-edited` | Order edited | `order.customer_locale` | Prints the order's state *after* the edit, deliberately with no "what changed" delta — see the file's doc comment, and the open question below. |
+| `contact-customer` | Contact customer | `customer.locale` | The template behind an order's "Contact customer" action. **Body only — there is no `contact-customer.subject.liquid`**, because the admin dialog has its own Subject field typed per message. Leave Shopify's stock subject template in place. |
+
+## Notifications deliberately *not* generated
+
+Shopify's customer-notification list is much longer than this directory. Each
+omission below is a decision, so that a missing template reads as one rather
+than as an oversight (#110's inventory):
+
+| Not generated | Why |
+|---|---|
+| Return requested / approved / declined, return label instructions | Drop one has no returns — the policy is "email us" (ADR-0007). **See the operational note below.** |
+| Customer account invite / activation / welcome / password reset | Customer accounts are off (#93). |
+| Local order ready for pickup / picked up / local delivery | No pickup, no local delivery. Three templates if that ever changes. |
+| Gift card created | Not selling gift cards. |
+| POS and mobile receipt, exchange receipt, B2B company invites | No POS, no B2B. |
+| Payment error, pending payment / payment reminder | Offline and retry payment methods only; Shopify Payments captures up front. Revisit if a manual payment method is ever enabled. |
+| Fulfillment request / cancellation | Goes to a fulfillment service, not a customer. |
+
+### Operational note: refund, don't "return"
+
+A refund issued **from the order page** fires `order-refund`, which is
+branded. A refund issued through Shopify's **returns flow** fires the return
+notifications instead, which are not in this directory and will go out as
+stock Shopify. For drop one, refund from the order page.
+
+## Open questions
+
+- **`order-edited`'s delta.** Shopify exposes the edit's added/removed lines
+  to that template, but under names its own variable reference doesn't pin
+  down and which have moved between API versions. The template prints the
+  order's resulting state instead. If the stock template turns out to carry a
+  reliable delta collection, adding a "what changed" block is a small change
+  to `shopify/src/templates/order-edited.ts`.
+- **`order-invoice`'s pay link.** `{{ invoice_url }}` is guarded, so a wrong
+  name renders no button rather than a dead one — but an invoice with no way
+  to pay it is still broken. This is the single most important field to check
+  against the stock template.
+- **A separate "Draft order invoice" slot.** If the admin lists one, it is its
+  own notification with its own stock template, not `order-invoice` pasted
+  twice.
 
 ## End-to-end verification (part of #93's own acceptance)
 
@@ -111,4 +153,8 @@ order they placed than on the page they placed it from.
 - Store address, abandoned-checkout toggle, sender DKIM: **#93**.
 - Refund/Shipping/Privacy/Terms/Contact policy slots (a different surface —
   Shopify's own policy pages, not these notifications): **#66**.
+- Printed documents (the packing slip) — a different medium with an inverted
+  palette and its own lint: `shopify/print/README.md`.
+- The full inventory of Shopify branding surfaces, including the ones that
+  aren't code: **#110**.
 - `ADR-0007`: why the address is a secret, not a constant.

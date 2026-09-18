@@ -1,0 +1,5 @@
+{%- assign na_lang = order.customer_locale | default: checkout.customer_locale | default: customer.locale | default: 'fr' -%}
+{%- assign na_lang2 = na_lang | slice: 0, 2 | downcase -%}
+{%- assign en = false -%}
+{%- if na_lang2 == 'en' -%}{%- assign en = true -%}{%- endif -%}
+{% if en %}Invoice for your order {{ order_name }}{% else %}Facture pour votre commande {{ order_name }}{% endif %}

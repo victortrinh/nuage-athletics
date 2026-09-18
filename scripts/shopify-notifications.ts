@@ -34,7 +34,10 @@ function outputs(): { path: string; content: string }[] {
   const files: { path: string; content: string }[] = []
   for (const tpl of NOTIFICATION_TEMPLATES) {
     files.push({ path: resolve(OUT_DIR, `${tpl.file}.liquid`), content: tpl.html })
-    files.push({ path: resolve(OUT_DIR, `${tpl.file}.subject.liquid`), content: tpl.subject })
+    // A template may deliberately ship no subject — see NotificationTemplate.
+    if (tpl.subject !== undefined) {
+      files.push({ path: resolve(OUT_DIR, `${tpl.file}.subject.liquid`), content: tpl.subject })
+    }
   }
   return files
 }
@@ -186,14 +189,25 @@ async function runPreview() {
       fulfillment,
       fulfillment_event: { message: 'Retard signalé par le transporteur.' },
       url: 'https://nuage-athletics-dev.myshopify.com/checkouts/abc123',
+      // contact-customer / order-invoice: the message typed in the admin
+      // dialog, and an unpaid order's payment link.
+      custom_message:
+        customerLocale === 'en'
+          ? 'Your parcel went out this morning.\n\nCanada Post has it now — tracking below.'
+          : 'Votre colis est parti ce matin.\n\nPostes Canada l’a maintenant — suivi ci-dessous.',
+      invoice_url: 'https://nuage-athletics-dev.myshopify.com/invoices/abc123',
       unsubscribe_url: 'https://nuage-athletics-dev.myshopify.com/unsubscribe/abc123',
       shop: { address: { summary: '123 Rue Test, Montréal QC H2X 1Y4' } },
     }
     for (const tpl of NOTIFICATION_TEMPLATES) {
       const html = await engine.parseAndRender(tpl.html, ctx)
-      const subject = await engine.parseAndRender(tpl.subject, ctx)
+      const subject = tpl.subject === undefined ? null : await engine.parseAndRender(tpl.subject, ctx)
       const out = resolve(PREVIEW_DIR, `${tpl.file}.${locale}.html`)
-      writeFileSync(out, `<!-- Subject: ${subject.trim()} -->\n${html}`)
+      const header =
+        subject === null
+          ? '<!-- Subject: (Shopify\'s own, typed per message — not generated) -->'
+          : `<!-- Subject: ${subject.trim()} -->`
+      writeFileSync(out, `${header}\n${html}`)
     }
   }
   console.log(`Preview HTML written to ${PREVIEW_DIR.replace(REPO_ROOT + '/', '')}/`)
