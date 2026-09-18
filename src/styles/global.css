@@ -329,6 +329,17 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
  * canvas under the glass at all. A lighter blur lets more of the cloud
  * shapes read through without giving up legibility.
  *
+ * The tint itself is 5% transparency — rgb(250 250 250 / 95%), the same
+ * alpha in both branches, so the band reads as paper with only a trace of
+ * the sky in it rather than as glass. That is deliberately most of the way
+ * to opaque: the blur stays anyway, because the little that does come
+ * through should arrive defocused rather than as a sharp moving canvas,
+ * and because dropping it would change what @supports and the
+ * prefers-reduced-transparency / forced-colors branches below are here to
+ * guard. Both branches carry one number on purpose — a blurred ground and
+ * a gradient one that disagreed about how see-through the band is would be
+ * two different bands depending on whether backdrop-filter exists.
+ *
  * @supports guards the blur: Firefox for Android and some older WebViews
  * don't implement backdrop-filter. Those fall back to header-veil's own
  * device (global.css), mirrored — solid at the bottom, fading to transparent
@@ -352,10 +363,10 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
  * This order is what keeps both properties in the compiled output.
  */
 @utility prompt-veil {
-  background-color: rgb(250 250 250 / 90%);
+  background-color: rgb(250 250 250 / 95%);
   background-image: linear-gradient(to bottom, transparent, var(--color-paper) 30%);
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    background-color: rgb(250 250 250 / 72%);
+    background-color: rgb(250 250 250 / 95%);
     background-image: none;
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
