@@ -329,14 +329,28 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
  * canvas under the glass at all. A lighter blur lets more of the cloud
  * shapes read through without giving up legibility.
  *
- * @supports guards the blur: Firefox for Android and some older WebViews
- * don't implement backdrop-filter. Those fall back to header-veil's own
- * device (global.css), mirrored — solid at the bottom, fading to transparent
- * toward the top — which is legible without ever blurring anything.
+ * The tint is 5% opaque — rgb(250 250 250 / 5%). Nearly all of the
+ * separation is therefore the blur, not the fill: this is glass, and what
+ * the band mostly shows is the sky behind it. That is a deliberate choice
+ * and it costs something real. Text here sits on a defocused cloud field
+ * rather than on paper, so its contrast is whatever the sky happens to be
+ * under it at that moment — it is not a ratio this stylesheet can promise.
+ * The two branches below are what keep that from reaching anyone who has
+ * said they don't want it.
+ *
+ * There is deliberately no gradient fallback any more. The old one
+ * (header-veil's device, mirrored: solid at the bottom, fading out toward
+ * the top) existed so browsers without backdrop-filter — Firefox for
+ * Android, some older WebViews — got a legible band without blurring
+ * anything. Kept alongside a 5% fill it would have painted those browsers
+ * a nearly solid band while everyone else saw through it, which is a
+ * different design, not a fallback. So @supports now adds only the blur,
+ * and a browser without it gets the same 5% tint, unblurred.
  *
  * prefers-reduced-transparency asks for exactly what it says: a ground you
- * can't partly see through. forced-colors drops the blur and tint
- * altogether — Canvas/CanvasText plus a real border are what makes the band
+ * can't partly see through, and it is the one branch that still paints
+ * solid paper. forced-colors drops the blur and tint altogether —
+ * Canvas/CanvasText plus a real border are what makes the band
  * read as a distinct surface there, same reasoning as the nav drawer panel's
  * own forced-colors:border-[CanvasText]; that border is specific to forced-
  * colors mode; the normal state stays true to the reference and has none.
@@ -352,23 +366,18 @@ button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
  * This order is what keeps both properties in the compiled output.
  */
 @utility prompt-veil {
-  background-color: rgb(250 250 250 / 90%);
-  background-image: linear-gradient(to bottom, transparent, var(--color-paper) 30%);
+  background-color: rgb(250 250 250 / 5%);
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    background-color: rgb(250 250 250 / 72%);
-    background-image: none;
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
   }
   @media (prefers-reduced-transparency: reduce) {
     background-color: var(--color-paper);
-    background-image: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
   @media (forced-colors: active) {
     background-color: Canvas;
-    background-image: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     border-top: 1px solid CanvasText;

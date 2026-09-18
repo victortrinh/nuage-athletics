@@ -53,35 +53,57 @@ const { locale, d, redirectTo, initialOpen, initialSuccess, initialErrorCode } =
   aria-labelledby="signup-prompt-label"
   class="prompt-veil fixed inset-x-0 bottom-0 z-50"
 >
-  <div class="mx-auto max-w-7xl px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:px-10">
-    <div class="mx-auto max-w-md">
-      <div class="flex items-start justify-between gap-4">
+  {/*
+    Padding on the outside, max-w-7xl on the inner div — the header's and
+    footer's arrangement, not main's (which carries both on one element and
+    so sits 40px narrower once the cap binds). Only the close button can
+    tell the difference: everything else in the band lives in the centred
+    max-w-md column below, so this wrapper's own width governs nothing but
+    where that button lands.
+  */}
+  <div class="px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:px-10">
+    <div class="relative mx-auto max-w-7xl">
+      {/*
+        Pinned to the full-width row rather than sitting in the max-w-md
+        column with the label, so it lands on the site's own right gutter,
+        directly under the header's locale link, instead of floating in from
+        the middle of the band. Below the cap the column already fills that
+        width, so on a phone this is where it was anyway and nothing moves.
+
+        -top-2/-right-2 is the -mt-2/-mr-2 it used to carry as a flex child:
+        the 32px box overhangs the content edge by 8px so the glyph inside
+        it, not the padding around it, optically aligns with the gutter.
+
+        First in the DOM, ahead of the form, so tab order is unchanged by the
+        move — the label it used to share a row with was never focusable.
+      */}
+      <button
+        type="button"
+        id="signup-prompt-close"
+        aria-label={d.promptClose}
+        class={cn(
+          buttonVariants({ variant: 'quiet' }),
+          'absolute -top-2 -right-2 flex size-8 items-center justify-center'
+        )}
+      >
+        <NavIcon variant="close" />
+      </button>
+      <div class="mx-auto max-w-md">
         <p id="signup-prompt-label" class="text-[11px] uppercase tracking-label text-mute">
           {d.promptLabel}
         </p>
-        <button
-          type="button"
-          id="signup-prompt-close"
-          aria-label={d.promptClose}
-          class={cn(
-            buttonVariants({ variant: 'quiet' }),
-            'flex size-8 shrink-0 items-center justify-center -mt-2 -mr-2'
-          )}
-        >
-          <NavIcon variant="close" />
-        </button>
-      </div>
-      <div class="mt-4">
-        <SignupForm
-          client:visible
-          {locale}
-          {d}
-          source="popup"
-          idPrefix="signup-prompt"
-          {redirectTo}
-          {initialErrorCode}
-          {initialSuccess}
-        />
+        <div class="mt-4">
+          <SignupForm
+            client:visible
+            {locale}
+            {d}
+            source="popup"
+            idPrefix="signup-prompt"
+            {redirectTo}
+            {initialErrorCode}
+            {initialSuccess}
+          />
+        </div>
       </div>
     </div>
   </div>
