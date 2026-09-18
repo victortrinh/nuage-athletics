@@ -130,3 +130,22 @@ export function paragraph(fr: string, en: string): string {
 export function smallPrint(fr: string, en: string): string {
   return SMALL(t(fr, en))
 }
+
+/**
+ * A paragraph whose content is not a translatable string.
+ *
+ * `paragraph()` takes both locales because every string this codebase writes
+ * must exist in both (non-negotiable #2, and `t()`'s signature enforces it).
+ * That rule is about copy *we* author. It does not describe a Liquid
+ * interpolation whose value is supplied at send time and is already in
+ * whatever language its author used — `{{ custom_message }}`, typed into the
+ * admin by a human addressing one customer. Running that through `t()` would
+ * emit the identical string in both branches, which reads like a translation
+ * that was never done rather than content that has no translation to do.
+ *
+ * Use this only for that: interpolated, send-time content. Anything we wrote
+ * goes through `paragraph()`.
+ */
+export function rawParagraph(html: string): string {
+  return P(html)
+}

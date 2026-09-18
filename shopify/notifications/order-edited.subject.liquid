@@ -1,0 +1,5 @@
+{%- assign na_lang = order.customer_locale | default: checkout.customer_locale | default: customer.locale | default: 'fr' -%}
+{%- assign na_lang2 = na_lang | slice: 0, 2 | downcase -%}
+{%- assign en = false -%}
+{%- if na_lang2 == 'en' -%}{%- assign en = true -%}{%- endif -%}
+{% if en %}Your order {{ order_name }} was updated{% else %}Votre commande {{ order_name }} a été modifiée{% endif %}

@@ -88,6 +88,9 @@ Then point DNS at the Worker. **Adding the web records does not touch MX** —
 | `npm run shopify:check` | ask the Storefront API what the site asks it, and print why the product page has a price or hasn't |
 | `npm run email:preview` | render every outbound email to `tmp/email-preview/` for eyeballing, no Resend account needed |
 | `npm run email:wordmark` | regenerate `public/img/wordmark-email.png` from `public/logo-nuage.svg` |
+| `npm run shopify:notifications` | generate `shopify/notifications/*.liquid` from `shopify/src/` (`-- --check` in CI, `-- --preview` to eyeball) |
+| `npm run shopify:print` | generate `shopify/print/*.liquid` from `shopify/src/print/` — the packing slip (`-- --check`, `-- --preview`) |
+| `npm run print:wordmark` | regenerate `public/img/wordmark-print.png` — the ink-on-paper mark for the packing slip |
 
 `astro check` is currently unusable: TypeScript 7 dropped the programmatic API the
 Astro language server needs. `tsc --noEmit` covers the same ground for now.
