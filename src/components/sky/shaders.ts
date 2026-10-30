@@ -15,101 +15,6 @@ export const VERTEX = /* glsl */ `
 `
 
 /**
- * Fluid step: advects the previous frame's velocity + carve field, decays it
- * toward zero, and splats a new disturbance along the segment the pointer
- * travelled since the last frame. The splat adds a forward velocity impulse
- * plus a counter-rotating vortex pair either side of the path — the pair is
- * what makes the wake curl like a contrail instead of just smearing.
- *
- * Channels: rg = velocity (encoded 0..1, decode v*2-1), b = carve amount.
- * No pressure projection: for a decorative wisp field this reads convincingly
- * close to a real fluid solve at a fraction of the cost of Jacobi iterations.
- */
-export const FLUID_STEP = /* glsl */ `
-  precision highp float;
-  varying vec2 vUv;
-
-  uniform sampler2D uSource;
-  uniform float uDt;
-  uniform float uDissipation;
-  uniform float uAspect;
-
-  uniform vec2 uPointerPrev;
-  uniform vec2 uPointerCurr;
-  uniform float uPointerActive;
-  uniform float uSplatRadius;
-  uniform float uSplatStrength;
-
-  vec2 decodeVel(vec2 v) { return v * 2.0 - 1.0; }
-  vec2 encodeVel(vec2 v) { return clamp(v, -1.0, 1.0) * 0.5 + 0.5; }
-
-  void main() {
-    vec4 data = texture2D(uSource, vUv);
-    vec2 vel = decodeVel(data.rg);
-
-    vec2 backCoord = vUv - vel * uDt * 0.6;
-    vec4 advected = texture2D(uSource, clamp(backCoord, 0.0, 1.0));
-    vel = decodeVel(advected.rg);
-    float carve = advected.b;
-
-    vel *= uDissipation;
-    carve *= uDissipation;
-
-    if (uPointerActive > 0.5) {
-      vec2 p = vUv; p.x *= uAspect;
-      vec2 a = uPointerPrev; a.x *= uAspect;
-      vec2 b = uPointerCurr; b.x *= uAspect;
-      vec2 ab = b - a;
-      float abLen2 = max(dot(ab, ab), 1e-6);
-      float t = clamp(dot(p - a, ab) / abLen2, 0.0, 1.0);
-      vec2 proj = a + ab * t;
-      float dist = distance(p, proj);
-      float r = max(uSplatRadius, 1e-4);
-      // A moderately steep falloff (power ~2.5) gives a somewhat defined,
-      // plateau-topped cleared channel down the middle — reads as an actual
-      // cut/parting rather than a soft blurry smudge — without going so
-      // steep it shrinks the visible affected width down to nothing.
-      float rr = dist / r;
-      float falloff = exp(-pow(rr * rr, 1.25));
-
-      vec2 dir = normalize(ab + 1e-6);
-      vec2 perp = vec2(-dir.y, dir.x);
-      float across = dot(p - proj, perp);
-      float vortexFalloff = exp(-(across * across) / (r * r * 0.4));
-
-      vel += dir * falloff * uSplatStrength;
-      vel += perp * sign(across) * vortexFalloff * falloff * uSplatStrength * 1.7;
-      // A decisive clear-channel: the core of a real contrail reads as
-      // fully parted cloud, not a partial fade.
-      carve += falloff * 1.15;
-    }
-
-    carve = clamp(carve, 0.0, 1.0);
-    gl_FragColor = vec4(encodeVel(vel), carve, 1.0);
-  }
-`
-
-/**
- * Seeds a fluid target to its neutral state.
- *
- * This is not cosmetic. Velocity lives in rg as `v * 0.5 + 0.5`, so zero
- * velocity encodes to 0.5 — but a freshly allocated render target is
- * *zero*-filled, and 0.0 decodes back to -1.0. Left alone, every fluid
- * buffer therefore starts out claiming a full-magnitude (-1,-1) velocity
- * across the entire field, which the cloud pass reads as a position warp of
- * (-0.6,-0.6) — around a quarter of the screen — that then slides back to
- * true over the several seconds the bogus velocity takes to dissipate. That
- * was the diagonal sweep the whole sky appeared to perform on every page
- * load, and no amount of fading the canvas in could have hidden it.
- */
-export const FLUID_SEED = /* glsl */ `
-  precision highp float;
-  void main() {
-    gl_FragColor = vec4(0.5, 0.5, 0.0, 1.0);
-  }
-`
-
-/**
  * Cloud density field, built the way production volumetric-cloud shaders
  * build one: big smooth masses first, then *erode* their edges with fine
  * noise. Several other approaches were tried and rejected here — thresholded
@@ -134,15 +39,12 @@ export const FLUID_SEED = /* glsl */ `
  * A separate, cheap, low-frequency "placement" field decides which broad
  * regions lean cloudy at all, and feeds the first remap's threshold — so a
  * region the mask calls clear needs a very solid base reading to show any
- * cloud, and a region it calls cloudy shows nearly all of it. The wake
- * displaces the shape sample and subtracts density, both scaled by that
- * mask (evaluated at the plain screen position, so there's no feedback
- * loop) — a swipe through a clear gap still does nothing, since there's no
- * cloud there to cut.
+ * cloud, and a region it calls cloudy shows nearly all of it.
  *
- * Output is clamped so no pixel ever gets dark enough to threaten text
- * contrast against the ink foreground (measured: the deepest shadowed core
- * still clears AAA).
+ * This pass no longer paints anything a visitor sees. It runs at one texel
+ * per glyph cell and writes the deck's density into r, which GLYPH below
+ * reads to decide which character each cell gets — so the cloud *shapes*
+ * are exactly the ones this field always drew, they are just set in type.
  */
 export const CLOUD = /* glsl */ `
   precision highp float;
@@ -151,7 +53,6 @@ export const CLOUD = /* glsl */ `
   uniform sampler2D uNoise;
   uniform sampler2D uNoiseSharp;
   uniform sampler2D uNoiseShape;
-  uniform sampler2D uFluid;
   uniform float uTime;
   uniform float uAspect;
   uniform vec2 uOffset1;
@@ -159,9 +60,6 @@ export const CLOUD = /* glsl */ `
   uniform float uCoverage;
   uniform float uCoverageSoftness;
   uniform float uCoverageBite;
-  uniform float uDensityFloor;
-  uniform float uCloudMin;
-  uniform float uCloudMax;
 
   float n(vec2 p) { return texture2D(uNoise, fract(p)).r; }
   float nSharp(vec2 p) { return texture2D(uNoiseSharp, fract(p)).r; }
@@ -225,12 +123,7 @@ export const CLOUD = /* glsl */ `
     float placement = placementNoise(placementPos);
     float mask = smoothstep(uCoverage - uCoverageSoftness, uCoverage + uCoverageSoftness, placement);
 
-    // Only the velocity is read here. The wake's actual clearing cut is made
-    // in the blit pass instead, at full display resolution — see BLIT.
-    vec2 vel = texture2D(uFluid, vUv).rg * 2.0 - 1.0;
-
-    vec2 warp = vel * 0.6;
-    vec2 detailPos = auv * 1.5 + uOffset1 + warp;
+    vec2 detailPos = auv * 1.5 + uOffset1;
 
     // Coverage cut. uCoverageBite caps how much the mask is allowed to eat,
     // so a "clear" region thins to haze rather than to bare sky — the deck
@@ -241,57 +134,116 @@ export const CLOUD = /* glsl */ `
     // smooth blobs. Cores (shape near 1) are untouched; thin edges get eaten
     // into billowy, frayed wisps.
     float density = remapFloor(shape, erosionNoise(detailPos * 3.0) * 0.42);
-    // Every pixel keeps at least this much cloud, so the deck never opens to
-    // bare white anywhere.
-    density = uDensityFloor + (1.0 - uDensityFloor) * density;
-
-    // Self-shadow: compare against the un-eroded shape a short step toward
-    // the sun. Skipping erosion in this second sample costs three texture
-    // fetches less per pixel and is visually indistinguishable — the shading
-    // term is low-frequency anyway.
-    vec2 sunDir = normalize(vec2(0.35, 0.5)) * 0.09;
-    float shapeLit = remapFloor(baseShape(detailPos - sunDir), coverFloor);
-    float light = clamp((density - shapeLit) * 2.2 + 0.5, 0.0, 1.0);
-
-    float lum = mix(uCloudMax, uCloudMin, density);
-    // Volume shading. Scaled by density so it can't tint pixels that hold no
-    // cloud at all — the same class of bug that once leaked detail-shaped
-    // texture into clear sky. This is where the puffiness comes from: it
-    // darkens undersides without making the field as a whole any greyer,
-    // which is what "glaring" felt like when the flat tone was pushed instead.
-    lum *= 1.0 - density * 0.18 * (1.0 - light);
-    lum = clamp(lum, uCloudMin - 0.18, uCloudMax);
-
-    gl_FragColor = vec4(vec3(lum), 1.0);
+    // No density floor here any more: a floor put a little cloud in every
+    // *pixel* so the old deck never opened to bare white, but a glyph is a
+    // threshold, and a floor would set a dot in every cell of the page. The
+    // coverage bite above already keeps thin regions hazy rather than clear,
+    // which is what reads as light cloud once it is set in type.
+    gl_FragColor = vec4(density, 0.0, 0.0, 1.0);
   }
 `
 
 /**
- * Upsamples the low-res cloud render target to the display canvas, and cuts
- * the wake's clearing line while doing it.
+ * Sets the deck in type. Every screen pixel works out which grid cell it is
+ * in, reads that cell's density from CLOUD's one-texel-per-cell target, and
+ * draws one character from a ramp that runs light to heavy cloud — so the
+ * field is the same weather the deck always was, at the resolution of a
+ * monospace grid.
  *
- * The cut lives here rather than in the cloud pass for a resolution reason:
- * the cloud pass runs at a fraction of the display size, so a wake drawn
- * only a few pixels wide is thinner than one of its texels and dissolves
- * into nothing. This pass runs per display pixel, so the line stays crisp
- * however fine it gets. The velocity warp stays in the cloud pass — that
- * part *wants* to be soft and low-frequency.
+ * Two things move a cell's glyph and tone on top of the drift: ripples (a
+ * ring that spreads from a click and fades over uRippleLife seconds, with a
+ * weaker trailing crest, like water) and a soft halo round the pointer. Both
+ * push density *up*, so a ripple passing through clear sky raises a ring of
+ * light marks and one passing through cloud thickens it.
  *
- * uCarveLum is the haze tone the deck thins to, never bare white: a swipe
- * parts the cloud, it doesn't punch a hole through to nothing. Cutting
- * toward max() also means the line can only ever lighten, so it can't leave
- * a dark seam where it crosses sky already lighter than that tone.
+ * The atlas holds every glyph twice: row 0 crisp, row 1 drawn with a blur,
+ * which is the glow. Greys only — mute at rest, darkening toward ink with a
+ * soft grey haze at a ripple's crest. At rest a glyph tops out well under half opacity, so text
+ * set over the field is read against what is still mostly paper; uCalm
+ * fades the field further behind the few blocks of type that sit directly
+ * on it (`data-sky-calm`, read by engine.ts).
+ *
+ * Coordinates are CSS pixels with y down, so everything the engine passes
+ * in — pointer, ripples, calm boxes — comes straight from clientX/Y and
+ * getBoundingClientRect() with no conversion.
  */
-export const BLIT = /* glsl */ `
+export const GLYPH = /* glsl */ `
   precision highp float;
   varying vec2 vUv;
-  uniform sampler2D uTex;
-  uniform sampler2D uFluid;
-  uniform float uCarveLum;
+
+  uniform sampler2D uCloud;
+  uniform sampler2D uAtlas;
+  uniform vec2 uViewport;
+  uniform vec2 uGrid;
+  uniform float uCell;
+  uniform float uGlyphCount;
+  uniform float uTime;
+  uniform vec4 uRipples[8];
+  uniform float uRippleSpeed;
+  uniform float uRippleLife;
+  uniform float uRippleWidth;
+  uniform vec2 uPointer;
+  uniform vec4 uCalm[4];
+  uniform float uCalmCount;
+  uniform vec3 uPaper;
+  uniform vec3 uMute;
+  uniform vec3 uCrest;
+  uniform vec3 uGlow;
+
   void main() {
-    float lum = texture2D(uTex, vUv).r;
-    float carve = clamp(texture2D(uFluid, vUv).b, 0.0, 1.0);
-    lum = mix(lum, max(lum, uCarveLum), carve * 0.9);
-    gl_FragColor = vec4(vec3(lum), 1.0);
+    vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uViewport;
+    vec2 cell = floor(p / uCell);
+    vec2 local = fract(p / uCell);
+    vec2 c = (cell + 0.5) * uCell;
+
+    float density = texture2D(uCloud, vec2((cell.x + 0.5) / uGrid.x, 1.0 - (cell.y + 0.5) / uGrid.y)).r;
+
+    float rip = 0.0;
+    for (int i = 0; i < 8; i++) {
+      vec4 r = uRipples[i];
+      if (r.w <= 0.0) continue;
+      float age = uTime - r.z;
+      if (age < 0.0 || age > uRippleLife) continue;
+      float d = distance(c, r.xy);
+      float k = (d - age * uRippleSpeed) / uRippleWidth;
+      float ring = exp(-k * k) + 0.35 * exp(-(k + 2.2) * (k + 2.2));
+      rip += r.w * ring * pow(1.0 - age / uRippleLife, 1.6) / (1.0 + d / 900.0);
+    }
+
+    vec2 dp = c - uPointer;
+    float hover = exp(-dot(dp, dp) / 9800.0);
+
+    float quiet = 1.0;
+    for (int i = 0; i < 4; i++) {
+      if (float(i) >= uCalmCount) break;
+      vec4 z = uCalm[i];
+      vec2 q = (c - z.xy) / z.zw;
+      quiet = min(quiet, clamp((length(q) - 0.7) / 0.9, 0.08, 1.0));
+    }
+
+    // The deck's density bunches in the middle of its range (the coverage
+    // bite keeps thin regions hazy, cores sit near 1), which set in type
+    // read as one flat grey of dashes. Stretching it before picking a glyph
+    // gives haze its light marks, cores their heavy ones, and the shapes
+    // between them back.
+    float shaped = smoothstep(0.02, 0.8, density);
+    float cloud = clamp(shaped + rip * 0.5 + hover * 0.15, 0.0, 1.0);
+    float g = floor(cloud * (uGlyphCount - 0.01));
+    if (g < 0.5) {
+      gl_FragColor = vec4(uPaper, 1.0);
+      return;
+    }
+
+    float k = clamp((0.12 + cloud * 0.25 + rip * 0.85) * quiet, 0.0, 1.0);
+    vec3 col = mix(uMute, uCrest, smoothstep(0.3, 1.0, k));
+    float alpha = 0.10 + 0.9 * pow(k, 1.3);
+
+    vec2 auv = vec2((g + local.x) / uGlyphCount, local.y * 0.5);
+    float core = texture2D(uAtlas, auv).a;
+    float glow = texture2D(uAtlas, auv + vec2(0.0, 0.5)).a;
+
+    vec3 outc = mix(uPaper, uGlow, glow * smoothstep(0.35, 1.0, k) * 0.7);
+    outc = mix(outc, col, core * alpha);
+    gl_FragColor = vec4(outc, 1.0);
   }
 `

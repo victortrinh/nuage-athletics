@@ -176,14 +176,14 @@ body {
  * Overlapping soft masses over a vertical wash, all of it static — the
  * reduced-motion audience is the largest single group that ever sees this and
  * nothing here may move. Greyscale, and *grey masses on a white ground*
- * rather than the reverse, because that is what the shader it stands in for
- * does: CLOUD writes mix(uCloudMax, uCloudMin, density), so density reads
- * darker and clear sky is the near-white. Depth is matched to the same
- * source: the densest overlap here measures #d3d3d3 against uCloudMin's
- * #d1d1d1, so the fallback and the live deck put text on the same tone rather
- * than the fallback quietly being a lighter, blanker page. (That tone is
- * 3.7:1 under --color-mute, which the live sky is too — mute-on-sky is a
- * pre-existing site-wide question, not one this layer introduces.)
+ * rather than the reverse: the live sky is the same cloud deck set in type
+ * (sky/shaders.ts, CLOUD then GLYPH), heavy cloud as dense marks on paper,
+ * so this is that deck drawn in tone instead of in characters. It is not
+ * matched pixel-for-pixel any more — it can't be, one is glyphs and one is
+ * gradients — and it doesn't need to be for text: both put type on what is
+ * mostly paper. The densest overlap here, #d3d3d3, is 3.7:1 under
+ * --color-mute; mute-on-sky is a pre-existing site-wide question, not one
+ * this layer introduces.
  *
  * Stated here rather than as an inline arbitrary value for the same reason
  * header-veil is: nine stacked gradients don't survive Tailwind's bracket
@@ -205,7 +205,7 @@ body {
 }
 
 /* Anyone on prefers-contrast: more is already, by osPrefersNoMotion() in
-   sky/prefs.ts, someone who never sees the WebGL deck at all — this layer is
+   sky/prefs.ts, someone who never sees the WebGL sky at all — this layer is
    their entire background, permanently. They asked for contrast, so they get
    the plain ground and none of the modelling above. Not a nicety: the masses
    are what put a 3.7:1 tone under text that is otherwise read on paper. */

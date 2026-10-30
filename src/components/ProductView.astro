@@ -234,8 +234,13 @@ const jsonLd = live
           complete sentence, but neither sibling line in this h1 carries
           terminal punctuation, and reading three lines as one notice means
           matching that, not making tagline the odd one out.
+
+          `data-sky-calm` fades the glyph sky (sky/engine.ts) behind these
+          three lines: they sit alone in the middle of the field, set in the
+          same monospace as its glyphs, and without it a passing ripple
+          crosses the type at full strength.
         */}
-        <h1 class="font-mono text-xs uppercase leading-loose tracking-label">
+        <h1 data-sky-calm class="font-mono text-xs uppercase leading-loose tracking-label">
           {d.dropAnnounceFirst}
           <br />
           {d.tagline.replace(/\.$/, '')}
