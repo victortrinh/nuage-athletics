@@ -157,9 +157,8 @@ export const CLOUD = /* glsl */ `
  * light marks and one passing through cloud thickens it.
  *
  * The atlas holds every glyph twice: row 0 crisp, row 1 drawn with a blur,
- * which is the glow. Colour comes from the brand tokens alone — mute grey at
- * rest, rising through accent ink to the accent blue with that glow at a
- * ripple's crest. At rest a glyph tops out well under half opacity, so text
+ * which is the glow. Greys only — mute at rest, darkening toward ink with a
+ * soft grey haze at a ripple's crest. At rest a glyph tops out well under half opacity, so text
  * set over the field is read against what is still mostly paper; uCalm
  * fades the field further behind the few blocks of type that sit directly
  * on it (`data-sky-calm`, read by engine.ts).
@@ -188,8 +187,8 @@ export const GLYPH = /* glsl */ `
   uniform float uCalmCount;
   uniform vec3 uPaper;
   uniform vec3 uMute;
-  uniform vec3 uAccentInk;
-  uniform vec3 uAccent;
+  uniform vec3 uCrest;
+  uniform vec3 uGlow;
 
   void main() {
     vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uViewport;
@@ -236,14 +235,14 @@ export const GLYPH = /* glsl */ `
     }
 
     float k = clamp((0.12 + cloud * 0.25 + rip * 0.85) * quiet, 0.0, 1.0);
-    vec3 col = k < 0.5 ? mix(uMute, uAccentInk, k * 2.0) : mix(uAccentInk, uAccent, (k - 0.5) * 2.0);
+    vec3 col = mix(uMute, uCrest, smoothstep(0.3, 1.0, k));
     float alpha = 0.10 + 0.9 * pow(k, 1.3);
 
     vec2 auv = vec2((g + local.x) / uGlyphCount, local.y * 0.5);
     float core = texture2D(uAtlas, auv).a;
     float glow = texture2D(uAtlas, auv + vec2(0.0, 0.5)).a;
 
-    vec3 outc = mix(uPaper, uAccent, glow * smoothstep(0.35, 1.0, k) * 0.9);
+    vec3 outc = mix(uPaper, uGlow, glow * smoothstep(0.35, 1.0, k) * 0.7);
     outc = mix(outc, col, core * alpha);
     gl_FragColor = vec4(outc, 1.0);
   }

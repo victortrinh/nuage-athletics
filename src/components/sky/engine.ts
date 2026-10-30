@@ -74,11 +74,17 @@ const GLYPHS = ' ·.:-~=≈+*#'
 /** Side of one grid cell, in CSS pixels. */
 const CELL_PX = 12
 
-/** Brand tokens (global.css), as linear 0..1 RGB for the glyph pass. */
+/**
+ * The field's palette, as 0..1 RGB for the glyph pass — greys only, the
+ * same family as the cloud deck it replaced. An accent-blue glow at a
+ * ripple's crest was tried on the preview and swapped for grey. Paper and mute are the global.css tokens; the crest is mute
+ * halfway to ink; the glow is the brand grey the logo uses (too light for
+ * text, which is exactly why it suits a haze).
+ */
 const PAPER = rgb(0xfa, 0xfa, 0xfa)
 const MUTE = rgb(0x63, 0x69, 0x6e)
-const ACCENT_INK = rgb(0x3a, 0x5f, 0xd9)
-const ACCENT = rgb(0x4f, 0x7c, 0xff)
+const CREST = rgb(0x36, 0x39, 0x3c)
+const GLOW = rgb(0x9b, 0xa1, 0xa6)
 
 /** Most ripples alive at once — the shader loops over a fixed array this size. */
 const MAX_RIPPLES = 8
@@ -292,8 +298,8 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
       uCalmCount: { value: 0 },
       uPaper: { value: PAPER },
       uMute: { value: MUTE },
-      uAccentInk: { value: ACCENT_INK },
-      uAccent: { value: ACCENT },
+      uCrest: { value: CREST },
+      uGlow: { value: GLOW },
     },
   })
   const glyphMesh = new Mesh(gl, { geometry, program: glyphProgram })

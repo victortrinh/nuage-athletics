@@ -450,8 +450,9 @@ of us to see the real buy flow on the real site before it opens.
   What it draws is the cloud deck set in type (#121, after Claude desktop's
   "Landing Texture"): `CLOUD` computes the deck's density at one texel per
   12px cell, and `GLYPH` (`sky/shaders.ts`) picks each cell's character from
-  a light-to-heavy ramp, coloured from the brand tokens only. Clicks on the
-  page's background send out ripples, and there is a halo around the pointer.
+  a light-to-heavy ramp, in greys only (an accent-blue glow at a ripple's
+  crest was tried on the preview and swapped for grey). Clicks on the page's
+  background send out ripples, and there is a halo around the pointer.
   A press on a link, button or other control never ripples: that click should
   feel like the control, and the pause/resume test in `sky-motion.e2e.ts`
   samples the canvas right after clicking the toggle. A block of type that
