@@ -75,6 +75,8 @@ npm run deploy
 
 Then point DNS at the Worker. **Adding the web records does not touch MX** —
 `nuageathletics.com` mail runs on Zoho (Canadian data centre) and is independent.
+SPF, DKIM and DMARC for everything that sends as the domain (Zoho, Resend,
+Shopify) are in `docs/email-authentication.md`.
 
 ## Commands
 
