@@ -436,10 +436,9 @@ of us to see the real buy flow on the real site before it opens.
   canvas, dropping the GL context, recording `na-sky-gaveup`), and three rules
   keep that from reading as a broken site. The `sky-fallback` layer under the
   canvas (`global.css`) is a drawn overcast deck, not a wash — it is the whole
-  background for reduced-motion, forced-colors and no-WebGL2 visitors, and its
-  densest tone deliberately tracks the shader's own `CLOUD_MIN` so the two
-  read as the same weather; `prefers-contrast: more` flattens it to paper
-  instead. The give-up flag carries a timestamp and expires, so one bad minute
+  background for reduced-motion, forced-colors and no-WebGL2 visitors, and it
+  is the same cloud deck the live sky draws, in tone where the live one is in
+  type; `prefers-contrast: more` flattens it to paper instead. The give-up flag carries a timestamp and expires, so one bad minute
   can't retire the sky for a whole browsing session. And `Sky.astro` mirrors
   any non-running state into `#sky-toggle`'s label — *in memory only*, never
   through `setStoredPause()`, which would persist a runtime verdict as if the
@@ -447,6 +446,18 @@ of us to see the real buy flow on the real site before it opens.
   time each frame runs *past* budget, capped per frame: an average of raw
   frame times let one GC pause spend most of the allowance and cost the sky a
   tier on hardware that was never slow.
+
+  What it draws is the cloud deck set in type (#121, after Claude desktop's
+  "Landing Texture"): `CLOUD` computes the deck's density at one texel per
+  12px cell, and `GLYPH` (`sky/shaders.ts`) picks each cell's character from
+  a light-to-heavy ramp, coloured from the brand tokens only. Clicks on the
+  page's background send out ripples, and there is a halo around the pointer.
+  A press on a link, button or other control never ripples: that click should
+  feel like the control, and the pause/resume test in `sky-motion.e2e.ts`
+  samples the canvas right after clicking the toggle. A block of type that
+  sits alone in the field carries `data-sky-calm`, which fades the glyphs
+  behind it. The engine reads at most four, every frame, so don't put it on
+  ordinary body copy.
 
 ## Component library
 

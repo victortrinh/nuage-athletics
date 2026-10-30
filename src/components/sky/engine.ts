@@ -1,6 +1,6 @@
 import { Renderer, Program, Mesh, Triangle, RenderTarget, Texture } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
-import { BLIT, CLOUD, FLUID_SEED, FLUID_STEP, VERTEX } from './shaders'
+import { CLOUD, GLYPH, VERTEX } from './shaders'
 import { buildNoiseTextures } from './noise'
 import { hasGivenUp, setGaveUp } from './prefs'
 
@@ -63,26 +63,53 @@ const SLOW_MS_TO_DEGRADE = 1000
  * to giving up rather than walking the remaining tiers. */
 const SLOW_MS_HARD_CEILING = 3000
 
-/** Grayscale range the cloud pass writes within. */
-const CLOUD_MIN = 0.82
-const CLOUD_MAX = 0.99
-/** Cloud kept in every pixel, so the deck never opens to bare white. */
-const DENSITY_FLOOR = 0.25
 /**
- * The tone a full-strength wake thins the deck to — exactly the luminance
- * the density floor alone produces, so a cut parts the cloud to haze and
- * stops there rather than punching through to white.
+ * The deck's density ramp, light cloud to heavy, one character per step.
+ * Index 0 is a space and is never drawn — clear sky is paper. Everything here
+ * is a plain text glyph rather than a symbol a platform might swap for an
+ * emoji, and each is in every system monospace stack the atlas falls back
+ * through.
  */
-const CARVE_LUM = CLOUD_MAX + (CLOUD_MIN - CLOUD_MAX) * DENSITY_FLOOR
+const GLYPHS = ' ·.:-~=≈+*#'
+/** Side of one grid cell, in CSS pixels. */
+const CELL_PX = 12
+
+/** Brand tokens (global.css), as linear 0..1 RGB for the glyph pass. */
+const PAPER = rgb(0xfa, 0xfa, 0xfa)
+const MUTE = rgb(0x63, 0x69, 0x6e)
+const ACCENT_INK = rgb(0x3a, 0x5f, 0xd9)
+const ACCENT = rgb(0x4f, 0x7c, 0xff)
+
+/** Most ripples alive at once — the shader loops over a fixed array this size. */
+const MAX_RIPPLES = 8
+/** How fast a ring travels outward, CSS px per second. */
+const RIPPLE_SPEED = 320
+/** Seconds a ripple takes to fade out entirely. */
+const RIPPLE_LIFE = 2.6
+/** Thickness of a ring's crest, CSS px. */
+const RIPPLE_WIDTH = 46
+/**
+ * Seconds between the ripples the field starts on its own, so it reads as
+ * weather rather than as a surface waiting for a click. The first is held
+ * back past this range's floor on purpose: nothing should appear to *start*
+ * as the page loads (see the drift note in renderField).
+ */
+const IDLE_RIPPLE_MIN_S = 3.5
+const IDLE_RIPPLE_SPREAD_S = 3.5
+const IDLE_RIPPLE_AMP = 0.55
+
+/** Most `data-sky-calm` boxes the shader fades the field behind. */
+const MAX_CALM = 4
 
 /**
- * Share of the wake (both the carve and the velocity driving it) still
- * present one second later — a twentieth. The visible trace is effectively
- * gone within about half a second of the pointer moving on, against roughly
- * 3.5s under the old fixed 0.986-per-step decay, so the cloud closes back
- * over behind the pointer instead of holding the mark.
+ * Clicking a control should feel like the control, not like the backdrop
+ * behind it, so a press on anything interactive raises no ripple.
  */
-const WAKE_RETENTION_PER_SEC = 0.05
+const NO_RIPPLE = 'a, button, input, label, select, textarea, summary, [role="button"], [contenteditable]'
+
+function rgb(r: number, g: number, b: number): [number, number, number] {
+  return [r / 255, g / 255, b / 255]
+}
 
 function isCoarsePointer(): boolean {
   try {
@@ -98,19 +125,16 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
   }
 
   const coarse = isCoarsePointer()
-  let cloudScale = coarse ? 0.4 : 0.55
-  const dprCap = coarse ? 1.0 : 1.5
-  let simHz = coarse ? 30 : 60
-  // The coarse-pointer sim already targets a lower rate by design (30Hz vs
-  // 60Hz), so judging it against the desktop frame budget would degrade
-  // touch devices that are running exactly as tuned.
+  // Type wants the display's real density to stay crisp — a glyph rendered
+  // at 1x and stretched to a 2x screen reads as soft grey fuzz. The field is
+  // one cheap pass (a texture read for the cell, two for its glyph), so full
+  // resolution costs far less here than the old cloud pass did at 0.55x.
+  let dpr = Math.min(window.devicePixelRatio || 1, 2)
+  // Touch devices render at a lower target rate by design, so judging them
+  // against the desktop frame budget would degrade them while running
+  // exactly as tuned.
+  let frameHz = coarse ? 30 : 60
   const slowFrameMs = coarse ? 30 : SLOW_FRAME_MS
-  // The wake can never be finer than one texel of this buffer. At the old
-  // 320 a single texel already covered ~5 screen px, which put a floor under
-  // how thin the streak could be drawn; 640 halves that so a genuinely
-  // hairline trail survives the sim. The step itself is two texture fetches
-  // per texel, so even quadrupled it stays a small fraction of the cloud pass.
-  let fluidBaseWidth = coarse ? 384 : 640
 
   let renderer: Renderer
   try {
@@ -124,7 +148,7 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
       // our render call and compositing, which also breaks any attempt to
       // read the canvas back (getImageData/drawImage) for testing.
       preserveDrawingBuffer: true,
-      dpr: Math.min(window.devicePixelRatio || 1, dprCap),
+      dpr,
       powerPreference: 'low-power',
     })
   } catch {
@@ -157,78 +181,67 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
   const noiseSharpTexture = new Texture(gl, { image: noiseData.placement, ...textureDefaults })
   const noiseShapeTexture = new Texture(gl, { image: noiseData.shape, ...textureDefaults })
 
-  let fluidA: RenderTarget
-  let fluidB: RenderTarget
-  let cloudTarget: RenderTarget
-  let fluidReadIsA = true
-
-  function makeFluidTarget(width: number, height: number): RenderTarget {
-    return new RenderTarget(gl, {
-      width,
-      height,
-      depth: false,
-      stencil: false,
-      wrapS: gl.CLAMP_TO_EDGE,
-      wrapT: gl.CLAMP_TO_EDGE,
-      minFilter: gl.LINEAR,
-      magFilter: gl.LINEAR,
-    })
+  /**
+   * Every glyph, drawn white on transparent at the exact device-pixel size
+   * of one cell: row 0 crisp, row 1 again with a blur round it (the glow).
+   * The shader reads only alpha, so the colour is decided there, from the
+   * brand tokens, rather than baked in. Rebuilt whenever dpr changes, since
+   * a cell's device size changes with it.
+   */
+  function buildAtlas(): HTMLCanvasElement {
+    const size = Math.max(1, Math.round(CELL_PX * dpr))
+    const atlas = document.createElement('canvas')
+    atlas.width = size * GLYPHS.length
+    atlas.height = size * 2
+    const ctx = atlas.getContext('2d')
+    if (!ctx) return atlas
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = `${Math.round(size * 0.72)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`
+    ctx.fillStyle = '#fff'
+    for (let g = 1; g < GLYPHS.length; g++) {
+      const x = g * size + size / 2
+      ctx.fillText(GLYPHS[g], x, size / 2)
+      ctx.shadowColor = '#fff'
+      ctx.shadowBlur = size * 0.6
+      ctx.fillText(GLYPHS[g], x, size * 1.5)
+      ctx.shadowBlur = 0
+    }
+    return atlas
   }
+  const atlasTexture = new Texture(gl, {
+    image: buildAtlas(),
+    generateMipmaps: false,
+    wrapS: gl.CLAMP_TO_EDGE,
+    wrapT: gl.CLAMP_TO_EDGE,
+    minFilter: gl.LINEAR,
+    magFilter: gl.LINEAR,
+    flipY: false,
+  })
 
-  function makeCloudTarget(width: number, height: number): RenderTarget {
-    return new RenderTarget(gl, {
-      width,
-      height,
+  let cloudTarget: RenderTarget
+  let cols = 1
+  let rows = 1
+
+  // One texel per glyph cell: the glyph pass reads each cell's density at
+  // its centre, so anything finer would be computed and thrown away.
+  function allocateTargets() {
+    cols = Math.max(1, Math.ceil(width / CELL_PX))
+    rows = Math.max(1, Math.ceil(height / CELL_PX))
+    cloudTarget = new RenderTarget(gl, {
+      width: cols,
+      height: rows,
       depth: false,
       stencil: false,
       wrapS: gl.CLAMP_TO_EDGE,
       wrapT: gl.CLAMP_TO_EDGE,
-      minFilter: gl.LINEAR,
-      magFilter: gl.LINEAR,
+      minFilter: gl.NEAREST,
+      magFilter: gl.NEAREST,
     })
   }
 
   let width = 1
   let height = 1
-  let fluidWidth = fluidBaseWidth
-  let fluidHeight = fluidBaseWidth
-
-  function allocateTargets() {
-    const aspect = width / height
-    fluidWidth = fluidBaseWidth
-    fluidHeight = Math.max(90, Math.round(fluidBaseWidth / aspect))
-    fluidA = makeFluidTarget(fluidWidth, fluidHeight)
-    fluidB = makeFluidTarget(fluidWidth, fluidHeight)
-    cloudTarget = makeCloudTarget(
-      Math.max(1, Math.round(width * cloudScale)),
-      Math.max(1, Math.round(height * cloudScale))
-    )
-    fluidReadIsA = true
-    // Both buffers must be written to their neutral encoding before anything
-    // samples them — see FLUID_SEED. A zero-filled target is not a still
-    // fluid, it is one moving diagonally at full speed.
-    renderer.render({ scene: seedMesh, target: fluidA })
-    renderer.render({ scene: seedMesh, target: fluidB })
-  }
-
-  const fluidProgram = new Program(gl, {
-    vertex: VERTEX,
-    fragment: FLUID_STEP,
-    uniforms: {
-      uSource: { value: null },
-      uDt: { value: 1 / 60 },
-      // Overwritten every step from WAKE_RETENTION_PER_SEC and the step's
-      // own duration — see stepFluid.
-      uDissipation: { value: 1 },
-      uAspect: { value: 1 },
-      uPointerPrev: { value: [0.5, 0.5] },
-      uPointerCurr: { value: [0.5, 0.5] },
-      uPointerActive: { value: 0 },
-      uSplatRadius: { value: 0.06 },
-      uSplatStrength: { value: 1.2 },
-    },
-  })
-  const fluidMesh = new Mesh(gl, { geometry, program: fluidProgram })
 
   const cloudProgram = new Program(gl, {
     vertex: VERTEX,
@@ -237,7 +250,6 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
       uNoise: { value: noiseTexture },
       uNoiseSharp: { value: noiseSharpTexture },
       uNoiseShape: { value: noiseShapeTexture },
-      uFluid: { value: null },
       uTime: { value: 0 },
       uAspect: { value: 1 },
       uOffset1: { value: [0, 0] },
@@ -247,43 +259,48 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
       // only decides where the deck runs thick versus thin.
       uCoverage: { value: 0.3 },
       uCoverageSoftness: { value: 0.14 },
-      // Together these are what guarantee no bare-white sky anywhere:
-      // uCoverageBite caps the mask's cut so thin regions stay hazy rather
-      // than going clear, and uDensityFloor puts a little cloud in every
-      // pixel regardless. Measured offline across four aspect ratios:
-      // exactly zero pixels at the flat-white ceiling, while the deck still
-      // reads as billowy structure rather than a flat grey wash.
+      // Caps the mask's cut so thin regions stay hazy rather than going
+      // clear — in type, the difference between a scatter of light marks and
+      // a hole in the page.
       uCoverageBite: { value: 0.5 },
-      uDensityFloor: { value: DENSITY_FLOOR },
-      // Raised from 0.72 — a calmer, softer grey floor. The old value read
-      // as glaring/harsh against the near-white sky; there's ample contrast
-      // margin against ink text to spare (was 19.3:1/11.35:1, both far past
-      // the 4.5:1 AA floor), so this trades some of that margin for comfort.
-      uCloudMin: { value: CLOUD_MIN },
-      uCloudMax: { value: CLOUD_MAX },
     },
   })
   const cloudMesh = new Mesh(gl, { geometry, program: cloudProgram })
 
-  const blitProgram = new Program(gl, {
+  // Plain arrays, not Float32Array: ogl resolves `uRipples[0]` by walking
+  // into the value with Array.isArray(), which a typed array fails — the
+  // uniform is then silently skipped and every ripple reads as zero.
+  const ripples: number[] = new Array(MAX_RIPPLES * 4).fill(0)
+  const calm: number[] = new Array(MAX_CALM * 4).fill(0)
+  const glyphProgram = new Program(gl, {
     vertex: VERTEX,
-    fragment: BLIT,
+    fragment: GLYPH,
     uniforms: {
-      uTex: { value: null },
-      uFluid: { value: null },
-      uCarveLum: { value: CARVE_LUM },
+      uCloud: { value: null },
+      uAtlas: { value: atlasTexture },
+      uViewport: { value: [1, 1] },
+      uGrid: { value: [1, 1] },
+      uCell: { value: CELL_PX },
+      uGlyphCount: { value: GLYPHS.length },
+      uTime: { value: 0 },
+      uRipples: { value: ripples },
+      uRippleSpeed: { value: RIPPLE_SPEED },
+      uRippleLife: { value: RIPPLE_LIFE },
+      uRippleWidth: { value: RIPPLE_WIDTH },
+      uPointer: { value: [-1e4, -1e4] },
+      uCalm: { value: calm },
+      uCalmCount: { value: 0 },
+      uPaper: { value: PAPER },
+      uMute: { value: MUTE },
+      uAccentInk: { value: ACCENT_INK },
+      uAccent: { value: ACCENT },
     },
   })
-  const blitMesh = new Mesh(gl, { geometry, program: blitProgram })
-
-  // Must exist before the first allocateTargets() call below, which seeds
-  // each freshly created fluid buffer with it.
-  const seedProgram = new Program(gl, { vertex: VERTEX, fragment: FLUID_SEED })
-  const seedMesh = new Mesh(gl, { geometry, program: seedProgram })
+  const glyphMesh = new Mesh(gl, { geometry, program: glyphProgram })
 
   // iOS Safari fires `resize` on every URL-bar collapse/expand: a
   // height-only delta of roughly 60-90px with the width unchanged.
-  // Reallocating every fluid render target for that is what makes the sky
+  // Reallocating the cell grid for that is what makes the sky
   // stutter mid-scroll, so a height-only change under this threshold is
   // absorbed into the existing CSS box instead of triggering a reallocation.
   // An ~11% vertical stretch of an abstract cloud field is invisible; the
@@ -324,29 +341,59 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
   }
   window.addEventListener('resize', onResize)
 
-  let latestX = 0.5
-  let latestY = 0.5
-  let prevFrameX = 0.5
-  let prevFrameY = 0.5
-  let hasPointerPosition = false
-  let movedSinceLastFrame = false
-
+  // CSS pixels, y down, matching the glyph pass. Off-screen until the first
+  // real sample, so no halo sits in the middle of the page on load.
+  let pointerX = -1e4
+  let pointerY = -1e4
   function onPointerMove(e: PointerEvent) {
-    latestX = e.clientX / window.innerWidth
-    latestY = 1 - e.clientY / window.innerHeight
-    if (!hasPointerPosition) {
-      // Otherwise the very first pointer sample after mount computes a
-      // splat segment from the default center position to wherever the
-      // real cursor already was — reads as an unintended streak tearing
-      // across the sky the instant the page loads, before the visitor has
-      // moved the mouse at all.
-      prevFrameX = latestX
-      prevFrameY = latestY
-      hasPointerPosition = true
-    }
-    movedSinceLastFrame = true
+    if (e.pointerType === 'touch') return
+    pointerX = e.clientX
+    pointerY = e.clientY
+  }
+  function onPointerLeave() {
+    pointerX = -1e4
+    pointerY = -1e4
   }
   window.addEventListener('pointermove', onPointerMove, { passive: true })
+  document.documentElement.addEventListener('pointerleave', onPointerLeave)
+
+  let nextRipple = 0
+  function addRipple(x: number, y: number, amp: number) {
+    const o = nextRipple * 4
+    ripples[o] = x
+    ripples[o + 1] = y
+    // Stamped on the field's own clock, not wall time, so a ring frozen by
+    // a pause resumes where it stopped rather than having aged meanwhile.
+    ripples[o + 2] = clock
+    ripples[o + 3] = amp
+    nextRipple = (nextRipple + 1) % MAX_RIPPLES
+  }
+  function onPointerDown(e: PointerEvent) {
+    if (paused || !e.isPrimary || e.button > 0) return
+    if (e.target instanceof Element && e.target.closest(NO_RIPPLE)) return
+    addRipple(e.clientX, e.clientY, 1)
+  }
+  window.addEventListener('pointerdown', onPointerDown, { passive: true })
+
+  const calmEls = Array.from(document.querySelectorAll('[data-sky-calm]')).slice(0, MAX_CALM)
+  // Read every frame rather than on scroll: the canvas is fixed and the
+  // text scrolls under it, and two or three getBoundingClientRect() calls
+  // on a page with nothing dirtying layout cost less than keeping a scroll
+  // listener honest.
+  function readCalm() {
+    let n = 0
+    for (const el of calmEls) {
+      const r = el.getBoundingClientRect()
+      if (!r.width || r.bottom < 0 || r.top > height) continue
+      const o = n * 4
+      calm[o] = r.left + r.width / 2
+      calm[o + 1] = r.top + r.height / 2
+      calm[o + 2] = r.width / 2 + 40
+      calm[o + 3] = r.height / 2 + 32
+      n++
+    }
+    glyphProgram.uniforms.uCalmCount.value = n
+  }
 
   let paused = false
   let hidden = document.visibilityState === 'hidden'
@@ -362,7 +409,8 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
   let clock = 0
   let rafId: number | null = null
   let lastTime = performance.now()
-  let simAccumulator = 0
+  let frameAccumulator = 0
+  let nextIdleRipple = IDLE_RIPPLE_MIN_S + Math.random() * IDLE_RIPPLE_SPREAD_S
   /**
    * Shortest frame seen since mount — a read of how often the display
    * actually refreshes, since a frame can never come in under one vsync
@@ -380,22 +428,9 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
    * on the first frame back. */
   const STALL_MS = 500
 
-  // Shared by the visibility resume path and the stall guard in frame():
-  // the pointer listener keeps updating latestX/Y while nothing is
-  // stepping, so the first sim step after a gap would otherwise splat a
-  // streak from the stale prevFrameX/Y to wherever the cursor is now — the
-  // same failure mode the first-sample guard in onPointerMove exists to
-  // avoid, just triggered by a gap instead of a fresh mount.
-  function resyncPointer() {
-    prevFrameX = latestX
-    prevFrameY = latestY
-    movedSinceLastFrame = false
-  }
-
   function resync() {
     lastTime = performance.now()
-    simAccumulator = 0
-    resyncPointer()
+    frameAccumulator = 0
   }
 
   function degrade(hardCeiling: boolean) {
@@ -403,14 +438,18 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
     slowMs = 0
     if (hardCeiling || degradeTier > 2) {
       giveUp()
-    } else if (degradeTier === 1) {
-      cloudScale *= 0.7
-      // Give back the resolution the finer wake costs before giving up
-      // anything else — a slightly coarser streak beats a dropped frame.
-      fluidBaseWidth = Math.round(fluidBaseWidth * 0.7)
-      allocateTargets()
+    } else if (degradeTier === 1 && dpr > 1) {
+      // Give back resolution before anything else: slightly softer type
+      // beats a dropped frame. The grid itself is in CSS px and doesn't move.
+      dpr = 1
+      renderer.dpr = dpr
+      renderer.setSize(width, height)
+      canvas.style.width = ''
+      canvas.style.height = ''
+      atlasTexture.image = buildAtlas()
+      atlasTexture.needsUpdate = true
     } else {
-      simHz = Math.max(15, simHz / 2)
+      frameHz = Math.max(15, frameHz / 2)
     }
   }
 
@@ -445,9 +484,8 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
 
     if (rawDt * 1000 > STALL_MS) {
       // Treat this exactly like a fresh resume: don't judge the gap as slow
-      // frames, and don't let a stale pointer position draw a wake streak.
-      simAccumulator = 0
-      resyncPointer()
+      // frames.
+      frameAccumulator = 0
       scheduleFrame()
       return
     }
@@ -475,86 +513,54 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
       slowMs = Math.max(0, slowMs + overBudgetMs)
     }
 
-    simAccumulator += dt
-    const simDt = 1 / simHz
-    while (simAccumulator >= simDt) {
-      simAccumulator -= simDt
-      stepFluid(simDt)
-      if (simAccumulator > simDt * 4) simAccumulator = 0
+    // The field only needs redrawing at frameHz; on a faster display the
+    // spare vsyncs are skipped rather than spent repainting the same frame.
+    frameAccumulator += dt
+    const step = 1 / frameHz
+    if (frameAccumulator + 1e-4 < step) {
+      scheduleFrame()
+      return
     }
-
-    clock += dt
-    renderCloud(clock)
+    clock += frameAccumulator
+    frameAccumulator = 0
+    if (clock > nextIdleRipple) {
+      addRipple(Math.random() * width, Math.random() * height, IDLE_RIPPLE_AMP)
+      nextIdleRipple = clock + IDLE_RIPPLE_MIN_S + Math.random() * IDLE_RIPPLE_SPREAD_S
+    }
+    renderField(clock)
     scheduleFrame()
   }
 
-  function stepFluid(simDt: number) {
-    const read = fluidReadIsA ? fluidA : fluidB
-    const write = fluidReadIsA ? fluidB : fluidA
-
-    const dx = latestX - prevFrameX
-    const dy = latestY - prevFrameY
-    const dist = Math.hypot(dx, dy)
-    const speed = dist / Math.max(simDt, 1 / 240)
-
-    fluidProgram.uniforms.uSource.value = read.texture
-    fluidProgram.uniforms.uDt.value = simDt
-    fluidProgram.uniforms.uAspect.value = width / height
-    // Raised to a per-*second* rate rather than a fixed per-step factor: the
-    // sim runs at 60Hz normally, 30Hz on coarse pointers and as low as 15Hz
-    // after the degrade path steps in, and a per-step constant would make the
-    // wake linger two or four times as long on exactly the devices least able
-    // to carry it.
-    fluidProgram.uniforms.uDissipation.value = Math.pow(WAKE_RETENTION_PER_SEC, simDt)
-    fluidProgram.uniforms.uPointerPrev.value = [prevFrameX, prevFrameY]
-    fluidProgram.uniforms.uPointerCurr.value = [latestX, latestY]
-    fluidProgram.uniforms.uPointerActive.value = movedSinceLastFrame ? 1 : 0
-    // Radius is in the aspect-corrected space the splat is measured in,
-    // where one unit spans the viewport's *height* — so on a 950px-tall
-    // window 0.004 is a hair under 4px, and the visible mark (the falloff
-    // reaches ~0.37 at exactly this radius) lands around 6-10px wide
-    // depending on speed. Deliberately hairline: it should read as a wire
-    // drawn through the deck, not a swathe.
-    fluidProgram.uniforms.uSplatRadius.value = 0.005 + Math.min(speed * 0.0015, 0.003)
-    // Strength is left where it was. The impulse is what makes a mark this
-    // thin still register — a narrower splat carrying a weaker push would
-    // simply vanish into the cloud.
-    fluidProgram.uniforms.uSplatStrength.value = 1.0 + Math.min(speed * 1.5, 1.8)
-
-    renderer.render({ scene: fluidMesh, target: write })
-
-    prevFrameX = latestX
-    prevFrameY = latestY
-    movedSinceLastFrame = false
-    fluidReadIsA = !fluidReadIsA
-  }
-
-  function renderCloud(t: number) {
-    const fluidRead = fluidReadIsA ? fluidA : fluidB
-    cloudProgram.uniforms.uFluid.value = fluidRead.texture
+  function renderField(t: number) {
     cloudProgram.uniforms.uTime.value = t
     cloudProgram.uniforms.uAspect.value = width / height
     // Drift is deliberately constant from the first frame — no fade-in, no
     // ease-in ramp. Anything that changes over the first seconds after mount
     // reads as an animation playing at page load, which is exactly what this
     // background should not do: the clouds should simply already be there,
-    // drifting as slowly as they always will. The speed below is slow enough
-    // that nothing appears to "start".
-    cloudProgram.uniforms.uOffset1.value = [t * 0.008, t * 0.003]
+    // drifting as slowly as they always will. Faster than the old deck's
+    // 0.008: a cell is a coarse unit, and at the old speed a glyph changed
+    // so rarely the field read as static.
+    cloudProgram.uniforms.uOffset1.value = [t * 0.02, t * 0.006]
     // Placement samples at a much lower coordinate scale (~0.1) than the
     // detail layer, so the same drift speed would cross the whole field
     // far faster — keep it slow enough that clouds migrate gradually.
-    cloudProgram.uniforms.uMacroOffset.value = [t * 0.00025, t * 0.0001]
+    cloudProgram.uniforms.uMacroOffset.value = [t * 0.0006, t * 0.0002]
     renderer.render({ scene: cloudMesh, target: cloudTarget })
 
-    blitProgram.uniforms.uTex.value = cloudTarget.texture
-    blitProgram.uniforms.uFluid.value = fluidRead.texture
-    renderer.render({ scene: blitMesh })
+    readCalm()
+    const u = glyphProgram.uniforms
+    u.uCloud.value = cloudTarget.texture
+    u.uViewport.value = [width, height]
+    u.uGrid.value = [cols, rows]
+    u.uTime.value = t
+    u.uPointer.value = [pointerX, pointerY]
+    renderer.render({ scene: glyphMesh })
   }
 
   // Fade the canvas in once the first real frame has painted.
   requestAnimationFrame(() => {
-    renderCloud(clock)
+    renderField(clock)
     canvas.style.opacity = '1'
     lastTime = performance.now()
     scheduleFrame()
@@ -582,6 +588,8 @@ export function mountSky(canvas: HTMLCanvasElement, options: SkyOptions = {}): S
     stop()
     window.removeEventListener('resize', onResize)
     window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerdown', onPointerDown)
+    document.documentElement.removeEventListener('pointerleave', onPointerLeave)
     document.removeEventListener('visibilitychange', onVisibility)
     canvas.removeEventListener('webglcontextlost', onContextLost)
     canvas.removeEventListener('webglcontextrestored', onContextRestoredEvent)

@@ -1,8 +1,10 @@
 ---
-// Fixed full-page cloud background. Renders behind everything (z-[-10]) and
-// never intercepts pointer events — the pointer-tracking listeners the
-// engine attaches live on `window`, not the canvas, so the wake still
-// carves even though clicks pass straight through to the page underneath.
+// Fixed full-page cloud background — the cloud deck set as a field of
+// monospace glyphs (sky/engine.ts). Renders behind everything (z-[-10]) and
+// never intercepts pointer events — the pointer listeners the engine
+// attaches live on `window`, not the canvas, so the halo still follows the
+// cursor and a click on the page's background still sends a ripple out, even
+// though clicks pass straight through to the page underneath.
 // The `sky-fallback` div is both the pre-JS paint and the permanent fallback
 // for prefers-reduced-motion / low-power devices: the canvas only ever fades
 // in on top of it, so there's never a blank frame or a layout shift.

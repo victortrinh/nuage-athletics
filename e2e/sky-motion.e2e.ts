@@ -3,8 +3,8 @@ import AxeBuilder from '@axe-core/playwright'
 import { ROUTES } from '../src/i18n/utils'
 
 /**
- * The a11y project defaults to reducedMotion: 'reduce' so the sky's fluid
- * sim never mounts (see the comment in playwright.config.ts) — deterministic,
+ * The a11y project defaults to reducedMotion: 'reduce' so the sky's engine
+ * never mounts (see the comment in playwright.config.ts) — deterministic,
  * but it never exercises the toggle. This project runs with real motion
  * preferences to confirm the toggle actually appears and stays accessible
  * once the engine has a chance to load. Playwright's Chromium has WebGL2 via
